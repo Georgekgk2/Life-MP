@@ -14,7 +14,12 @@ eval "$(grep -E '^(DATABASE_URL|TEST_DATABASE_URL|MIGRATION_TEST_DATABASE_URL|RE
 
 export NODE_ENV="test"
 export ALLOW_SYNTHETIC_CATALOG="true"
-export DATABASE_URL="${TEST_DATABASE_URL:-}"
+
+# Explicitly map TEST_DATABASE_URL unless CI set a specific test database URL
+if [ -n "${TEST_DATABASE_URL:-}" ] && [[ "${DATABASE_URL:-}" != *"life_medusa_test"* ]]; then
+    export DATABASE_URL="${TEST_DATABASE_URL}"
+fi
+
 export REDIS_URL="${REDIS_URL:-}"
 export JWT_SECRET="${JWT_SECRET:-}"
 export COOKIE_SECRET="${COOKIE_SECRET:-}"
@@ -22,13 +27,15 @@ export STORE_CORS="${STORE_CORS:-}"
 export ADMIN_CORS="${ADMIN_CORS:-}"
 export AUTH_CORS="${AUTH_CORS:-}"
 
-# Explicit DB parameters for Medusa test runner
-export DB_HOST="localhost"
-export DB_PORT="54329"
-export DB_USERNAME="life_medusa_test"
-export DB_PASSWORD="life_medusa_test_password"
-export DB_NAME="life_medusa_test"
-export DB_WAITINGROOM_DATABASE="postgres"
+# Parse DATABASE_URL dynamically for Medusa test runner
+if [[ "$DATABASE_URL" =~ ^postgres(ql)?://([^:]+):([^@]+)@([^:/]+)(:([0-9]+))?/([^?]+) ]]; then
+    export DB_USERNAME="${BASH_REMATCH[2]}"
+    export DB_PASSWORD="${BASH_REMATCH[3]}"
+    export DB_HOST="${BASH_REMATCH[4]}"
+    export DB_PORT="${BASH_REMATCH[6]:-5432}"
+    export DB_NAME="${BASH_REMATCH[7]}"
+    export DB_WAITINGROOM_DATABASE="postgres"
+fi
 
 if [ -z "$DATABASE_URL" ]; then
     echo "ERROR: TEST_DATABASE_URL is required for commerce integration tests." >&2

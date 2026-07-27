@@ -72,6 +72,9 @@ medusaIntegrationTestRunner({
           "priceUah",
           "provider",
           "isSynthetic",
+          "verifiedVendorBadge",
+          "certifiedProductBadge",
+          "organicProductBadge",
         ]);
 
         const forbiddenInternalKeys = [
@@ -83,6 +86,14 @@ medusaIntegrationTestRunner({
           "vendor_members",
           "rationale",
           "documents",
+          "verifications",
+          "tax_identifier",
+          "legal_name",
+          "legal_address",
+          "reviewer_comment",
+          "notes",
+          "file_url",
+          "document_number",
           "created_at",
           "updated_at",
           "deleted_at",

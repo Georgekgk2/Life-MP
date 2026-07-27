@@ -1,5 +1,8 @@
 packages:
   - apps/*
   - packages/*
+allowBuilds:
+  # Static fixture prototype: no approved sharp build.
+  sharp: false
 minimumReleaseAgeExclude:
   - globals@17.8.0

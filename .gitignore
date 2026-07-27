@@ -24,6 +24,8 @@ Thumbs.db
 dist/
 build/
 *.egg-info/
+# TypeScript incremental build metadata
+*.tsbuildinfo
 
 # Next.js and Turborepo
 .next/

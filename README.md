@@ -1,6 +1,6 @@
 # Life-MP
 
-Life-MP — **непродукційна** технічна основа майбутньої платформи. У репозиторії є монорепозиторій, типізовані каркаси пакетів і локальні data-services; тут немає готового клієнтського застосунку, checkout, приймання платежів, відправлень, vendor onboarding або production-розгортання.
+Life-MP — **непродукційна** технічна основа майбутньої платформи. У репозиторії є монорепозиторій, типізовані каркаси пакетів, локальні data-services і локальний prototype storefront; тут немає готового комерційного застосунку, checkout, приймання платежів, відправлень, vendor onboarding або production-розгортання.
 
 > **Не заявляємо готовність production, staging, юридичних погоджень або комерційного запуску.** Межі запуску визначені документами нижче, а не наявністю каркасу коду.
 
@@ -30,6 +30,16 @@ pnpm build
 pnpm run ci
 ```
 
+## Локальний storefront prototype
+
+Після встановлення залежностей запустіть локальний некомерційний prototype:
+
+```bash
+pnpm --filter @life/storefront dev
+```
+
+Prototype доступний за адресою [http://127.0.0.1:3100](http://127.0.0.1:3100). Це лише локальна smoke-перевірка UI з fixture-даними, не staging і не production-сервіс; він не реалізує commerce-функції, checkout або платежі.
+
 Пояснення локального середовища, Compose і зупинки сервісів: [runbook локальної розробки](docs/runbooks/local-development.md). Інструкція для першого імпорту репозиторію та налаштування `main`/CI без виконання цих дій: [runbook початкового налаштування](docs/runbooks/repository-bootstrap.md).
 
 ## Поточна межа
@@ -37,7 +47,7 @@ pnpm run ci
 Реалізовано лише основу робочих просторів:
 
 - `@life/types` — спільна типізована основа;
-- `@life/storefront`, `@life/commerce`, `@life/cms` — каркаси пакетів без UI, CMS runtime, інтеграцій чи підключення до data-services;
+- `@life/storefront` — локальний fixture-only prototype для smoke-перевірки UI, не commerce-застосунок;
 - `@life/config` — типізовані метадані інструментів;
 - локальні PostgreSQL і Redis для майбутньої розробки; запуск прикладних сервісів не є частиною Compose.
 
@@ -55,7 +65,7 @@ pnpm run ci
 
 ```text
 apps/
-  storefront/   # @life/storefront: skeleton без UI/runtime
+  storefront/   # @life/storefront: локальний fixture-only prototype, не commerce runtime
   commerce/     # @life/commerce: skeleton; checkout/payment/shipping заблоковані
   cms/           # @life/cms: skeleton без CMS runtime
 packages/

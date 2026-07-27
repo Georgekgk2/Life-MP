@@ -49,7 +49,7 @@ test-integration: ## Запустити HTTP інтеграційні тести
 test-migrations: ## Запустити тести ідемпотентності міграцій commerce
 	pnpm run test:migrations
 test-fresh-state: ## Запустити повну перевірку з чистого стану Docker (down -v -> up -> migrate -> seed -> test)
-	@./scripts/test-fresh-state-repro.sh
+	@LIFE_ALLOW_DESTRUCTIVE_LOCAL_RESET=true ./scripts/test-fresh-state-repro.sh
 
 # =============================================================================
 # Кореневі pnpm-скрипти

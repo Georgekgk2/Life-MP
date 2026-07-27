@@ -5,18 +5,22 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 ENV_FILE="$ROOT_DIR/.env.example"
 
-if [ ! -f "$ENV_FILE" ]; then
-    echo "ERROR: .env.example file not found at $ENV_FILE" >&2
-    exit 1
-fi
+PRESET_MIGRATION_URL="${MIGRATION_TEST_DATABASE_URL:-${DATABASE_URL:-}}"
 
-eval "$(grep -E '^(TEST_DATABASE_URL|MIGRATION_TEST_DATABASE_URL|REDIS_URL|JWT_SECRET|COOKIE_SECRET|STORE_CORS|ADMIN_CORS|AUTH_CORS)=' "$ENV_FILE")"
+if [ -f "$ENV_FILE" ]; then
+    eval "$(grep -E '^(MIGRATION_TEST_DATABASE_URL|REDIS_URL|JWT_SECRET|COOKIE_SECRET|STORE_CORS|ADMIN_CORS|AUTH_CORS)=' "$ENV_FILE")"
+fi
 
 export NODE_ENV="test"
 export ALLOW_SYNTHETIC_CATALOG="true"
 
-# Explicitly map DATABASE_URL to MIGRATION_TEST_DATABASE_URL
-export DATABASE_URL="${MIGRATION_TEST_DATABASE_URL:-}"
+# Preserve environment-supplied MIGRATION_TEST_DATABASE_URL / DATABASE_URL if present (e.g. in CI)
+if [ -n "$PRESET_MIGRATION_URL" ]; then
+    export DATABASE_URL="$PRESET_MIGRATION_URL"
+    export MIGRATION_TEST_DATABASE_URL="$PRESET_MIGRATION_URL"
+else
+    export DATABASE_URL="${MIGRATION_TEST_DATABASE_URL:-}"
+fi
 
 export REDIS_URL="${REDIS_URL:-}"
 export JWT_SECRET="${JWT_SECRET:-}"

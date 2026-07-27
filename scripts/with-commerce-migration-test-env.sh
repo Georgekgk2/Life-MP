@@ -15,9 +15,9 @@ eval "$(grep -E '^(DATABASE_URL|TEST_DATABASE_URL|MIGRATION_TEST_DATABASE_URL|RE
 export NODE_ENV="test"
 export ALLOW_SYNTHETIC_CATALOG="true"
 
-# Explicitly map MIGRATION_TEST_DATABASE_URL unless CI set a specific migration database URL
-if [ -n "${MIGRATION_TEST_DATABASE_URL:-}" ] && [[ "${DATABASE_URL:-}" != *"life_medusa_migration_test"* ]]; then
-    export DATABASE_URL="${MIGRATION_TEST_DATABASE_URL}"
+# Allow environment override of DATABASE_URL if set (e.g. in CI)
+if [ -z "${DATABASE_URL:-}" ]; then
+    export DATABASE_URL="${MIGRATION_TEST_DATABASE_URL:-}"
 fi
 
 export REDIS_URL="${REDIS_URL:-}"
@@ -34,7 +34,7 @@ if [[ "$DATABASE_URL" =~ ^postgres(ql)?://([^:]+):([^@]+)@([^:/]+)(:([0-9]+))?/(
     export DB_HOST="${BASH_REMATCH[4]}"
     export DB_PORT="${BASH_REMATCH[6]:-5432}"
     export DB_NAME="${BASH_REMATCH[7]}"
-    export DB_WAITINGROOM_DATABASE="postgres"
+    export DB_WAITINGROOM_DATABASE="${DB_NAME}"
 fi
 
 if [ -z "$DATABASE_URL" ]; then

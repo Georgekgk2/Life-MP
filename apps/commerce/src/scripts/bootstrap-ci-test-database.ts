@@ -51,6 +51,14 @@ async function bootstrapCiTestDatabase() {
       );
     }
 
+    // Ensure default 'postgres' database exists
+    const postgresDbCheck = await client.query(
+      "SELECT 1 FROM pg_database WHERE datname = 'postgres'",
+    );
+    if (postgresDbCheck.rowCount === 0) {
+      await client.query(`CREATE DATABASE "postgres" OWNER "${appUser}";`);
+    }
+
     const dbCheck = await client.query(
       "SELECT 1 FROM pg_database WHERE datname = $1",
       [appDb],

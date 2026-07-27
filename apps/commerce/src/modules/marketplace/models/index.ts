@@ -8,3 +8,7 @@ export * from "./product-claim.js";
 export * from "./moderation-decision.js";
 export * from "./staff-role-assignment.js";
 export * from "./audit-event.js";
+export * from "./parent-order.js";
+export * from "./vendor-child-order.js";
+export * from "./vendor-payable.js";
+export * from "./settlement-batch.js";

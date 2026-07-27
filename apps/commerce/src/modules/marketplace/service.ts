@@ -10,6 +10,10 @@ import {
   ModerationDecision,
   StaffRoleAssignment,
   AuditEvent,
+  ParentOrder,
+  VendorChildOrder,
+  VendorPayable,
+  SettlementBatch,
 } from "./models/index.js";
 
 class MarketplaceModuleService extends MedusaService({
@@ -23,6 +27,10 @@ class MarketplaceModuleService extends MedusaService({
   ModerationDecision,
   StaffRoleAssignment,
   AuditEvent,
+  ParentOrder,
+  VendorChildOrder,
+  VendorPayable,
+  SettlementBatch,
 }) {}
 
 export default MarketplaceModuleService;

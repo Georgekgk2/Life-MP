@@ -27,6 +27,7 @@ jobs:
         with:
           node-version: 22
           check-latest: true
+          package-manager-cache: false
 
       - name: Enable Corepack
         run: corepack enable

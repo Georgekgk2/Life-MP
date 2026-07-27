@@ -22,15 +22,14 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v5
 
+      - name: Enable Corepack
+        run: corepack enable
+
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
           node-version: 22
           check-latest: true
-          package-manager-cache: false
-
-      - name: Enable Corepack
-        run: corepack enable
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -38,14 +37,14 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Build
+        run: pnpm build
+
       - name: Typecheck
         run: pnpm typecheck
 
       - name: Test
         run: pnpm test
-
-      - name: Build
-        run: pnpm build
 
   catalog-provider-integration:
     name: Catalog Provider Integration
@@ -81,17 +80,20 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v5
 
+      - name: Enable Corepack
+        run: corepack enable
+
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
           node-version: 22
           check-latest: true
 
-      - name: Enable Corepack
-        run: corepack enable
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Build Packages
+        run: pnpm build
 
       - name: Bootstrap CI Test Database
         env:
@@ -143,17 +145,20 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v5
 
+      - name: Enable Corepack
+        run: corepack enable
+
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
           node-version: 22
           check-latest: true
 
-      - name: Enable Corepack
-        run: corepack enable
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Build Packages
+        run: pnpm build
 
       - name: Bootstrap CI Migration Database
         env:
@@ -180,14 +185,14 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v5
 
+      - name: Enable Corepack
+        run: corepack enable
+
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
           node-version: 22
           check-latest: true
-
-      - name: Enable Corepack
-        run: corepack enable
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

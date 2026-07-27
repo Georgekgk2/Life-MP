@@ -41,7 +41,7 @@ blob-report/
 logs/
 
 # Tool-generated orchestration artifact
-/artifacts/omp-logs1.txt
+/artifacts/omp-logs*.txt
 
 # Local database backups
 backups/

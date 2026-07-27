@@ -1,5 +1,6 @@
 import { defineMiddlewares, authenticate } from "@medusajs/medusa";
-import { assertMarketplaceCoreLocalMode } from "../modules/marketplace/authorization";
+import { assertMarketplaceCoreLocalMode } from "../modules/marketplace/authorization.js";
+import { sanitizeLogPayload } from "../utils/pii-masking.js";
 
 export default defineMiddlewares({
   routes: [
@@ -9,8 +10,12 @@ export default defineMiddlewares({
         authenticate("vendor", ["session", "bearer"], {
           allowUnregistered: false,
         }),
-        (_req, _res, next) => {
+        (req, _res, next) => {
           assertMarketplaceCoreLocalMode();
+          if (req.body && typeof req.body === "object") {
+            (req as unknown as { sanitizedLogBody: unknown }).sanitizedLogBody =
+              sanitizeLogPayload(req.body as Record<string, unknown>);
+          }
           next();
         },
       ],
@@ -21,8 +26,12 @@ export default defineMiddlewares({
         authenticate("user", ["session", "bearer"], {
           allowUnregistered: false,
         }),
-        (_req, _res, next) => {
+        (req, _res, next) => {
           assertMarketplaceCoreLocalMode();
+          if (req.body && typeof req.body === "object") {
+            (req as unknown as { sanitizedLogBody: unknown }).sanitizedLogBody =
+              sanitizeLogPayload(req.body as Record<string, unknown>);
+          }
           next();
         },
       ],
@@ -38,6 +47,11 @@ export default defineMiddlewares({
             id: "pk_synthetic_catalog",
             sales_channel_ids: [],
           };
+
+          if (req.body && typeof req.body === "object") {
+            (req as unknown as { sanitizedLogBody: unknown }).sanitizedLogBody =
+              sanitizeLogPayload(req.body as Record<string, unknown>);
+          }
 
           const rawUrl = req.originalUrl || req.path || req.url || "";
           const targetPath = rawUrl.split("?")[0];

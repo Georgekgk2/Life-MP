@@ -2,7 +2,7 @@
 
 ## Призначення та межа
 
-Цей runbook описує лише локальне середовище розробки на Node.js 22, pnpm і OrbStack. `docker-compose.dev.yml` запускає **тільки** PostgreSQL 16 і Redis 7; прикладні сервіси, storefront, CMS, checkout, payment, shipment і production deployment він не запускає.
+Цей runbook описує лише локальне середовище розробки на Node.js 22, pnpm і OrbStack. `docker-compose.dev.yml` запускає **тільки** PostgreSQL 16 і Redis 7; прикладні сервіси, CMS, checkout, payment, shipment і production deployment він не запускає. Storefront запускається окремо лише як локальний fixture-only prototype.
 
 PostgreSQL та Redis опубліковані виключно на `127.0.0.1`. Це обмеження захищає локальну машину від доступу з мережі, але не створює staging або production-контур і не є сховищем для реальних даних чи секретів.
 
@@ -40,7 +40,13 @@ make dev-infra-logs
 make dev-infra-down
 ```
 
-Ці цілі використовують `docker-compose.dev.yml`. Застосунки не стартують разом із ними. Коренева команда `make dev` делегує до `pnpm dev`, але зараз `pnpm dev` навмисно завершується помилкою до появи реальних локальних storefront/commerce-сервісів; skeleton не є доступним UI або API.
+Ці цілі використовують `docker-compose.dev.yml`. Застосунки не стартують разом із ними. Коренева команда `make dev` делегує до `pnpm dev`, але не запускає storefront. Для локальної smoke-перевірки некомерційного prototype storefront після `pnpm install` виконайте:
+
+```bash
+pnpm --filter @life/storefront dev
+```
+
+Prototype доступний лише локально за адресою [http://127.0.0.1:3100](http://127.0.0.1:3100). Він використовує fixture-дані та не є staging або production-сервісом: не реалізує checkout, платежі, shipment чи інші commerce-функції.
 
 ### Дані та безпека
 

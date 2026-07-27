@@ -1,0 +1,31 @@
+import type { Metadata } from "next";
+import type { ReactNode } from "react";
+
+import { SiteFooter, SiteHeader } from "@/components";
+
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: {
+    default: "Life-MP — вітрина можливостей",
+    template: "%s | Life-MP",
+  },
+  description:
+    "Демонстраційна вітрина Life-MP з локальними даними про людей, історії та події.",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: ReactNode;
+}>) {
+  return (
+    <html lang="uk">
+      <body>
+        <SiteHeader />
+        <main id="main-content">{children}</main>
+        <SiteFooter />
+      </body>
+    </html>
+  );
+}

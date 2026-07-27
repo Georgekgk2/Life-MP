@@ -2,7 +2,6 @@
   "name": "@life/commerce",
   "version": "0.0.0",
   "private": true,
-  "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -15,11 +14,44 @@
     "dist"
   ],
   "scripts": {
+    "dev": "TS_NODE_TRANSPILE_ONLY=true NODE_OPTIONS='--import tsx' medusa develop",
+    "start": "TS_NODE_TRANSPILE_ONLY=true NODE_OPTIONS='--import tsx' medusa start",
+    "db:migrate": "TS_NODE_TRANSPILE_ONLY=true NODE_OPTIONS='--import tsx' medusa db:migrate",
+    "seed": "TS_NODE_TRANSPILE_ONLY=true NODE_OPTIONS='--import tsx' medusa exec ./src/scripts/seed-catalog-provider-core.ts",
+    "test:integration:http": "../../scripts/with-commerce-test-env.sh env TEST_TYPE=integration:http NODE_OPTIONS='--experimental-vm-modules --import tsx' ./scripts/run-integration-tests.sh",
+    "test:migrations": "../../scripts/with-commerce-migration-test-env.sh env TEST_TYPE=integration:migrations NODE_OPTIONS='--experimental-vm-modules --import tsx' jest --silent=false --runInBand --forceExit",
     "lint": "eslint src test --max-warnings=0",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "test": "vitest run",
     "build": "tsc --project tsconfig.json",
     "format:check": "prettier --check package.json tsconfig.json src test"
+  },
+  "dependencies": {
+    "@life/types": "workspace:*",
+    "@medusajs/caching-redis": "2.18.0",
+    "@medusajs/core-flows": "2.18.0",
+    "@medusajs/event-bus-redis": "2.18.0",
+    "@medusajs/framework": "2.18.0",
+    "@medusajs/medusa": "2.18.0",
+    "@medusajs/workflow-engine-redis": "2.18.0",
+    "pg": "^8.13.3",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@jest/globals": "^29.7.0",
+    "@medusajs/test-utils": "2.18.0",
+    "@mikro-orm/core": "^6.4.11",
+    "@mikro-orm/migrations": "^6.4.11",
+    "@swc/core": "1.15.46",
+    "@swc/jest": "0.2.39",
+    "@types/jest": "^29.5.14",
+    "@types/jsonwebtoken": "9.0.10",
+    "@types/node": "22.19.1",
+    "@types/pg": "^8.11.11",
+    "jest": "30.4.2",
+    "jsonwebtoken": "9.0.3",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.19.3"
   },
   "engines": {
     "node": ">=22"

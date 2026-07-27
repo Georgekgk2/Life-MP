@@ -9,15 +9,8 @@ import {
   SectionHeading,
   StoryCard,
 } from "@/components";
-import {
-  categories,
-  charityProjects,
-  events,
-  partners,
-  people,
-  products,
-  stories,
-} from "@/fixtures";
+import { charityProjects, events, partners, people, stories } from "@/fixtures";
+import { getCatalogSnapshot } from "@/catalog/server";
 
 export const metadata: Metadata = {
   title: "Life-MP — люди, історії та спільнота",
@@ -25,7 +18,13 @@ export const metadata: Metadata = {
     "Демонстраційна добірка людей, історій, подій і тематичних матеріалів Life-MP.",
 };
 
-export default function HomePage() {
+export default async function HomePage() {
+  const catalogResult = await getCatalogSnapshot();
+
+  const isCatalogReady = catalogResult.kind === "ready";
+  const categories = isCatalogReady ? catalogResult.snapshot.categories : [];
+  const products = isCatalogReady ? catalogResult.snapshot.products : [];
+
   return (
     <>
       <section className="page-section page-section--spacious">
@@ -46,8 +45,8 @@ export default function HomePage() {
             <h2 className="notice__title">Це демонстраційний прототип</h2>
             <p>
               Life-MP показує лише структуру інформації. Тут немає кошика,
-              оформлення замовлень, оплат, доставки, збору персональних даних чи
-              партнерського відстеження.
+              оформлення замовлений, оплат, доставки, збору персональних даних
+              чи партнерського відстеження.
             </p>
           </aside>
         </div>
@@ -62,11 +61,17 @@ export default function HomePage() {
             actionHref="/catalog"
             actionLabel="Усі добірки"
           />
-          <div className="content-grid content-grid--cards">
-            {categories.map((category) => (
-              <CategoryCard category={category} key={category.id} />
-            ))}
-          </div>
+          {!isCatalogReady ? (
+            <aside className="notice notice--warning">
+              <p>Каталог тимчасово недоступний.</p>
+            </aside>
+          ) : (
+            <div className="content-grid content-grid--cards">
+              {categories.map((category) => (
+                <CategoryCard category={category} key={category.id} />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -96,11 +101,17 @@ export default function HomePage() {
             actionHref="/catalog"
             actionLabel="Відкрити каталог"
           />
-          <div className="content-grid content-grid--cards">
-            {products.slice(0, 4).map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
+          {!isCatalogReady ? (
+            <aside className="notice notice--warning">
+              <p>Каталог тимчасово недоступний.</p>
+            </aside>
+          ) : (
+            <div className="content-grid content-grid--cards">
+              {products.slice(0, 4).map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

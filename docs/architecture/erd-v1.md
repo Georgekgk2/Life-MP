@@ -1,24 +1,23 @@
 # ERD v1: межа майбутньої commerce-моделі
 
-## Статус і правило читання
+У цьому репозиторії реалізовано **Catalog & Provider Core** на базе Medusa v2.18.0 для розробки та локальних тестувань. `@life/types` містить публічні DTO каталогу, а `@life/commerce` реалізує кастомні модульні таблиці вендорів, членства, модерації лістингів та аудиту, пов'язані з нативними сутностями Medusa `Product` і `ProductCategory`.
 
-У цьому репозиторії **немає реалізованої persistent commerce-schema, міграцій або даних домену**. `@life/types` містить лише загальну типізовану основу, а `@life/commerce` явно позначає checkout, payment і shipping заблокованими.
-
-Тому ця ERD є **планованою картою питань**, а не моделлю, яку дозволено імплементувати. Жодна сутність нижче не створена як таблиця, API, тип домену, seed або vendor record. Карта не знімає блокери [меж запуску](../decisions/launch-scope.md) і не є юридичним, фінансовим чи operational approval.
-
+Ця ERD фіксує схему Phase 2 для некомерційного синтетичного каталогу. Всі транзакційні сутності (`Customer`, `Cart`, `Order`, `Payment`, `Shipment`, `FiscalDocument`, `CommissionEntry`) залишаються **[ЗАБЛОКОВАНО]**.
 Позначки:
 
 - **[SKELETON]** — наявна лише source-level межа пакета; не означає таблицю чи runtime.
 - **[ПЛАН]** — можлива майбутня сутність, яку не можна реалізовувати без окремого затвердженого контракту.
 - **[ЗАБЛОКОВАНО]** — сутність або її ключові зв’язки залежать від невирішеного рішення; не створювати реалізацію до його прийняття.
 
-## Що реалізовано зараз
+## Що реалізовано в Phase 2 (Catalog & Provider Core)
 
-| Межа | Статус | Дані |
+| Межа | Статус | Дані / Сутності |
 |---|---|---|
-| `@life/types` | [SKELETON] | Загальні package metadata; не містить entity, ключів чи зв’язків commerce. |
-| `@life/commerce` | [SKELETON] | Константа межі блокування; не містить checkout, payment, shipment або persistence. |
-| PostgreSQL у локальному Compose | [SKELETON] | Локальний сервіс без business schema, застосункового підключення чи production даних. |
+| `@life/types` | Реалізовано DTO | Публічні контракти `StorefrontCatalogSnapshot`, `StorefrontCatalogProduct`, `StorefrontCatalogCategory`, `VendorVerificationDTO`, `ComplianceDocumentDTO`, `ProductClaimDTO`. |
+| `@life/commerce` | Реалізовано Medusa Module | Модуль `marketplace`: `Vendor`, `VendorMember`, `VendorProfile`, `CatalogListing`, `ModerationDecision`, `StaffRoleAssignment`, `AuditEvent`. |
+| `Compliance & Verification` | Модель розроблена (ADR 0007) | `VendorVerification` (ЄДРПОУ/РНОКПП), `ComplianceDocument` (декларації/сертифікати), `ProductClaim` (eco/natural/handmade/organic/medical). |
+| `Fulfillment & Sales Model` | Модель розроблена (ADR 0008) | `fulfillment_mode` (`vendor_direct` \| `platform_warehouse` \| `hybrid`), `seller_model` (`vendor_is_seller` \| `platform_is_seller` \| `lead_only`). |
+| PostgreSQL у локальному Compose | Реалізовано розмежування | Окремі бази `life_medusa_dev`, `life_medusa_test`, `life_medusa_migration_test` із розмежованими привілеями. |
 
 ## Планована карта сутностей
 

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { CategoryCard, ProductCard, SectionHeading } from "@/components";
-import { categories, products } from "@/fixtures";
+import { getCatalogSnapshot } from "@/catalog/server";
 
 export const metadata: Metadata = {
   title: "Тематичні добірки",
@@ -9,7 +9,13 @@ export const metadata: Metadata = {
     "Інформаційний каталог тематичних матеріалів Life-MP у демонстраційному прототипі.",
 };
 
-export default function CatalogPage() {
+export default async function CatalogPage() {
+  const catalogResult = await getCatalogSnapshot();
+
+  const isCatalogReady = catalogResult.kind === "ready";
+  const categories = isCatalogReady ? catalogResult.snapshot.categories : [];
+  const products = isCatalogReady ? catalogResult.snapshot.products : [];
+
   return (
     <>
       <section className="page-section page-section--spacious">
@@ -31,35 +37,57 @@ export default function CatalogPage() {
         </div>
       </section>
 
-      <section className="page-section--tint" aria-label="Категорії каталогу">
-        <div className="page-shell">
-          <SectionHeading
-            eyebrow="Напрями"
-            title="Оберіть добірку"
-            description="Кожен напрям відкривається окремою статичною сторінкою."
-          />
-          <div className="content-grid content-grid--cards">
-            {categories.map((category) => (
-              <CategoryCard category={category} key={category.id} />
-            ))}
+      {!isCatalogReady ? (
+        <section
+          className="page-section--tint"
+          aria-label="Статус доступу до каталогу"
+        >
+          <div className="page-shell">
+            <aside className="notice notice--warning">
+              <h2 className="notice__title">Каталог тимчасово недоступний</h2>
+              <p>
+                Не вдалося завантажити актуальні дані каталогу з сервісу Medusa.
+                Будь ласка, перевірте з'єднання або спробуйте пізніше.
+              </p>
+            </aside>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : (
+        <>
+          <section
+            className="page-section--tint"
+            aria-label="Категорії каталогу"
+          >
+            <div className="page-shell">
+              <SectionHeading
+                eyebrow="Напрями"
+                title="Оберіть добірку"
+                description="Кожен напрям відкривається окремою сторінкою."
+              />
+              <div className="content-grid content-grid--cards">
+                {categories.map((category) => (
+                  <CategoryCard category={category} key={category.id} />
+                ))}
+              </div>
+            </div>
+          </section>
 
-      <section className="page-section" aria-label="Усі матеріали каталогу">
-        <div className="page-shell">
-          <SectionHeading
-            eyebrow="Усі матеріали"
-            title="Добірка для огляду"
-            description="Скористайтеся категоріями вище, щоб статично звузити перелік за напрямом."
-          />
-          <div className="content-grid content-grid--cards">
-            {products.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
-        </div>
-      </section>
+          <section className="page-section" aria-label="Усі матеріали каталогу">
+            <div className="page-shell">
+              <SectionHeading
+                eyebrow="Усі матеріали"
+                title="Добірка для огляду"
+                description="Скористайтеся категоріями вище, щоб звузити перелік за напрямом."
+              />
+              <div className="content-grid content-grid--cards">
+                {products.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
+            </div>
+          </section>
+        </>
+      )}
     </>
   );
 }

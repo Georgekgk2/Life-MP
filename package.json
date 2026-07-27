@@ -12,6 +12,8 @@
     "lint": "pnpm --filter './apps/*' --filter './packages/*' --recursive run lint",
     "typecheck": "pnpm --filter './apps/*' --filter './packages/*' --recursive run typecheck",
     "test": "pnpm --filter './apps/*' --filter './packages/*' --recursive run test",
+    "test:integration": "pnpm --filter @life/commerce run test:integration:http",
+    "test:migrations": "pnpm --filter @life/commerce run test:migrations",
     "build": "pnpm --filter './apps/*' --filter './packages/*' --recursive run build",
     "format:check": "pnpm --filter './apps/*' --filter './packages/*' --recursive run format:check",
     "ci": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build"

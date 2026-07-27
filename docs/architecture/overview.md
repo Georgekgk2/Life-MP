@@ -2,22 +2,30 @@
 
 ## Статус
 
-Цей документ розділяє **реалізовану основу** від **майбутньої або заблокованої topology**. Він не є заявою про готовий storefront, API, CMS, дані каталогу, checkout, staging чи production.
+Цей документ розділяє **реалізовану основу** від **майбутньої або заблокованої topology**. Він описує наявний Next.js storefront прототип та backend-сервіс Medusa v2.18.0 для розробки, але не є заявою про готовий production, реальний onboarding вендорів, checkout, payment чи shipment.
 
-- **Реалізовано в skeleton:** pnpm/Node.js 22 монорепозиторій, строгі TypeScript-пакети, кореневі quality scripts, локальний Compose із PostgreSQL і Redis, а також source-level межі пакетів.
-- **Не реалізовано:** runtime UI/API/CMS, business schema, міграції, підключення застосунків до PostgreSQL/Redis, vendor data model, каталог, checkout, payment, shipment, auth та production topology.
+- **Реалізовано в коді:** pnpm/Node.js 22 монорепозиторій, Next.js 16 App Router storefront прототип (`apps/storefront`), Medusa v2.18.0 backend (`apps/commerce`) з кастомним модулем `marketplace` для некомерційного синтетичного каталогу й ізоляції вендорів, PostgreSQL 16 та Redis 7 у Docker Compose, а також CI workflow.
+- **Не реалізовано / заблоковано:** real vendor onboarding, реальні комерційні категорії, кошик, checkout, оплата, фіскалізація, відправлення, ТТН, реальні перевірки регульованих категорій, Payload CMS runtime та production topology.
 - **Заблоковано для комерційного запуску:** COM-1, COM-2, COM-3, COM-5 і LOG-1 у [реєстрі відкритих рішень](../decisions/open-questions.md).
 
+## Карта та послідовність фаз розробки
+
+1. **Phase 2 — Catalog & Provider Core (ЗАВЕРШЕНО):** Перетворення `@life/commerce` у Medusa v2.18.0, кастомний модуль `marketplace`, авторизація тенантів, модерація, synthetic catalog API, розмежування ролей PostgreSQL.
+2. **Phase 2.1 — Security & Verification Hardening (ЗАВЕРШЕНО):** Посилення безпеки reset-скриптів (`LIFE_ALLOW_DESTRUCTIVE_LOCAL_RESET=true`), 12+ негативних асерцій авторизації, contract-тести проти витоку даних, visual smoke скріншоти.
+3. **Phase 3 — Content, Vendor Operations & Compliance Workflows (ПОТОЧНА ФАЗА):** Онбординг вендорів (`VendorVerification`), завантаження та review комплаєнс-документів (`ComplianceDocument`), модерація клеймів продуктів (`ProductClaim`), CMS редакційний шар (Stories, Guides, Events, Charity, Partners), Media Adapter та виведення значків довіри.
+4. **Phase 4 — Commerce Checkout & Fulfillment (ПОСТ-ПРИЙНЯТТЯ БІЗНЕС-РІШЕНЬ):** Кошик, parent/child замовлення, розщеплення замовлень, платіжні вебхуки, Нова Пошта, РРО/ПРРО. Запускається строго після письмових відповідей замовника щодо Seller of Record.
+5. **Phase 5 — Affiliate Tracking & Payouts:** Відстеження реферальних посилань та виплати партнерам.
+6. **Phase 6 — Staging, Production, Backups & Observability:** Production-інфраструктура, профілювання та моніторинг.
 ## Поточна структура пакетів
 
 | Межа | Стан | Відповідальність | Чого немає |
 |---|---|---|---|
-| `@life/types` | Реалізований skeleton | Спільні типізовані метадані та їхня фабрика | Доменна commerce-модель, database schema, API-контракт |
-| `@life/config` | Реалізований skeleton | Типізовані метадані інструментів | Секрети, runtime-конфігурація production |
-| `@life/storefront` | Реалізований skeleton | Source-level метадані storefront | UI, HTTP runtime, каталог, кошик, checkout |
-| `@life/commerce` | Реалізований skeleton | Явна межа: checkout/payment/shipping заблоковані | Commerce runtime, payment provider, shipment, vendor data |
-| `@life/cms` | Реалізований skeleton | Source-level метадані CMS | CMS runtime, редакційні дані, публічний ingress |
-| PostgreSQL 16 + Redis 7 у Compose | Локальний development-only сервіс | Майбутні локальні експерименти після появи реального контракту | Production кластер, ролі застосунків, реальні дані або application connectivity |
+| `@life/types` | Реалізований базовий пакет | Спільні типізовані публічні DTO каталогу та метадані | Доменні транзакційні об'єкти, кошик, платіжні типи |
+| `@life/config` | Реалізований skeleton | Типізовані метадані інструментів та конфігів | Секрети, runtime-конфігурація production |
+| `@life/storefront` | Реалізований Next.js App Router | Публічний UI та серверний адаптер каталогу (`fixtures` \| `medusa`) | Кошик, checkout, оплата, оформлення замовлення |
+| `@life/commerce` | Реалізована Medusa v2.18.0 | Кастомний модуль `marketplace`, авторизація вендорів, модерація, synthetic catalog API | Payment provider, shipment, order creation, checkout |
+| `@life/cms` | Заблокований skeleton | Source-level межа (Payload не встановлений per ADR 0005) | CMS runtime, редакційні дані, публічний ingress |
+| PostgreSQL 16 + Redis 7 у Compose | Локальний development/test сервіс | Окремі БД/ролі `life_medusa_dev`, `life_medusa_test`, `life_medusa_migration_test` | Production кластер, суперкористувачі для застосунку |
 
 ## Текстова діаграма
 

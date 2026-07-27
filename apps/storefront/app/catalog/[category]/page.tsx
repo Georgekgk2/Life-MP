@@ -3,7 +3,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { EmptyState, ProductCard, SectionHeading } from "@/components";
-import { categories, products } from "@/fixtures";
+import { getCatalogSnapshot } from "@/catalog/server";
+import { categories as fixtureCategories } from "@/fixtures";
+
+export const dynamic = "force-dynamic";
 
 type CategoryPageProps = Readonly<{
   params: Promise<{
@@ -12,14 +15,28 @@ type CategoryPageProps = Readonly<{
 }>;
 
 export function generateStaticParams() {
-  return categories.map((category) => ({ category: category.slug }));
+  const source = process.env["CATALOG_SOURCE"] || "fixtures";
+  if (source === "fixtures") {
+    return fixtureCategories.map((category) => ({ category: category.slug }));
+  }
+  return [];
 }
 
 export async function generateMetadata({
   params,
 }: CategoryPageProps): Promise<Metadata> {
   const { category: categorySlug } = await params;
-  const category = categories.find(({ slug }) => slug === categorySlug);
+  const catalogResult = await getCatalogSnapshot();
+
+  if (catalogResult.kind === "unavailable") {
+    return {
+      title: "Каталог тимчасово недоступний",
+    };
+  }
+
+  const category = catalogResult.snapshot.categories.find(
+    ({ slug }) => slug === categorySlug,
+  );
 
   if (!category) {
     notFound();
@@ -33,13 +50,33 @@ export async function generateMetadata({
 
 export default async function CategoryPage({ params }: CategoryPageProps) {
   const { category: categorySlug } = await params;
-  const category = categories.find(({ slug }) => slug === categorySlug);
+  const catalogResult = await getCatalogSnapshot();
+
+  if (catalogResult.kind === "unavailable") {
+    return (
+      <section className="page-section page-section--spacious">
+        <div className="page-shell">
+          <aside className="notice notice--warning">
+            <h2 className="notice__title">Каталог тимчасово недоступний</h2>
+            <p>
+              Не вдалося завантажити актуальні дані каталогу з сервісу Medusa.
+              Будь ласка, перевірте з'єднання або спробуйте пізніше.
+            </p>
+          </aside>
+        </div>
+      </section>
+    );
+  }
+
+  const category = catalogResult.snapshot.categories.find(
+    ({ slug }) => slug === categorySlug,
+  );
 
   if (!category) {
     notFound();
   }
 
-  const categoryProducts = products.filter(
+  const categoryProducts = catalogResult.snapshot.products.filter(
     (product) => product.categorySlug === category.slug,
   );
 
@@ -58,8 +95,8 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
           <aside className="notice" aria-label="Статус матеріалів">
             <h2 className="notice__title">Матеріали тільки для огляду</h2>
             <p>
-              Це статично відфільтрований перелік у демонстраційному прототипі.
-              Жодної покупки, резервування чи оформлення тут немає.
+              Це відфільтрований перелік у демонстраційному прототипі. Жодної
+              покупки, резервування чи оформлення тут немає.
             </p>
           </aside>
         </div>
@@ -73,7 +110,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
           <SectionHeading
             eyebrow="Матеріали"
             title={`Усі матеріали напряму «${category.name}»`}
-            description="Перелік сформовано локально за обраною категорією."
+            description="Перелік сформовано за обраною категорією."
           />
           {categoryProducts.length > 0 ? (
             <div className="content-grid content-grid--cards">

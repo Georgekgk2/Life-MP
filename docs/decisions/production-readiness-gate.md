@@ -13,7 +13,7 @@
 - ручний запуск GitHub CI для `ec9e6f4` пройшов;
 - для `main` налаштовано protection, environments і vulnerability alerts;
 - push-triggered GitHub CI запуски були лише поставлені в чергу, а один queued run скасовано;
-- застосунок залишається skeleton без runtime UI/API/CMS, бізнес-схеми, каталогу, checkout, payment, shipment, auth або production topology.
+- застосунок містить Next.js storefront прототип (`apps/storefront`) та Medusa v2.18.0 backend (`apps/commerce`) з кастомним модулем `marketplace` для некомерційного синтетичного каталогу й модерації; checkout, payment, shipment, real vendor onboarding, CMS runtime та production topology залишаються заблокованими/відсутніми.
 
 Не виконувались і не можуть вважатися наявними за цим записом: server discovery, legal approvals, staging, payment, shipping, production deployment, backup або restore drill. Production server не налаштований як SSH host і не контактувався. Жодного секрету, ключа, `.env`, backup чи іншого ресурсу Jorvis не використовували й не розкривали.
 

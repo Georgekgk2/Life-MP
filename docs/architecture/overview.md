@@ -8,6 +8,14 @@
 - **Не реалізовано / заблоковано:** real vendor onboarding, реальні комерційні категорії, кошик, checkout, оплата, фіскалізація, відправлення, ТТН, реальні перевірки регульованих категорій, Payload CMS runtime та production topology.
 - **Заблоковано для комерційного запуску:** COM-1, COM-2, COM-3, COM-5 і LOG-1 у [реєстрі відкритих рішень](../decisions/open-questions.md).
 
+## Карта та послідовність фаз розробки
+
+1. **Phase 2 — Catalog & Provider Core (ЗАВЕРШЕНО):** Перетворення `@life/commerce` у Medusa v2.18.0, кастомний модуль `marketplace`, авторизація тенантів, модерація, synthetic catalog API, розмежування ролей PostgreSQL.
+2. **Phase 2.1 — Security & Verification Hardening (ЗАВЕРШЕНО):** Посилення безпеки reset-скриптів (`LIFE_ALLOW_DESTRUCTIVE_LOCAL_RESET=true`), 12+ негативних асерцій авторизації, contract-тести проти витоку даних, visual smoke скріншоти.
+3. **Phase 3 — Content, Vendor Operations & Compliance Workflows (ПОТОЧНА ФАЗА):** Онбординг вендорів (`VendorVerification`), завантаження та review комплаєнс-документів (`ComplianceDocument`), модерація клеймів продуктів (`ProductClaim`), CMS редакційний шар (Stories, Guides, Events, Charity, Partners), Media Adapter та виведення значків довіри.
+4. **Phase 4 — Commerce Checkout & Fulfillment (ПОСТ-ПРИЙНЯТТЯ БІЗНЕС-РІШЕНЬ):** Кошик, parent/child замовлення, розщеплення замовлень, платіжні вебхуки, Нова Пошта, РРО/ПРРО. Запускається строго після письмових відповідей замовника щодо Seller of Record.
+5. **Phase 5 — Affiliate Tracking & Payouts:** Відстеження реферальних посилань та виплати партнерам.
+6. **Phase 6 — Staging, Production, Backups & Observability:** Production-інфраструктура, профілювання та моніторинг.
 ## Поточна структура пакетів
 
 | Межа | Стан | Відповідальність | Чого немає |

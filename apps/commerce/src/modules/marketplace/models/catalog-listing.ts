@@ -1,6 +1,7 @@
 import { model } from "@medusajs/framework/utils";
-import { Vendor } from "./vendor";
-import { ModerationDecision } from "./moderation-decision";
+import { Vendor } from "./vendor.js";
+import { ModerationDecision } from "./moderation-decision.js";
+import { ProductClaim } from "./product-claim.js";
 
 export const CatalogListing = model.define("catalog_listing", {
   id: model.id().primaryKey(),
@@ -27,5 +28,8 @@ export const CatalogListing = model.define("catalog_listing", {
   published_at: model.dateTime().nullable(),
   moderation_decisions: model.hasMany(() => ModerationDecision, {
     mappedBy: "listing",
+  }),
+  claims: model.hasMany(() => ProductClaim, {
+    mappedBy: "catalog_listing",
   }),
 });

@@ -46,6 +46,35 @@ export type MarketplaceServiceType = {
   createAuditEvents: (
     data: Record<string, unknown>,
   ) => Promise<Record<string, unknown>>;
+
+  // Compliance & Verification additions
+  listVendorVerifications: (
+    query: Record<string, unknown>,
+  ) => Promise<Record<string, unknown>[]>;
+  createVendorVerifications: (
+    data: Record<string, unknown>,
+  ) => Promise<Record<string, unknown>>;
+  updateVendorVerifications: (
+    data: Record<string, unknown>,
+  ) => Promise<Record<string, unknown>>;
+  retrieveVendorVerification: (
+    id: string,
+  ) => Promise<Record<string, unknown> | null>;
+
+  createComplianceDocuments: (
+    data: Record<string, unknown>,
+  ) => Promise<Record<string, unknown>>;
+  updateComplianceDocuments: (
+    data: Record<string, unknown>,
+  ) => Promise<Record<string, unknown>>;
+  retrieveComplianceDocument: (
+    id: string,
+  ) => Promise<Record<string, unknown> | null>;
+
+  retrieveProductClaim: (id: string) => Promise<Record<string, unknown> | null>;
+  updateProductClaims: (
+    data: Record<string, unknown>,
+  ) => Promise<Record<string, unknown>>;
 };
 
 export type ProductServiceType = {

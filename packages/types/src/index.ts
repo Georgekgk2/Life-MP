@@ -71,6 +71,9 @@ export type StorefrontCatalogProduct = Readonly<{
     name: string;
   }>;
   isSynthetic: boolean;
+  verifiedVendorBadge?: string;
+  certifiedProductBadge?: string;
+  organicProductBadge?: string;
 }>;
 
 export type StorefrontCatalogSnapshot = Readonly<{

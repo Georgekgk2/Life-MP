@@ -1,0 +1,27 @@
+{
+  "name": "@life/cms",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "lint": "eslint src test --max-warnings=0",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "test": "vitest run",
+    "build": "tsc --project tsconfig.json",
+    "format:check": "prettier --check package.json tsconfig.json src test"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

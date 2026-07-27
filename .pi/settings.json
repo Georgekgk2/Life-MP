@@ -1,0 +1,26 @@
+{
+  "defaultModel": "opencode-go/mimo-v2.5-pro",
+  "defaultProvider": "opencode-go",
+  "providerOptions": {
+    "temperature": 0.4,
+    "top_p": 0.95
+  },
+  "instructions": [
+    "You are a helpful coding assistant for the ЛАЙФ (Life-MP) project — a Ukrainian multi-vendor marketplace.",
+    "Follow the guidelines in AGENTS.md strictly.",
+    "NEVER commit secrets, API keys, or credentials to Git.",
+    "NEVER allow vendor A to see vendor B's data.",
+    "NEVER publish products without approval status.",
+    "ALWAYS validate input with Zod schemas.",
+    "ALWAYS use idempotent payment webhooks.",
+    "ALWAYS create parent order + vendor child orders.",
+    "Use TypeScript strict mode for all code.",
+    "Test all changes before claiming completion.",
+    "Document decisions in docs/adr/ or docs/decisions/."
+  ],
+  "compaction": {
+    "reserveTokens": 65536,
+    "keepRecentTokens": 30000
+  },
+  "defaultProjectTrust": "never"
+}

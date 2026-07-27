@@ -1,0 +1,1409 @@
+Нижче — готове **ТЗ і план передачі іншому агенту**. Його можна копіювати як стартовий документ у задачу; рекомендую вимагати від агента спочатку пройти фазу Discovery і затвердити рішення, а не починати реалізацію з припущень.
+
+***
+
+# Технічне завдання  
+## Проєкт «ЛАЙФ»
+
+**Версія:** 1.0  
+**Статус:** Discovery + MVP specification  
+**Мова продукту:** українська  
+**Базовий ринок:** Україна  
+**Валюта:** UAH  
+**Часова зона:** `Europe/Kyiv`
+
+***
+
+## 1. Мета продукту
+
+Створити українську мультивендорну платформу **«ЛАЙФ»** у блакитно-білій стилістиці, яка об’єднує:
+
+- продаж еко‑, натуральних і авторських товарів;
+- профілі виробників, майстрів, експертів і практиків;
+- послуги та практики, що потребують заявки або запису;
+- тренінги, майстер‑класи та інші події;
+- editorial‑контент: історії, відео, корисні матеріали;
+- благодійні ініціативи та сторінки партнерів;
+- affiliate / реферальну програму для контент‑партнерів.
+
+Проєкт не повинен виглядати як «ще один інтернет‑магазин». Основна ідея — **живий простір людей, майстрів, товарів, знань і практик**, де товар є частиною історії людини або бренду.
+
+***
+
+## 2. Продуктові принципи
+
+1. **Контент перед продажем.** Кожен виробник/майстер має профіль, історію, медіа та перелік пропозицій.
+2. **Один каталог, різні типи пропозицій.** Товари, послуги, події та благодійність показуються в спільній навігації, але мають різну бізнес‑логіку.
+3. **Мультивендорність.** Кожен виробник у майбутньому керує власним каталогом, замовленнями та профілем у межах своїх прав.
+4. **Affiliate лише за підтверджені продажі.** Немає вступних внесків, «інвестицій», винагород за вербування або необмеженої багаторівневої структури.
+5. **Публічні claim-и проходять модерацію.** Платформа не повинна автоматично публікувати медичні або лікувальні обіцянки.
+6. **Mobile-first.** Основний трафік очікується з Instagram, TikTok, Telegram та посилань від блогерів.
+7. **Швидкий перший реліз.** Спочатку концепт, каталог і продаж нехарчових/нескладних товарів; складні категорії підключаються поступово.
+
+***
+
+## 3. Межі MVP
+
+### Входить у MVP
+
+- Головна сторінка та каталог.
+- Категорії, підкатегорії, бренди/майстри.
+- Профілі виробників і практиків.
+- Товари, варіанти, ціни, залишки, фото, характеристики.
+- Контентні сторінки: історії, відео, добірки.
+- Кошик і checkout для товарів.
+- Базова інтеграція Нової пошти.
+- Один український payment provider після його вибору замовником.
+- Кабінет платформи.
+- Vendor onboarding та обмежений кабінет виробника.
+- Affiliate tracking: лінк → перехід → атрибуція → підтверджене замовлення → комісія.
+- Заявки на послуги та події, без складного календаря бронювань.
+- Cloudflare, CDN, object storage, backups, базовий моніторинг.
+- Staging та production deployment.
+
+### Не входить у MVP
+
+- Мобільні застосунки iOS/Android.
+- Складський облік, закупівлі та власний fulfillment.
+- Відеохостинг і transcoding на власному сервері.
+- Свіже м’ясо, готова їжа, холодовий ланцюг та доставка день-у-день.
+- Повноцінний календар із бронюваннями, депозитами, переносами та no-show policy.
+- Продаж квитків із автоматичними QR‑квитками.
+- Автоматичні банківські виплати афіліатам.
+- Self-hosted PostHog, ClickHouse, Kafka, Meilisearch.
+- Розподілена мікросервісна архітектура.
+- AI‑помічник, LLM‑пошук чи персональні рекомендації.
+- Публічний «знак якості» без затверджених правил і процедури підтвердження.
+
+***
+
+## 4. Пропонований стек
+
+| Шар | Рішення | Обґрунтування |
+|---|---|---|
+| Storefront | Next.js, TypeScript, App Router | SEO, SSR/ISR, висока швидкість на мобільному, зручна інтеграція з Medusa |
+| Commerce | Medusa v2, TypeScript | Commerce API, carts, orders, payments, inventory, custom modules/workflows |
+| Marketplace | Custom Medusa module | Вендори, vendor admins, зв’язок vendor–product–order, split orders |
+| CMS | Payload CMS у Next.js repo або Medusa custom module | Stories, профілі, редакційні матеріали, сторінки партнерів |
+| DB | PostgreSQL 16 | Основне сховище |
+| Cache/queue | Redis + BullMQ | Кеш, черги, email, синхронізація доставок, payout reports |
+| Files | Cloudflare R2 | Фото, документи, сертифікати, резервні копії |
+| Video | Cloudflare Stream або Mux | Відео без навантаження на VPS |
+| Edge/DNS/WAF | Cloudflare | TLS, CDN, rate limits, WAF, базовий DDoS protection |
+| Deploy | Docker Compose, GitHub Actions, Hetzner CX31 | Достатньо для раннього production при винесених медіа/аналітиці |
+| Monitoring | UptimeRobot/Better Stack + Sentry | Uptime, помилки, алерти |
+| Email | Resend / Postmark / Brevo | Transactional email |
+| Payments | LiqPay / Fondy / WayForPay — обрати один | Рішення залежить від юридичної особи, комісій і договору |
+| Delivery | Nova Poshta API | Створення відправлень, статуси, розрахунок доставки, ТТН |
+
+Medusa має офіційний приклад реалізації marketplace‑логіки через власний модуль: вендори й їхні адміністратори, прив’язка товарів і замовлень, а також групування товарів по вендорах для створення дочірніх замовлень. Це саме той рівень кастомізації, який потрібен для цього проєкту.[1]
+
+Nova Post API підтримує створення відправлень, розрахунок вартості доставки, отримання статусів, друк документів та повернення за умовами сервісу; інтеграцію слід робити через ізольований adapter, а не виклики API безпосередньо з checkout.
+
+***
+
+## 5. Репозиторій і середовища
+
+```text
+life-marketplace/
+├── apps/
+│   ├── storefront/              # Next.js customer-facing app
+│   ├── commerce/                # Medusa v2 backend + modules
+│   └── admin-portal/            # Optional; otherwise Medusa Admin
+│
+├── packages/
+│   ├── ui/                      # Shared UI components / design tokens
+│   ├── config/                  # ESLint, TS, Tailwind config
+│   ├── types/                   # Shared DTOs/types where appropriate
+│   └── eslint-config/
+│
+├── infra/
+│   ├── docker/
+│   ├── compose/
+│   ├── caddy/
+│   └── scripts/
+│
+├── docs/
+│   ├── adr/
+│   ├── api/
+│   ├── runbooks/
+│   ├── decisions/
+│   └── product/
+│
+├── .github/
+│   └── workflows/
+├── docker-compose.dev.yml
+├── docker-compose.staging.yml
+├── docker-compose.production.yml
+├── Makefile
+└── README.md
+```
+
+### Обов’язкові середовища
+
+| Середовище | Призначення | Домен |
+|---|---|---|
+| Local | Розробка | `localhost` |
+| Staging | Review, QA, демо замовнику | `staging.<domain>` |
+| Production | Реальні користувачі | `<domain>` |
+
+### Git workflow
+
+```text
+main        → production deployment
+develop     → staging deployment
+feature/*   → pull request у develop
+fix/*       → pull request у develop або main
+```
+
+Вимоги:
+
+- Усі зміни — через Pull Request.
+- Обов’язкові lint, typecheck, unit tests та build.
+- Міграції БД версіоновані й виконуються окремим deployment step.
+- Жодних production secrets у Git.
+- Для production — immutable tagged Docker images.
+- Обов’язковий rollback runbook.
+
+***
+
+## 6. Ролі та доступи
+
+| Роль | Права |
+|---|---|
+| `super_admin` | Повний доступ, системні налаштування, ролі, фінанси |
+| `platform_admin` | Керування товарами, вендорами, замовленнями, контентом, affiliate |
+| `content_editor` | Stories, добірки, медіа, профілі, чернетки |
+| `compliance_reviewer` | Перевірка документів, claim-ів, публікація регульованого контенту |
+| `vendor_owner` | Профіль бренду, товари, залишки, свої замовлення |
+| `vendor_manager` | Обмежене управління товарами та замовленнями вендора |
+| `practitioner` | Свій профіль, послуги, заявки |
+| `event_organizer` | Події, реєстрації, матеріали |
+| `affiliate_partner` | Affiliate links, статистика, виплати |
+| `customer` | Профіль, замовлення, адреси, заявки |
+| `guest` | Перегляд і гостьовий checkout |
+
+Критично: `vendor_owner` і `vendor_manager` **ніколи** не можуть бачити дані іншого вендора, його товари, замовлення, клієнтів або фінанси.
+
+***
+
+## 7. Інформаційна архітектура
+
+```text
+/
+├── Головна
+├── Каталог
+│   ├── Усі товари
+│   ├── Корисна їжа
+│   ├── Натуральна косметика
+│   ├── Екоодяг
+│   ├── Ортопедичні товари й аксесуари
+│   ├── Кераміка й екоінтер’єр
+│   ├── Екобіжутерія та мінерали
+│   ├── Аромадизайн і ароматерапія
+│   ├── Практики для тіла
+│   ├── Тренінги й майстер-класи
+│   └── Психологічна підтримка
+├── Люди ЛАЙФ
+├── Історії / Журнал
+├── Події
+├── Знак якості
+├── Благодійність
+├── Наші партнери
+├── Для виробників і майстрів
+├── Для партнерів
+├── Доставка й оплата
+├── Повернення
+├── Підтримка
+├── Політика конфіденційності
+├── Публічна оферта
+└── Умови affiliate-програми
+```
+
+***
+
+## 8. Категорії MVP
+
+### 8.1. Товарні категорії
+
+```text
+Корисна їжа
+├── Батончики та солодощі
+├── Снеки й чіпси
+├── Олії
+├── Вода
+├── Напої
+├── Хліб
+└── Інше
+
+Натуральна косметика
+├── Косметика
+├── Мило
+├── Гідролати
+└── Парфуми
+
+Екоодяг
+├── Одяг із конопель та кропиви
+├── Футболки
+├── Худі
+└── Бавовняний одяг
+
+Ортопедичні товари та аксесуари
+├── Масажери
+├── Реабілітаційні аксесуари
+└── Інші товари
+
+Кераміка та екоінтер’єр
+├── Посуд
+├── Скульптура
+├── Інтер’єр
+├── Обігрівачі
+└── Керамобані
+
+Екобіжутерія та мінерали
+├── Бурштин
+├── Бісер і бусини
+├── Handmade прикраси
+├── Інші мінерали
+└── Інтер’єрні рішення з каменю
+
+Аромадизайн та ароматерапія
+├── Аромаолії
+├── Аромалампи
+├── Дифузори
+└── Дистилятори
+```
+
+### 8.2. Нетоварні категорії
+
+```text
+Практики для тіла
+├── Масаж
+├── Танцювальні практики
+├── Банні практики
+└── Реабілітаційні практики
+
+Тренінги та майстер-класи
+├── Бізнес і лідерство
+├── Продажі
+├── ШІ-візуалізація
+├── Кулінарія
+├── Глина та кераміка
+├── Біжутерія
+├── Ароматерапія
+└── Інші події
+
+Психологічна підтримка
+├── Індивідуальні консультації
+├── Підтримка ветеранів і сімей
+└── Групові формати
+```
+
+***
+
+## 9. Типи пропозицій
+
+### 9.1. `product`
+
+Фізичний товар, який додається до кошика.
+
+Обов’язкові поля:
+
+```text
+title
+slug
+vendor_id
+category_id
+short_description
+description
+status
+price_uah
+variants
+sku
+inventory_quantity
+weight_grams
+dimensions_mm
+media
+shipping_profile
+return_policy
+legal_review_status
+```
+
+Додаткові поля для їжі:
+
+```text
+ingredients
+allergens
+nutrition_facts
+net_quantity
+storage_conditions
+best_before
+producer_name
+producer_address
+country_of_origin
+```
+
+### 9.2. `service`
+
+Послуга фахівця з CTA «Залишити заявку» або «Записатися».
+
+```text
+title
+provider_id
+category_id
+short_description
+description
+format: offline | online | hybrid
+location
+duration_minutes
+price_from_uah
+request_form_schema
+eligibility_notes
+cancellation_policy
+legal_review_status
+```
+
+**MVP:** lead form, email/CRM notification, статус заявки.  
+**Після MVP:** календар, слоти, синхронізація Google Calendar, передоплата.
+
+### 9.3. `event`
+
+Тренінг, майстер-клас або зустріч.
+
+```text
+title
+organizer_id
+category_id
+description
+format: offline | online | hybrid
+venue
+meeting_url
+starts_at
+ends_at
+timezone
+capacity
+price_uah
+registration_status
+programme
+speaker_ids
+```
+
+**MVP:** реєстрація/заявка.  
+**Після MVP:** квитки, QR, waitlist, повернення та перенесення.
+
+### 9.4. `charity_project`
+
+```text
+title
+organization
+verified_status
+description
+goal_amount
+collected_amount
+donation_url
+reports
+media
+status
+```
+
+**MVP:** інформаційна сторінка та зовнішній перевірений donation link.  
+Не приймати пожертви на баланс платформи без затвердженої юридичної та бухгалтерської моделі.
+
+***
+
+## 10. Функціональні вимоги
+
+### 10.1. Головна сторінка
+
+Обов’язкові блоки:
+
+1. Hero із назвою «ЛАЙФ» та CTA «Відкрити каталог».
+2. Категорії.
+3. «Люди ЛАЙФ» — картки виробників, майстрів, практиків.
+4. Добірка товарів.
+5. Найближчі події.
+6. Історії та відео.
+7. Знак якості.
+8. Благодійність.
+9. Партнери.
+10. Підписка на новини.
+11. Footer: legal, delivery, contacts, соціальні мережі.
+
+### 10.2. Каталог
+
+Функції:
+
+- Breadcrumbs.
+- Категорії та підкатегорії.
+- Full-text search.
+- Фільтри за категорією, виробником, ціною, наявністю, матеріалом/інгредієнтами.
+- Сортування: популярні, нові, ціна за зростанням/спаданням.
+- Пагінація або cursor-based infinite scroll.
+- SEO‑сторінки категорій.
+- Канонічні URL.
+- Empty states.
+- Рекомендовані товари тієї ж категорії.
+
+### 10.3. Картка товару
+
+Має містити:
+
+- Назву, ціну, варіанти, наявність.
+- Фото та відео.
+- Виробника з посиланням на профіль.
+- Опис.
+- Склад або матеріали.
+- Обов’язкові характеристики залежно від категорії.
+- Доставку та повернення.
+- Кнопку «Додати в кошик».
+- Можливість перейти на story виробника.
+- Секцію «Схожі товари».
+- Статус модерації не відображається покупцю.
+
+### 10.4. Профіль виробника / майстра
+
+```text
+name
+slug
+avatar/logo
+cover
+short_bio
+full_story
+location
+social_links
+contacts
+media_gallery
+certificates
+offerings
+stories
+verified_status
+```
+
+Різниця:
+
+- **Виробник:** товари, доставка, сертифікати, бренд‑історія.
+- **Практик:** послуги, формат, локація/онлайн, кваліфікація, форма заявки.
+- **Організатор:** події, програми, спікери.
+- **Партнер:** опис партнерства, посилання, без checkout.
+
+### 10.5. Контент / «Жива газета»
+
+Потрібен редакційний CMS‑модуль.
+
+Сутності:
+
+```text
+Story
+Guide
+Collection
+Video
+Quote
+MediaAsset
+LandingPage
+SEO metadata
+```
+
+Кожен матеріал може бути прив’язаний до:
+
+- одного або кількох людей;
+- товарів;
+- подій;
+- категорій;
+- партнерів;
+- affiliate campaign, якщо це дозволено редакційними правилами.
+
+Анімація має бути легкою, без autoplay‑аудіо; підтримати `prefers-reduced-motion`.
+
+### 10.6. Кошик і checkout
+
+В MVP дозволено:
+
+- Guest checkout.
+- Вхід/реєстрація за email.
+- Один кошик із товарами кількох вендорів.
+- Розрахунок вартості доставки по кожній vendor shipment group.
+- Оплата карткою через один provider.
+- Оплата при отриманні — лише якщо це дозволяє vendor shipping profile.
+- Створення parent order та дочірніх vendor orders.
+- Email покупцю, вендору й адміністратору.
+- Customer order page.
+- Перегляд статусів доставки.
+
+Мультивендорна логіка має групувати позиції кошика за вендором і формувати окремі vendor orders. Medusa документує подібний підхід через custom workflow та зв’язки між vendor, product і order.[1]
+
+### 10.7. Доставка
+
+Зробити інтерфейс `ShippingProviderAdapter`:
+
+```ts
+interface ShippingProviderAdapter {
+  listPickupPoints(input): Promise<PickupPoint[]>
+  calculate(input): Promise<ShippingQuote[]>
+  createShipment(input): Promise<Shipment>
+  getTracking(input): Promise<TrackingEvent[]>
+  cancelShipment(input): Promise<void>
+}
+```
+
+Реалізувати `NovaPoshtaAdapter`.
+
+Функції першої версії:
+
+- Вибір міста.
+- Пошук відділення/поштомату.
+- Доставка у відділення.
+- Адресна доставка — за наявності даних від вендора.
+- Розрахунок вартості.
+- Створення відправлення після підтвердження замовлення.
+- Збереження ТТН та shipment ID.
+- Синхронізація статусів queue job-ом.
+- Відображення трекінгу в кабінеті покупця.
+- Вендор бачить тільки свої відправлення.
+
+Nova Post API передбачає окремі операції для створення відправлення, редагування у статусі `ReadyToShip`, розрахунку ціни та отримання повного/скороченого трекінгу; adapter має мапити зовнішні статуси у внутрішню state machine.
+
+### 10.8. Affiliate / referral module
+
+#### Бізнес‑обмеження
+
+- Комісія лише за **оплачені/успішно доставлені** замовлення.
+- Джерело виплати — частина узгодженої маржі або marketing budget.
+- Відсутні вступні внески.
+- Відсутня винагорода за залучення партнерів як самоціль.
+- MVP: один рівень атрибуції.
+- Другий рівень може бути лише окремим майбутнім рішенням після юридичного погодження.
+- Винагорода не нараховується на скасовані, повернені, fraud‑замовлення.
+
+#### Сутності
+
+```text
+AffiliatePartner
+AffiliateLink
+AffiliateClick
+Attribution
+AffiliateConversion
+CommissionRule
+CommissionLedgerEntry
+PayoutBatch
+Payout
+```
+
+#### Логіка атрибуції
+
+```text
+1. Партнер отримує ref code: ?ref=alex-master
+2. Система записує click_id, ref code, utm, landing page, IP hash, user-agent hash
+3. Ставить first-party cookie на 30 днів
+4. При checkout зберігає attribution у cart/order
+5. Після статусу PAID або DELIVERED:
+   - створити commission ledger entry зі статусом pending
+6. Після завершення return window:
+   - змінити статус на approved
+7. Payout у MVP створюється вручну адміністратором
+8. Після виплати: paid + payment reference
+```
+
+#### Правило атрибуції MVP
+
+```text
+Модель: last non-direct click
+Вікно: 30 днів
+Пріоритет: явний affiliate ref > збережений cookie > direct
+Самореферал: заборонений
+Кросдевайс: не гарантується у MVP
+```
+
+#### Кабінет афіліата
+
+- Унікальне посилання.
+- Можливість створити deeplink на конкретну сторінку.
+- Кліки.
+- Унікальні переходи.
+- Замовлення в атрибуції.
+- Pending / approved / paid commission.
+- Експорт CSV.
+- Платіжні реквізити.
+- Умови програми.
+
+### 10.9. Admin і vendor backoffice
+
+#### Platform admin
+
+- CRUD категорій.
+- CRUD вендорів і майстрів.
+- Review профілів.
+- Review товарів.
+- Review claim-ів.
+- Замовлення, виплати, affiliate.
+- Управління контентом.
+- Перегляд заявок на послуги/події.
+- Audit log.
+- CSV exports.
+
+#### Vendor portal
+
+- Профіль вендора.
+- Чернетки товарів.
+- Завантаження фото.
+- Редагування цін, SKU, варіантів і залишків.
+- Перегляд лише власних замовлень.
+- Перегляд лише власних shipment records.
+- Отримання повідомлень про нове замовлення.
+- Статуси: `draft`, `submitted`, `approved`, `published`, `rejected`, `archived`.
+
+***
+
+## 11. Модерація та compliance
+
+### 11.1. Статуси
+
+```text
+draft
+submitted
+under_review
+changes_requested
+approved
+published
+rejected
+archived
+```
+
+### 11.2. Claim review
+
+Для полів, що потенційно містять лікувальні, терапевтичні чи медичні твердження:
+
+```text
+claim_text
+claim_type
+evidence_links
+reviewer_id
+review_status
+review_comment
+reviewed_at
+```
+
+Правила:
+
+- Не публікувати «лікує», «гарантує одужання», «цілющий», «реабілітує» без юридично й доказово погодженої підстави.
+- Для категорій їжі відображати факти, а не оздоровчі обіцянки.
+- Для медичних виробів зберігати документи та класифікацію.
+- Для психологічних послуг додати disclaimer, що платформа не замінює екстрену медичну допомогу.
+- Для роботи з травмою — окремий кризовий блок із контактами екстреної допомоги, які заповнює замовник.
+
+Відомості про харчові продукти мають бути точними, зрозумілими й не вводити в оману, включно з інформацією про склад, алергени та інші обов’язкові дані.[2][3]
+
+Реклама медичних послуг, лікарських засобів і медичних виробів має додаткові обмеження, тому медичні та лікувальні твердження мають проходити окремий review process.[4][5][6]
+
+***
+
+## 12. Нефункціональні вимоги
+
+### Продуктивність
+
+- LCP: до 2.5 с на mobile для основних сторінок у нормальній мережі.
+- INP: до 200 мс як ціль.
+- CLS: до 0.1.
+- API p95: до 800 мс для типових read‑операцій.
+- Checkout не повинен залежати від синхронного виклику зовнішнього API доставки після натискання «Оплатити».
+- Зовнішні інтеграції мають retry policy та dead-letter логіку.
+
+### Безпека
+
+- TLS only.
+- Secure, HttpOnly, SameSite cookies.
+- Secrets лише через env/secret manager.
+- Password hashing сучасним алгоритмом.
+- RBAC.
+- Rate limiting на auth, affiliate click endpoints і forms.
+- CSRF protection там, де застосовно.
+- Server-side validation через Zod.
+- Upload allowlist: MIME, size, extension.
+- Antivirus scan — post-MVP або через storage pipeline.
+- Audit log для критичних адмін‑дій.
+- Мінімізація PII.
+- Не зберігати карткові дані.
+- Резервні копії PostgreSQL зашифровані.
+
+### Надійність
+
+- Щоденний database backup у R2/S3.
+- Retention: 30 днів.
+- Перед кожною production migration — snapshot/backup.
+- Health endpoints: `/healthz`, `/readyz`.
+- Контейнерні `healthcheck`.
+- Alerting на 5xx, disk > 80%, RAM > 85%, backup failure, queue failure.
+- Docker log rotation.
+- Один-два GB swap лише як аварійний buffer, а не постійна пам’ять.
+
+### Accessibility
+
+- Семантичний HTML.
+- Keyboard navigation.
+- Visible focus states.
+- Контраст WCAG AA.
+- Alt text.
+- `prefers-reduced-motion`.
+- Форми з помилками, що читабельні screen reader-ом.
+
+### SEO
+
+- SSR/ISR.
+- `sitemap.xml`, `robots.txt`.
+- Canonical URLs.
+- Open Graph.
+- JSON-LD: `Organization`, `Product`, `BreadcrumbList`, `Article`, `Event` — залежно від типу сторінки.
+- Українські slug-и допускаються, але рекомендовано транслітеровані ASCII slug-и для стабільності URL.
+- SEO metadata на рівні сторінки, категорії, товару, профілю та story.
+
+***
+
+## 13. Інфраструктура CX31
+
+На Hetzner CX31 використовувати:
+
+```text
+Caddy / Nginx
+Next.js storefront
+Medusa API
+Medusa worker
+PostgreSQL
+Redis
+Payload CMS або CMS в storefront
+```
+
+Не розгортати на цьому сервері:
+
+- Meilisearch/Typesense у постійному режимі;
+- self-hosted PostHog;
+- ClickHouse/Kafka;
+- MinIO;
+- FFmpeg/transcoding;
+- локальні LLM;
+- відео та великі файли;
+- багато одночасних Next.js production builds.
+
+Рекомендовані початкові memory limits:
+
+```yaml
+postgres:      1600m
+redis:          384m
+medusa-api:    1200m
+medusa-worker:  900m
+storefront:     700m
+cms:            700m
+```
+
+Це орієнтири, не фінальні гарантії: агент має виконати load test і скорегувати ліміти. Build образів треба робити у GitHub Actions або окремому CI runner, а на сервер доставляти готові images.
+
+***
+
+## 14. API та інтеграційні правила
+
+1. Всі інтеграції реалізуються через adapters/interfaces.
+2. Немає provider-specific коду у UI або business workflows.
+3. Webhooks мають бути idempotent.
+4. Кожен зовнішній request має:
+   - timeout;
+   - retry для transient errors;
+   - structured logging;
+   - correlation ID;
+   - failure status у БД або queue.
+5. Секрети платіжного провайдера і Nova Poshta — тільки server-side.
+6. Для sandbox і production використовувати окремі конфігурації та ключі.
+7. Ніколи не блокувати checkout через довгі зовнішні процеси.
+
+***
+
+## 15. Acceptance criteria MVP
+
+### Каталог
+
+- Адмін створює категорію, вендора, профіль і товар.
+- Товар після approval видно в каталозі, категорії та профілі вендора.
+- Користувач знаходить товар пошуком або через категорію.
+- Фільтри та сортування працюють.
+- Товар має canonical URL, SEO title, description та OG‑image.
+
+### Замовлення
+
+- Гість додає товари одного або кількох вендорів у кошик.
+- Система правильно групує позиції за вендором.
+- Користувач обирає місто та пункт Нової пошти.
+- Користувач завершує sandbox checkout.
+- Створюються parent order та vendor orders.
+- Вендор бачить тільки власну частину замовлення.
+- Адмін бачить все замовлення та дочірні замовлення.
+- Покупець і вендор отримують email‑повідомлення.
+- Зберігається shipment ID / ТТН після створення відправлення.
+
+### Affiliate
+
+- Партнер отримує унікальне посилання.
+- Клік зберігається без запису сирої IP‑адреси.
+- Замовлення по лінку коректно отримує affiliate attribution.
+- Після оплати комісія стає `pending`.
+- Адмін може approve/reject комісію.
+- Скасоване/повернене замовлення не може перейти у `paid`.
+- Партнер бачить агреговану статистику і власний ledger.
+
+### Контент
+
+- Редактор створює story та прив’язує її до людини і товарів.
+- Story коректно показується на storefront.
+- Відео завантажується/відтворюється через зовнішній media provider.
+- При `prefers-reduced-motion` декоративні анімації вимкнені або суттєво спрощені.
+
+### Безпека та ops
+
+- Усі production‑домени працюють через HTTPS.
+- Production secrets не зберігаються у Git.
+- Є перевірена процедура backup restore.
+- Є staging environment.
+- Є Sentry або еквівалент.
+- Є uptime monitoring.
+- CI не дозволяє merge при failure lint/typecheck/tests.
+
+***
+
+# Деталізований план для агента
+
+## Фаза 0. Правила виконання
+
+**Тривалість:** 0.5–1 день  
+**Результат:** агент розуміє межі задачі та не вигадує критичних бізнес‑рішень.
+
+### Завдання
+
+1. Створити `docs/decisions/open-questions.md`.
+2. Створити `docs/adr/`.
+3. Не реалізовувати платежі, автоматичні payout, fresh food delivery, психологічне бронювання чи медичні claim-и без позначки `DECISION REQUIRED`.
+4. Усі невизначені рішення фіксувати за шаблоном:
+
+```md
+## DEC-XXX: Назва рішення
+
+- Контекст:
+- Варіанти:
+- Рекомендація:
+- Вплив:
+- Власник рішення:
+- Дедлайн:
+- Статус: OPEN | ACCEPTED | REJECTED
+```
+
+### Deliverables
+
+- `open-questions.md`
+- 10–15 ADR/decision placeholders
+- Scope checklist
+- Initial risk register
+
+***
+
+## Фаза 1. Discovery і фундамент
+
+**Тривалість:** 2–3 дні  
+**Результат:** затверджений технічний фундамент.
+
+### Завдання
+
+1. Підготувати architecture diagram.
+2. Підготувати ERD доменних сутностей.
+3. Створити monorepo.
+4. Налаштувати:
+   - TypeScript strict mode;
+   - ESLint;
+   - Prettier;
+   - Husky/lint-staged;
+   - Vitest;
+   - Playwright;
+   - Changesets або conventional commits.
+5. Підняти локальний Docker environment.
+6. Додати `.env.example`.
+7. Налаштувати CI pipeline.
+8. Підготувати Compose для staging/production.
+9. Додати Caddy reverse proxy.
+10. Додати healthchecks.
+11. Підготувати runbook локального запуску.
+
+### Definition of Done
+
+```bash
+make dev
+make test
+make lint
+make typecheck
+make build
+```
+
+успішно працюють на чистій машині за документацією.
+
+### Deliverables
+
+- Monorepo.
+- CI.
+- Local dev stack.
+- C4/architecture diagram.
+- ERD v1.
+- `README.md`.
+- `docs/runbooks/local-development.md`.
+
+***
+
+## Фаза 2. Design system і UI prototype
+
+**Тривалість:** 3–5 днів  
+**Результат:** клікабельний/робочий storefront‑prototype, який можна показати замовнику до реалізації комерції.
+
+### Завдання
+
+1. Створити дизайн‑токени:
+   - блакитний primary;
+   - білий/світлий surface;
+   - темний текст;
+   - accent;
+   - success/warning/error;
+   - spacing, radii, shadows, typography.
+2. Реалізувати компоненти:
+   - Header;
+   - Footer;
+   - Category card;
+   - Product card;
+   - Person card;
+   - Story card;
+   - Event card;
+   - Badge;
+   - CTA;
+   - Filter controls;
+   - Empty state;
+   - Form controls.
+3. Створити demo content fixture.
+4. Реалізувати сторінки:
+   - `/`
+   - `/catalog`
+   - `/catalog/[category]`
+   - `/people`
+   - `/people/[slug]`
+   - `/stories`
+   - `/stories/[slug]`
+   - `/events`
+   - `/charity`
+   - `/partners`
+5. Перевірити mobile UX у viewport 360 px.
+6. Додати SEO skeleton.
+
+### Definition of Done
+
+- Замовник може побачити структуру «ЛАЙФ».
+- Є 5–6 демо‑персон.
+- Є 20–30 демо‑товарів.
+- Є 3–5 stories.
+- Усі сторінки responsive.
+- Lighthouse базово не має критичних accessibility errors.
+
+***
+
+## Фаза 3. Commerce core і marketplace module
+
+**Тривалість:** 5–8 днів  
+**Результат:** адмін створює вендора, товари й бачить їх у storefront.
+
+### Завдання
+
+1. Підняти Medusa v2.
+2. Створити `marketplace` module:
+   - `Vendor`;
+   - `VendorAdmin`;
+   - `VendorProfile`;
+   - `VendorVerification`;
+   - links `Vendor ↔ Product`;
+   - links `Vendor ↔ Order`.
+3. Додати actor type `vendor`.
+4. Створити workflows:
+   - `create-vendor`;
+   - `invite-vendor-admin`;
+   - `create-vendor-product`;
+   - `submit-product-for-review`;
+   - `approve-product`;
+   - `reject-product`.
+5. Створити vendor‑scoped API routes.
+6. Забезпечити authorization tests.
+7. Реалізувати product custom fields:
+   - vendor;
+   - listing type;
+   - claim review;
+   - shipping profile;
+   - content relations.
+8. Реалізувати базовий admin UI або адаптувати Medusa Admin.
+
+Medusa має офіційний патерн: окремий Marketplace Module з `Vendor`/`VendorAdmin`, links до продуктів і замовлень та custom authenticated vendor routes; агент має використовувати цей підхід, а не намагатися замінити vendor isolation лише frontend filtering.[1]
+
+### Definition of Done
+
+- Platform admin створює вендора.
+- Вендор логіниться.
+- Вендор створює товар.
+- Товар має пройти review.
+- Вендор не бачить дані інших вендорів.
+- Published товар видно на storefront.
+
+***
+
+## Фаза 4. CMS, люди, історії, нетоварні listings
+
+**Тривалість:** 4–6 днів  
+**Результат:** платформа виглядає як медіа‑простір, а не лише магазин.
+
+### Завдання
+
+1. Обрати та зафіксувати:
+   - Payload у Next.js;
+   - або Medusa custom content module.
+
+2. Реалізувати:
+   - `ProviderProfile`;
+   - `Story`;
+   - `Guide`;
+   - `Collection`;
+   - `MediaAsset`;
+   - `Service`;
+   - `Event`;
+   - `CharityProject`;
+   - `Partner`.
+
+3. Зробити зв’язки:
+   - story → persons;
+   - story → products;
+   - story → events;
+   - provider → products/services/events;
+   - category → listings.
+
+4. Реалізувати форму заявки:
+   - ім’я;
+   - телефон;
+   - email;
+   - повідомлення;
+   - consent checkbox;
+   - source/UTM;
+   - captcha/rate limiting.
+
+5. Додати email admin/провайдеру про нову заявку.
+6. Додати dashboard зі статусами lead:
+   - `new`;
+   - `contacted`;
+   - `scheduled`;
+   - `closed_won`;
+   - `closed_lost`.
+
+### Definition of Done
+
+- Сторінка людини відображає його товари, послуги/події та історії.
+- Заявка на послугу створюється й потрапляє уповноваженому користувачу.
+- Event має сторінку з датою, форматом, програмою та CTA.
+- Контент не може бути опубліковано без review status.
+
+***
+
+## Фаза 5. Cart, checkout, payments
+
+**Тривалість:** 5–8 днів  
+**Результат:** можливе end‑to‑end sandbox замовлення.
+
+### Завдання
+
+1. Storefront cart.
+2. Guest checkout.
+3. Customer account.
+4. Address book.
+5. Checkout UI.
+6. Payment adapter interface.
+7. Обрати й інтегрувати один payment provider у sandbox.
+8. Payment webhook handler:
+   - signature validation;
+   - idempotency;
+   - status mapping;
+   - audit logging.
+9. Parent order + vendor child orders.
+10. Emails:
+   - order confirmation customer;
+   - new vendor order;
+   - payment status;
+   - cancellation/refund status.
+11. Customer order history.
+12. Admin order view.
+13. Vendor order view.
+
+### Definition of Done
+
+- E2E тест створює cart, checkout, order.
+- Повторний webhook не створює дубль order/payment.
+- Вендор бачить лише свою child order.
+- Скасування замовлення правильно відображається в affiliate ledger.
+
+***
+
+## Фаза 6. Nova Poshta
+
+**Тривалість:** 3–5 днів  
+**Результат:** delivery flow працює у sandbox, а shipment data не змішується між вендорами.
+
+### Завдання
+
+1. Реалізувати `NovaPoshtaAdapter`.
+2. Реалізувати кеш довідників/пунктів видачі.
+3. UI вибору міста/відділення.
+4. Shipping quotes.
+5. Створення shipment після події:
+   - payment confirmed або
+   - admin/vendor confirms fulfillment,
+   - залежно від затвердженої бізнес‑моделі.
+6. Зберігати:
+   - external shipment ID;
+   - ТТН/номер;
+   - vendor order ID;
+   - shipping status;
+   - raw status payload у sanitized audit log.
+7. Background sync.
+8. Сторінка трекінгу для customer.
+9. Vendor label/TTN view.
+10. Failure/retry handling.
+
+Nova Post дозволяє створювати shipment documents, отримувати списки та tracking; shipment update має обмеження за статусом, тому UI повинен блокувати/пояснювати зміни після переходу відправлення з `ReadyToShip`.
+
+### Definition of Done
+
+- Користувач обирає відділення.
+- Система розраховує доставку.
+- Для vendor order створюється shipment.
+- ТТН відображається адміну/вендору/покупцю за правами.
+- Queue job оновлює shipment status.
+- Помилка API не ламає checkout.
+
+***
+
+## Фаза 7. Affiliate module
+
+**Тривалість:** 4–6 днів  
+**Результат:** прозора CPA‑атрибуція й ручні виплати.
+
+### Завдання
+
+1. Створити модуль і міграції.
+2. Реферальний код і deeplinks.
+3. Click endpoint:
+   - cookie;
+   - UTM;
+   - anonymized IP hash;
+   - rate limit;
+   - bot filtering baseline.
+4. Attribution logic.
+5. Order linkage.
+6. Commission rule:
+   - fixed UAH;
+   - percentage;
+   - global / category / vendor / product priority.
+7. Commission ledger.
+8. Approval workflow.
+9. Admin payout batch.
+10. Affiliate dashboard.
+11. CSV exports.
+12. Fraud controls:
+   - self referral;
+   - refunded/canceled order reversal;
+   - suspicious click burst flags.
+
+### Definition of Done
+
+- Посилання `?ref=<code>` створює attribution.
+- Зарахування комісії виконується рівно один раз.
+- Комісія не стає payable, поки не закінчиться return window.
+- Адмін бачить повний ledger.
+- Партнер не бачить PII покупців.
+
+***
+
+## Фаза 8. Hardening, QA, observability
+
+**Тривалість:** 3–5 днів  
+**Результат:** стабільний production candidate.
+
+### Завдання
+
+1. Sentry.
+2. Uptime monitoring.
+3. Structured JSON logs.
+4. Correlation IDs.
+5. Backup automation.
+6. Restore drill.
+7. Rate limiting.
+8. Security headers.
+9. Dependency scanning.
+10. Test suite:
+   - unit;
+   - integration;
+   - authorization;
+   - E2E checkout;
+   - E2E affiliate;
+   - E2E shipping sandbox.
+11. Load test:
+   - каталог;
+   - product details;
+   - cart;
+   - checkout start;
+   - affiliate click endpoint.
+12. Documentation:
+   - deployment;
+   - rollback;
+   - backup restore;
+   - incident;
+   - adding vendor;
+   - approving product;
+   - setting affiliate rule.
+
+### Definition of Done
+
+- Є успішний backup restore.
+- Є documented rollback.
+- Критичні E2E проходять у CI.
+- Немає high/critical known vulnerabilities без acceptance.
+- Load test не виявляє OOM на CX31 у погодженому MVP профілі.
+
+***
+
+## Фаза 9. Production launch
+
+**Тривалість:** 1–2 дні  
+**Результат:** керований запуск.
+
+### Launch checklist
+
+- Домен, DNS, Cloudflare.
+- Production secrets.
+- TLS.
+- Payment production credentials.
+- Nova Poshta production credentials.
+- Email sender domain DNS records.
+- Privacy policy.
+- Public offer.
+- Return policy.
+- Affiliate terms.
+- Cookie consent policy.
+- Vendor agreements.
+- Test order.
+- Test refund/cancellation.
+- Test shipment.
+- Test affiliate conversion.
+- Test backup.
+- Monitoring alerts.
+- Admin access inventory.
+- Launch communication plan.
+- Rollback decision owner.
+
+***
+
+# Важливі відкриті питання до замовника
+
+Агент не має вирішувати це самостійно. Він має зібрати відповіді й зафіксувати у `docs/decisions`.
+
+## Комерція
+
+1. Хто є юридичним продавцем: платформа чи кожен вендор окремо?
+2. Хто приймає оплату від покупця?
+3. Хто видає чек/РРО?
+4. Чи платформа утримує комісію, і яка її модель?
+5. Чи buyer отримує одне замовлення/одну оплату при товарах різних вендорів?
+6. Хто відповідає за повернення, гарантії та customer support?
+7. Який payment provider обрано?
+8. Чи підтримується післяплата, і хто несе ризик невидачі?
+
+## Логістика
+
+1. Кожен вендор сам відправляє товар чи існує один склад?
+2. Чи має кожен вендор власний договір Нової пошти?
+3. Хто платить за доставку?
+4. Чи будуть доставка до відділення, поштомату, адресна доставка?
+5. Чи будуть товари з температурними обмеженнями?
+6. Чи можна поєднувати в одному кошику food і non-food?
+7. Яка географія: тільки Україна чи також ЄС?
+
+## Каталог
+
+1. Які категорії реально запускаються в першій хвилі?
+2. Які 10–20 виробників і майстрів готові надати дані першими?
+3. Які категорії вимагають сертифікатів або документів?
+4. Хто наповнює товарні картки й контент?
+5. Хто модерує claims, документи й якість?
+6. Чи «ЛАЙФ» — остаточна назва, і чи перевіряли ТМ/домен?
+
+## Послуги та події
+
+1. Чи послуги оплачуються на платформі чи лише через прямий контакт?
+2. Онлайн, офлайн чи гібрид?
+3. Чи потрібні календарі/слоти на старті?
+4. Які правила скасування?
+5. Хто несе відповідальність за послуги психологів/практиків?
+6. Які документи/кваліфікації обов’язкові для фахівців?
+7. Чи потрібні квитки, QR-коди та ліміти місць для подій?
+
+## Affiliate
+
+1. Хто може бути партнером: блогер, покупець, вендор, співробітник?
+2. Який відсоток/сума комісії для кожної категорії?
+3. Який return window?
+4. Хто перевіряє й затверджує виплати?
+5. Як афіліати надають реквізити?
+6. Чи виплата раз на місяць, чи за досягнення мінімальної суми?
+7. Чи потрібні промокоди на додаток до посилань?
+8. Чи передбачається будь-який другий рівень? Якщо так — лише після юридичного висновку.
+
+***
+
+# Формат фінального звіту від агента
+
+Після завершення кожної фази агент має надавати:
+
+```md
+# Phase N Report
+
+## Completed
+- ...
+
+## Changed files / modules
+- ...
+
+## Demo URLs
+- ...
+
+## Tests
+- lint:
+- typecheck:
+- unit:
+- integration:
+- e2e:
+
+## Decisions made
+- ADR-...
+
+## Risks / blockers
+- ...
+
+## Required client decisions
+- ...
+
+## Next phase plan
+- ...
+```
+
+***
+
+# Найважливіша інструкція агенту
+
+> Не будуй фінансову «піраміду», не реалізовуй авто‑виплати афіліатам і не публікуй медичні/лікувальні обіцянки без окремого затвердження. У першому релізі пріоритет: красивий контентний простір, керований каталог, профілі людей, простий товарний checkout, Nova Poshta sandbox і прозора одно-рівнева affiliate‑атрибуція.
+
+Sources
+[1] Marketplace Recipe https://docs.medusajs.com/resources/recipes/marketplace
+[2] Ukraine - Labeling and Marking Requirements https://www.trade.gov/country-commercial-guides/ukraine-labeling-and-marking-requirements
+[3] Food products labeling: novelties of Ukrainian legislation https://journals.knute.edu.ua/commodities-and-markets/article/view/1067
+[4] Закон України «Про рекламу» https://zakon.rada.gov.ua/laws/show/270/96-%D0%B2%D1%80#Text
+[5] Закон України «Про рекламу» (чинна редакція) https://zakon.rada.gov.ua/laws/show/270/96-%D0%B2%D1%80#Text
+[6] Pharmaceutical and Medical Device Advertising in Ukraine Guide https://cms.law/en/int/expert-guides/cms-expert-guide-to-advertising-of-medicines-and-medical-devices/ukraine

@@ -46,3 +46,154 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+  catalog-provider-integration:
+    name: Catalog Provider Integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci_bootstrap
+          POSTGRES_PASSWORD: ci_bootstrap_password
+          POSTGRES_DB: ci_control
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          check-latest: true
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Bootstrap CI Test Database
+        env:
+          TEST_BOOTSTRAP_DATABASE_URL: postgresql://ci_bootstrap:ci_bootstrap_password@127.0.0.1:${{ job.services.postgres.ports[5432] }}/ci_control
+          TEST_APPLICATION_DATABASE_URL: postgresql://life_medusa_test:ci_test_password@127.0.0.1:${{ job.services.postgres.ports[5432] }}/life_medusa_test
+        run: pnpm --filter @life/commerce exec tsx ./src/scripts/bootstrap-ci-test-database.ts
+
+      - name: Run Integration Tests
+        env:
+          DATABASE_URL: postgresql://life_medusa_test:ci_test_password@127.0.0.1:${{ job.services.postgres.ports[5432] }}/life_medusa_test
+          REDIS_URL: redis://127.0.0.1:${{ job.services.redis.ports[6379] }}
+          NODE_ENV: test
+          ALLOW_SYNTHETIC_CATALOG: "true"
+          JWT_SECRET: ci_jwt_secret_test_only
+          COOKIE_SECRET: ci_cookie_secret_test_only
+        run: pnpm run test:integration
+
+  catalog-provider-migrations:
+    name: Catalog Provider Migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci_bootstrap
+          POSTGRES_PASSWORD: ci_bootstrap_password
+          POSTGRES_DB: ci_control
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          check-latest: true
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Bootstrap CI Migration Database
+        env:
+          TEST_BOOTSTRAP_DATABASE_URL: postgresql://ci_bootstrap:ci_bootstrap_password@127.0.0.1:${{ job.services.postgres.ports[5432] }}/ci_control
+          TEST_APPLICATION_DATABASE_URL: postgresql://life_medusa_migration_test:ci_migration_password@127.0.0.1:${{ job.services.postgres.ports[5432] }}/life_medusa_migration_test
+        run: pnpm --filter @life/commerce exec tsx ./src/scripts/bootstrap-ci-test-database.ts
+
+      - name: Run Migration Idempotence Tests
+        env:
+          DATABASE_URL: postgresql://life_medusa_migration_test:ci_migration_password@127.0.0.1:${{ job.services.postgres.ports[5432] }}/life_medusa_migration_test
+          REDIS_URL: redis://127.0.0.1:${{ job.services.redis.ports[6379] }}
+          NODE_ENV: test
+          ALLOW_SYNTHETIC_CATALOG: "true"
+          JWT_SECRET: ci_jwt_secret_test_only
+          COOKIE_SECRET: ci_cookie_secret_test_only
+        run: pnpm run test:migrations
+
+  storefront-e2e:
+    name: Storefront E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          check-latest: true
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @life/storefront exec playwright install --with-deps chromium
+
+      - name: Run Storefront E2E Tests
+        run: pnpm --filter @life/storefront run test:e2e

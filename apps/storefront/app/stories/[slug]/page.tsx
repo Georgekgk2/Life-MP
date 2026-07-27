@@ -8,7 +8,8 @@ import {
   ProductCard,
   SectionHeading,
 } from "@/components";
-import { people, products, stories } from "@/fixtures";
+import { people, stories } from "@/fixtures";
+import { getCatalogProductsBySlugs } from "@/catalog/server";
 
 type StoryPageProps = Readonly<{
   params: Promise<{
@@ -31,7 +32,7 @@ export async function generateMetadata({
   }
 
   return {
-    title: `${story.title} — історії Life-MP`,
+    title: `${story.title} — історія спільноти`,
     description: story.summary,
   };
 }
@@ -47,11 +48,13 @@ export default async function StoryPage({ params }: StoryPageProps) {
   const relatedPerson = people.find(
     (person) => person.slug === story.personSlug,
   );
-  const relatedProducts = products.filter((product) =>
-    story.relatedProductSlugs.some(
-      (productSlug) => productSlug === product.slug,
-    ),
+
+  const catalogResult = await getCatalogProductsBySlugs(
+    story.relatedProductSlugs,
   );
+
+  const isCatalogReady = catalogResult.kind === "ready";
+  const relatedProducts = isCatalogReady ? catalogResult.snapshot.products : [];
 
   return (
     <>
@@ -110,7 +113,11 @@ export default async function StoryPage({ params }: StoryPageProps) {
             title="Пов’язані тематичні позиції"
             description="Позиції наведено для контексту історії та недоступні для купівлі."
           />
-          {relatedProducts.length > 0 ? (
+          {!isCatalogReady ? (
+            <aside className="notice notice--warning">
+              <p>Каталог тимчасово недоступний.</p>
+            </aside>
+          ) : relatedProducts.length > 0 ? (
             <div className="content-grid content-grid--cards">
               {relatedProducts.map((product) => (
                 <ProductCard key={product.id} product={product} />

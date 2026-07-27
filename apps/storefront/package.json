@@ -10,7 +10,8 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "next typegen && tsc --project tsconfig.json --noEmit",
     "test": "vitest run",
-    "format:check": "prettier --check package.json tsconfig.json next.config.ts next-env.d.ts app src test"
+    "test:e2e": "playwright test",
+    "format:check": "prettier --check package.json tsconfig.json next.config.ts next-env.d.ts app src test e2e"
   },
   "dependencies": {
     "@life/types": "workspace:*",
@@ -19,6 +20,7 @@
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.50.1",
     "@types/node": "22.19.1",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3"

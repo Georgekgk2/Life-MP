@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import {
@@ -9,7 +8,8 @@ import {
   SectionHeading,
   StoryCard,
 } from "@/components";
-import { events, people, products, stories } from "@/fixtures";
+import { events, people, stories } from "@/fixtures";
+import { getCatalogProductsBySlugs } from "@/catalog/server";
 
 type PersonPageProps = Readonly<{
   params: Promise<{
@@ -32,7 +32,7 @@ export async function generateMetadata({
   }
 
   return {
-    title: `${person.name} — люди Life-MP`,
+    title: `${person.name} — людина спільноти`,
     description: person.description,
   };
 }
@@ -45,11 +45,15 @@ export default async function PersonPage({ params }: PersonPageProps) {
     notFound();
   }
 
-  const featuredProducts = products.filter((product) =>
-    person.featuredProductSlugs.some(
-      (productSlug) => productSlug === product.slug,
-    ),
+  const catalogResult = await getCatalogProductsBySlugs(
+    person.featuredProductSlugs,
   );
+
+  const isCatalogReady = catalogResult.kind === "ready";
+  const featuredProducts = isCatalogReady
+    ? catalogResult.snapshot.products
+    : [];
+
   const personStories = stories.filter(
     (story) => story.personSlug === person.slug,
   );
@@ -71,9 +75,6 @@ export default async function PersonPage({ params }: PersonPageProps) {
                 <dd className="data-list__value">{person.role}</dd>
               </div>
             </dl>
-            <p>
-              <Link href="/people">Повернутися до всіх людей</Link>
-            </p>
           </div>
           <aside className="notice" aria-label="Статус профілю">
             <h2 className="notice__title">Інформаційний профіль</h2>
@@ -122,7 +123,11 @@ export default async function PersonPage({ params }: PersonPageProps) {
             title="Пов’язані тематичні матеріали"
             description="Інформаційні позиції наведено без можливості купівлі чи резервування."
           />
-          {featuredProducts.length > 0 ? (
+          {!isCatalogReady ? (
+            <aside className="notice notice--warning">
+              <p>Каталог тимчасово недоступний.</p>
+            </aside>
+          ) : featuredProducts.length > 0 ? (
             <div className="content-grid content-grid--cards">
               {featuredProducts.map((product) => (
                 <ProductCard key={product.id} product={product} />

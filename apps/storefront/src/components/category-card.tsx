@@ -1,8 +1,8 @@
-import type { Category } from "@life/types";
+import type { StorefrontCatalogCategory } from "@life/types";
 import Link from "next/link";
 
 type CategoryCardProps = Readonly<{
-  category: Category;
+  category: StorefrontCatalogCategory;
 }>;
 
 export function CategoryCard({ category }: CategoryCardProps) {

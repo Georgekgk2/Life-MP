@@ -20,6 +20,64 @@ export function defineFoundationPackageMetadata<
 }
 
 export type DemoAvailability = "demo-only";
+export type StorefrontCatalogSource = "fixtures" | "medusa";
+export type FulfillmentMode = "vendor_direct" | "platform_warehouse" | "hybrid";
+export type SellerModel =
+  "vendor_is_seller" | "platform_is_seller" | "lead_only";
+
+export type VendorVerificationDTO = Readonly<{
+  vendorId: string;
+  taxIdentifier: string; // EDRPOU or RNOKPP
+  legalName: string;
+  verificationStatus: "pending" | "verified" | "rejected" | "suspended";
+  verifiedAt?: string;
+}>;
+
+export type ComplianceDocumentDTO = Readonly<{
+  id: string;
+  documentType:
+    | "quality_certificate"
+    | "ses_conclusion"
+    | "organic_certificate"
+    | "declaration";
+  documentNumber: string;
+  status: "submitted" | "verified" | "expired" | "rejected";
+  expiresAt?: string;
+}>;
+
+export type ProductClaimDTO = Readonly<{
+  claimType: "organic" | "eco" | "natural" | "handmade" | "medical";
+  publicBadgeText: string;
+  isVerified: boolean;
+  evidenceDocumentId?: string;
+}>;
+
+export type StorefrontCatalogCategory = Readonly<{
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+}>;
+
+export type StorefrontCatalogProduct = Readonly<{
+  id: string;
+  slug: string;
+  categorySlug: string;
+  name: string;
+  description: string;
+  priceUah: number;
+  provider: Readonly<{
+    handle: string;
+    name: string;
+  }>;
+  isSynthetic: boolean;
+}>;
+
+export type StorefrontCatalogSnapshot = Readonly<{
+  source: StorefrontCatalogSource;
+  categories: readonly StorefrontCatalogCategory[];
+  products: readonly StorefrontCatalogProduct[];
+}>;
 
 export type Category<Slug extends string = string> = Readonly<{
   id: string;

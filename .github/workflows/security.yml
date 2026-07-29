@@ -1,0 +1,126 @@
+# =============================================================================
+# Life-MP Security Scan
+# =============================================================================
+# За прикладом Jorvis: Gitleaks для секретів, Trivy для контейнерів.
+# =============================================================================
+
+name: Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 3 * * 1" # Щопонеділка о 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ===========================================================================
+  # Secret Detection (Gitleaks)
+  # ===========================================================================
+  secrets-scan:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+
+  # ===========================================================================
+  # Dependency Audit
+  # ===========================================================================
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit production dependencies
+        run: pnpm audit --prod || true
+
+      - name: Check for known vulnerabilities
+        run: |
+          echo "Checking pnpm audit output..."
+          AUDIT_OUTPUT=$(pnpm audit --prod 2>&1 || true)
+          echo "$AUDIT_OUTPUT"
+          if echo "$AUDIT_OUTPUT" | grep -q "found 0 vulnerabilities"; then
+            echo "No vulnerabilities found"
+          else
+            echo "::warning::Dependency audit found potential vulnerabilities. Review above output."
+          fi
+
+  # ===========================================================================
+  # Container Image Scan (Trivy) — only on main
+  # ===========================================================================
+  container-scan:
+    name: Container Scan
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: commerce
+            dockerfile: deploy/Dockerfile.commerce
+            image: life-commerce-scan
+          - name: storefront
+            dockerfile: deploy/Dockerfile.storefront
+            image: life-storefront-scan
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Build image for scanning
+        run: |
+          DOCKER_BUILDKIT=1 docker build \
+            --load \
+            -t ${{ matrix.image }}:scan \
+            -f ${{ matrix.dockerfile }} \
+            .
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "${{ matrix.image }}:scan"
+          format: "table"
+          exit-code: "0"
+          ignore-unfixed: true
+          vuln-type: "os,library"
+          severity: "CRITICAL,HIGH"
+        env:
+          TRIVY_NO_PROGRESS: "true"
+
+      - name: Check for .env files in image
+        run: |
+          echo "Checking for accidentally included secrets..."
+          HISTORY=$(docker history --no-trunc ${{ matrix.image }}:scan 2>/dev/null || true)
+          if echo "$HISTORY" | grep -iE '\.env|secret|password|token|key\.pem'; then
+            echo "::warning::Potential secret artifacts found in image layers"
+          fi

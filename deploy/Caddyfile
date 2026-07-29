@@ -1,0 +1,37 @@
+# =============================================================================
+# Life-MP Caddyfile — Reverse Proxy with Auto-TLS
+# =============================================================================
+# Замініть life.ua на реальний домен після його реєстрації.
+# Поки домен не зареєстровано, Caddy працюватиме на портах 80/443
+# з self-signed сертифікатом або без TLS (для IP-based доступу).
+# =============================================================================
+
+{$DOMAIN:localhost} {
+    # Storefront
+    handle /api/* {
+        reverse_proxy commerce:9000
+    }
+
+    handle {
+        reverse_proxy storefront:3000
+    }
+
+    # Security headers
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options SAMEORIGIN
+        Referrer-Policy strict-origin-when-cross-origin
+        -Server
+    }
+
+    # Gzip
+    encode gzip
+
+    # Logging
+    log {
+        output file /data/access.log {
+            roll_size 10mb
+            roll_keep 5
+        }
+    }
+}

@@ -1,0 +1,65 @@
+# =============================================================================
+# Life-MP .dockerignore — Exclude from Docker build context
+# =============================================================================
+
+# Git
+.git
+.gitignore
+
+# Node
+node_modules
+**/node_modules
+
+# Build outputs
+**/.next
+**/dist
+**/build
+**/.turbo
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+!.env.prod.template
+
+# Docker
+docker-compose*.yml
+Dockerfile*
+deploy/Dockerfile*
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# CI/CD
+.github
+.gitleaks.toml
+
+# Documentation
+docs
+*.md
+!README.md
+
+# Tests
+**/test
+**/tests
+**/__tests__
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+**/e2e
+**/playwright-report
+**/test-results
+
+# Backups & artifacts
+backups
+artifacts
+*.tar.gz
+*.sql
+*.sql.gz
+
+# Scripts (not needed in runtime)
+scripts

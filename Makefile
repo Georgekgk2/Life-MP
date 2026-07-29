@@ -8,7 +8,7 @@ COMPOSE := docker compose --env-file .env.example -f docker-compose.dev.yml
 	dev-infra-up dev-infra-wait dev-infra-down dev-infra-logs \
 	db-bootstrap commerce-migrate commerce-seed test-integration test-migrations test-fresh-state \
 	db-backup db-restore db-reset docker-clean \
-	deploy-staging deploy-production
+	deploy-staging deploy-production docker-build-local docker-up-local docker-down-local
 
 help: ## Показати доступні команди
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-25s\033[0m %s\n", $$1, $$2}'
@@ -105,13 +105,32 @@ docker-clean: ## [ЛОКАЛЬНО, РУЙНІВНО] Зупинити серв�
 	$(COMPOSE) down --volumes --remove-orphans
 
 # =============================================================================
-# Розгортання
+# Локальна контейнеризація (для тестування перед розгортанням)
 # =============================================================================
 
-deploy-staging: ## Не підтримується: staging-розгортання не реалізовано
-	@printf '%s\n' "ERROR: staging deployment is unimplemented; жодного розгортання не виконано." >&2
-	@exit 1
+PROD_COMPOSE := docker compose -f deploy/docker-compose.prod.yml
 
-deploy-production: ## Не підтримується: production-розгортання не реалізовано
-	@printf '%s\n' "ERROR: production deployment is unimplemented; жодного розгортання не виконано." >&2
-	@exit 1
+docker-build-local: ## Зібрати Docker-образи локально (storefront + commerce)
+	DOCKER_BUILDKIT=1 docker build -t life-commerce:local -f deploy/Dockerfile.commerce .
+	DOCKER_BUILDKIT=1 docker build -t life-storefront:local -f deploy/Dockerfile.storefront .
+
+docker-up-local: ## Запустити production-подібне середовище локально
+	@cp -n deploy/.env.prod.template deploy/.env.local 2>/dev/null || true
+	COMMERCE_IMAGE=life-commerce:local STOREFRONT_IMAGE=life-storefront:local \
+		$(PROD_COMPOSE) --env-file deploy/.env.local up -d --remove-orphans
+	docker ps --filter "name=life-"
+
+docker-down-local: ## Зупинити локальне production-подібне середовище
+	$(PROD_COMPOSE) down --remove-orphans
+
+# =============================================================================
+# Розгортання (через GitHub Actions)
+# =============================================================================
+
+deploy-staging: ## Тригерити staging deploy через GitHub CLI
+	gh workflow run deploy.yml -f environment=staging
+	@printf '%s\n' "Staging deploy triggered. Track: https://github.com/Georgekgk2/Life-MP/actions/workflows/deploy.yml"
+
+deploy-production: ## Тригерити production deploy через GitHub CLI (потрібне схвалення)
+	gh workflow run deploy.yml -f environment=production
+	@printf '%s\n' "Production deploy triggered. Approval required in GitHub Environments."

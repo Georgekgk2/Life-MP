@@ -29,12 +29,14 @@
   "dependencies": {
     "@life/types": "workspace:*",
     "@medusajs/caching-redis": "2.18.0",
+    "@medusajs/cli": "2.18.0",
     "@medusajs/core-flows": "2.18.0",
     "@medusajs/event-bus-redis": "2.18.0",
     "@medusajs/framework": "2.18.0",
     "@medusajs/medusa": "2.18.0",
     "@medusajs/workflow-engine-redis": "2.18.0",
     "pg": "^8.13.3",
+    "tsx": "^4.19.3",
     "zod": "^3.24.2"
   },
   "devDependencies": {

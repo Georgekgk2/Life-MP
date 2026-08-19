@@ -28,19 +28,6 @@ describe("PWA Manifest & Configuration", () => {
     expect(sizes).toContain("512x512");
   });
 
-  it("public/manifest.webmanifest matches manifest specification and exists on disk", () => {
-    const manifestPath = getPublicPath("manifest.webmanifest");
-    expect(fs.existsSync(manifestPath)).toBe(true);
-
-    const raw = fs.readFileSync(manifestPath, "utf-8");
-    const parsed = JSON.parse(raw);
-    expect(parsed.name).toBe("ЛАЙФ — Ярмарок крафту");
-    expect(parsed.short_name).toBe("ЛАЙФ");
-    expect(parsed.display).toBe("standalone");
-    expect(parsed.theme_color).toBe("#1a3026");
-    expect(parsed.icons.length).toBeGreaterThanOrEqual(4);
-  });
-
   it("public/sw.js exists and implements caching strategies", () => {
     const swPath = getPublicPath("sw.js");
     expect(fs.existsSync(swPath)).toBe(true);

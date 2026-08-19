@@ -11,3 +11,4 @@ export { SectionHeading } from "./section-heading";
 export { SiteFooter } from "./site-footer";
 export { SiteHeader } from "./site-header";
 export { StoryCard } from "./story-card";
+export { VendorProductForm } from "./vendor-product-form";

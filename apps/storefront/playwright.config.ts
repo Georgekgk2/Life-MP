@@ -22,9 +22,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "pnpm run dev",
+    command: "pnpm run build && pnpm run start",
     url: "http://127.0.0.1:3100",
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     env: {
       CATALOG_SOURCE: "fixtures",
     },

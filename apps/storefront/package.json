@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev --port 3100",
     "build": "next build",
-    "start": "next start",
+    "start": "next start --port 3100",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "next typegen && tsc --project tsconfig.json --noEmit",
     "test": "vitest run",
@@ -17,7 +17,8 @@
     "@life/types": "workspace:*",
     "next": "16.2.11",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@playwright/test": "^1.50.1",

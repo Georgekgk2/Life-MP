@@ -1,4 +1,8 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useSaved } from "@/context/saved-context";
 
 type NavigationItem = Readonly<{
   href: `/${string}`;
@@ -14,6 +18,15 @@ const primaryNavigation: readonly NavigationItem[] = [
 ];
 
 export function SiteHeader() {
+  const { count, isHydrated } = useSaved();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const savedCount = mounted && isHydrated ? count : 0;
+
   return (
     <>
       <a className="skip-link" href="#main-content">
@@ -43,6 +56,31 @@ export function SiteHeader() {
               ))}
             </ul>
           </nav>
+          <div className="site-header__actions">
+            <Link
+              href="/saved"
+              className="site-header__saved-link"
+              aria-label={
+                savedCount > 0
+                  ? `Збережені товари: ${savedCount}`
+                  : "Збережені товари"
+              }
+            >
+              <span aria-hidden="true">❤️</span>
+              <span className="site-header__saved-text">Збережене</span>
+              {savedCount > 0 && (
+                <span className="site-header__saved-badge" aria-hidden="true">
+                  {savedCount}
+                </span>
+              )}
+            </Link>
+            <Link
+              href="/join-as-artisan"
+              className="button button--secondary button--sm site-header__artisan-btn"
+            >
+              Стати майстром
+            </Link>
+          </div>
         </div>
       </header>
     </>

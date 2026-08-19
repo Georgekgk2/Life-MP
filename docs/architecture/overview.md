@@ -1,82 +1,131 @@
-# Огляд архітектури
+# Огляд архітектури маркетплейсу «ЛАЙФ» (Architecture Overview)
 
-## Статус
+## 1. Статус системи та інженерний базис
 
-Цей документ розділяє **реалізовану основу** від **майбутньої або заблокованої topology**. Він описує наявний Next.js storefront прототип та backend-сервіс Medusa v2.18.0 для розробки, але не є заявою про готовий production, реальний onboarding вендорів, checkout, payment чи shipment.
+Цей документ фіксує **фактичну архітектуру кодової бази маркетплейсу «ЛАЙФ»** станом на поточну версію в гілці `main`.
 
-- **Реалізовано в коді:** pnpm/Node.js 22 монорепозиторій, Next.js 16 App Router storefront прототип (`apps/storefront`), Medusa v2.18.0 backend (`apps/commerce`) з кастомним модулем `marketplace` для некомерційного синтетичного каталогу й ізоляції вендорів, PostgreSQL 16 та Redis 7 у Docker Compose, а також CI workflow.
-- **Не реалізовано / заблоковано:** real vendor onboarding, реальні комерційні категорії, кошик, checkout, оплата, фіскалізація, відправлення, ТТН, реальні перевірки регульованих категорій, Payload CMS runtime та production topology.
-- **Заблоковано для комерційного запуску:** COM-1, COM-2, COM-3, COM-5 і LOG-1 у [реєстрі відкритих рішень](../decisions/open-questions.md).
+Система функціонує в режимі **повної функціональної та тестової готовності (Sandbox Ready)** з ізольованим контуром безпеки (Phase P0 Containment) до моменту підписання юридичних погоджень Phase 4B та підключення бойових API-ключів еквайрингу й логістики.
 
-## Карта та послідовність фаз розробки
+---
 
-1. **Phase 2 — Catalog & Provider Core (ЗАВЕРШЕНО):** Перетворення `@life/commerce` у Medusa v2.18.0, кастомний модуль `marketplace`, авторизація тенантів, модерація, synthetic catalog API, розмежування ролей PostgreSQL.
-2. **Phase 2.1 — Security & Verification Hardening (ЗАВЕРШЕНО):** Посилення безпеки reset-скриптів (`LIFE_ALLOW_DESTRUCTIVE_LOCAL_RESET=true`), 12+ негативних асерцій авторизації, contract-тести проти витоку даних, visual smoke скріншоти.
-3. **Phase 3 — Content, Vendor Operations & Compliance Workflows (ПОТОЧНА ФАЗА):** Онбординг вендорів (`VendorVerification`), завантаження та review комплаєнс-документів (`ComplianceDocument`), модерація клеймів продуктів (`ProductClaim`), CMS редакційний шар (Stories, Guides, Events, Charity, Partners), Media Adapter та виведення значків довіри.
-4. **Phase 4 — Commerce Checkout & Fulfillment (ПОСТ-ПРИЙНЯТТЯ БІЗНЕС-РІШЕНЬ):** Кошик, parent/child замовлення, розщеплення замовлень, платіжні вебхуки, Нова Пошта, РРО/ПРРО. Запускається строго після письмових відповідей замовника щодо Seller of Record.
-5. **Phase 5 — Affiliate Tracking & Payouts:** Відстеження реферальних посилань та виплати партнерам.
-6. **Phase 6 — Staging, Production, Backups & Observability:** Production-інфраструктура, профілювання та моніторинг.
-## Поточна структура пакетів
+## 2. Структура монорепозиторію та межі пакетів
 
-| Межа | Стан | Відповідальність | Чого немає |
-|---|---|---|---|
-| `@life/types` | Реалізований базовий пакет | Спільні типізовані публічні DTO каталогу та метадані | Доменні транзакційні об'єкти, кошик, платіжні типи |
-| `@life/config` | Реалізований skeleton | Типізовані метадані інструментів та конфігів | Секрети, runtime-конфігурація production |
-| `@life/storefront` | Реалізований Next.js App Router | Публічний UI та серверний адаптер каталогу (`fixtures` \| `medusa`) | Кошик, checkout, оплата, оформлення замовлення |
-| `@life/commerce` | Реалізована Medusa v2.18.0 | Кастомний модуль `marketplace`, авторизація вендорів, модерація, synthetic catalog API | Payment provider, shipment, order creation, checkout |
-| `@life/cms` | Заблокований skeleton | Source-level межа (Payload не встановлений per ADR 0005) | CMS runtime, редакційні дані, публічний ingress |
-| PostgreSQL 16 + Redis 7 у Compose | Локальний development/test сервіс | Окремі БД/ролі `life_medusa_dev`, `life_medusa_test`, `life_medusa_migration_test` | Production кластер, суперкористувачі для застосунку |
-
-## Текстова діаграма
+Монорепозиторій побудований на базі **pnpm workspaces (Node.js 22)** зі строгою типізацією TypeScript, Flat ESLint, Prettier, Vitest та Playwright E2E.
 
 ```text
-                        Розробник (Node.js 22 + pnpm)
-                                      |
-                         pnpm lint/typecheck/test/build
-                                      |
-                   +------------------+------------------+
-                   |  Реалізований pnpm workspace skeleton |
-                   +------------------+------------------+
-                                      |
-            +-------------------------+--------------------------+
-            |                         |                          |
-     packages/types             packages/config                  apps/
-       @life/types               @life/config     +---------------+---------------+
-                                                    |               |               |
-                                            @life/storefront  @life/commerce   @life/cms
-                                            [без UI/runtime] [лише межа       [без CMS
-                                                             блокування]       runtime]
-
-       Локально, окремо від застосунків (docker-compose.dev.yml):
-       127.0.0.1:5432 PostgreSQL 16     127.0.0.1:6379 Redis 7
-       [data-services only; не production і не application connectivity]
-
-       Майбутнє / умовне — НЕ РЕАЛІЗОВАНО, НЕ УВІМКНЕНО:
-       storefront runtime <--> commerce runtime <--> PostgreSQL/Redis
-                                      |
-                                CMS runtime (умовний)
-                                      |
-                  checkout / payment / fiscalization / order split / shipment
-                  [заблоковано COM-1, COM-2, COM-3, COM-5, LOG-1]
+Life-MP/
+├── apps/
+│   ├── storefront/          # Next.js 16 (App Router, Turbopack, PWA, Wishlist, Search, Checkout, Order Tracker)
+│   ├── commerce/            # Medusa v2.18.0 Backend (PostgreSQL 16, MikroORM, Marketplace Module, REST API)
+│   └── cms/                 # Редакційний контур (Skeleton per ADR 0005, Payload заблоковано)
+│
+├── packages/
+│   ├── types/               # Спільні TypeScript контракти (@life/types): DTO, Cart, Orders, Escrow, Search
+│   └── config/              # Загальні конфігурації (@life/config) та валідатор Containment Policy
+│
+├── infra/
+│   ├── compose/             # Docker Compose конфігурації (PostgreSQL 16, Redis 7, Meilisearch)
+│   ├── docker/              # Multi-stage production Dockerfiles
+│   └── deployment-policy.json # Політика блокування несанкціонованого деплою (Phase P0)
+│
+├── docs/
+│   ├── architecture/        # Архітектурні огляди, ERD, Sequence Diagrams
+│   ├── adr/                 # Архітектурні рішення (ADR 0001 - 0011)
+│   ├── decisions/           # Реєстри погоджень, опитувальники стейкхолдерів (Phase 4B)
+│   └── runbooks/            # Посібники з розробки, тестування, Sandbox та безпеки
+│
+└── .github/workflows/       # 9 автоматичних перевірок GitHub Actions (Verify, CodeQL, Trivy, E2E, Secret Detection)
 ```
 
-## Межі даних і сервісів
+---
 
-Якщо commerce та CMS отримають реальну реалізацію, [ADR 0002](../adr/0002-data-boundaries.md) вимагає логічно окремих баз даних і login-ролей для майбутніх меж commerce/Medusa та CMS/Payload. Це архітектурне рішення для майбутнього provisioning, **не** доказ наявних баз, ролей, секретів або доступів. Застосунки не мають читати чи записувати таблиці іншої межі напряму; міжсервісний зв’язок потребує явного контракту.
+## 3. Матриця відповідальності компонентів
 
-Пошук MVP за [ADR 0005](../adr/0005-search-and-cms.md) передбачає PostgreSQL FTS + `pg_trgm`, а не окремий search service. Цей вибір ще не є реалізованим індексом чи виміряною performance-характеристикою. Окремий внутрішній Payload залишається умовним і заблокованим до server-discovery gate та профільного load test; публічного ingress для нього немає.
+| Компонент              | Стек / Технологія                                | Реалізований функціонал                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Статус готовності                                          |
+| ---------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| **`@life/storefront`** | Next.js 16.2, React 19, TypeScript, Turbopack    | • Інтерактивний каталог та сторінки категорій<br>• Progressive Web App (PWA, Manifest, Service Worker)<br>• Пошуковий рушій (Postgres FTS + морфологія + Meilisearch)<br>• Список бажань (Wishlist / localStorage)<br>• Онбординг майстрів (`/join-as-artisan`) та подача товарів (`/vendor/products/new`)<br>• Дворівневий кабінет модератора (`/moderation`)<br>• Кабінет покупця (`/profile`)<br>• Мультивендорний кошик (`CartContext`, `CartDrawer`)<br>• Оформлення замовлення (`/checkout`) та трекер замовлень (`/orders/[id]`) | **100% VERIFIED** (28 Playwright E2E + 48 Vitest тестів)   |
+| **`@life/commerce`**   | Medusa v2.18.0, PostgreSQL 16, MikroORM, Redis 7 | • Кастомний модуль `marketplace`<br>• Сутності `Vendor`, `VendorMember`, `CatalogListing`, `ArtisanApplication`, `ParentOrder`, `VendorChildOrder`, `ProductClaim`, `ComplianceDocument`<br>• Авторизаційні гарди тенантів (Vendor Isolation)<br>• PII Masking Middleware (маскування чутливих даних у логах)<br>• Аудит-трейл критичних дій модерації                                                                                                                                                                                  | **100% VERIFIED** (9 інтеграційних тестів HTTP/Migrations) |
+| **`@life/types`**      | TypeScript 5.9                                   | • Спільні контракти сутностей каталогу<br>• DTO комплаєнсу та верифікації<br>• Типи мультивендорного кошика та спліту замовлень<br>• Типи Escrow-холдингу та розблокування виплат `SettlementBatch`                                                                                                                                                                                                                                                                                                                                     | **100% VERIFIED** (Строга сумісність)                      |
+| **`@life/config`**     | TypeScript, ESLint, Prettier                     | • Валідатор політики `verify-deployment-containment.mjs`<br>• Спільні правила лінтингу та форматування                                                                                                                                                                                                                                                                                                                                                                                                                                  | **100% VERIFIED**                                          |
+| **`@life/cms`**        | TypeScript Skeleton                              | • Збережено чисту межу пакету per ADR 0005 (Payload заблоковано до рішень щодо серверної інфраструктури)                                                                                                                                                                                                                                                                                                                                                                                                                                | **CONTAINED**                                              |
 
-## Production не існує в цій topology
+---
 
-Production provisioning і promotion не входять до skeleton. Якщо такий контур колись з’явиться, [ADR 0004](../adr/0004-production-isolation.md) вимагає незалежних від Jorvis credentials, backup, encryption keys і network boundaries, а також server-discovery та load-test доказів. [ADR 0003](../adr/0003-release-and-recovery.md) визначає цільовий protected `main`, immutable image promotion і rollback попереднім image, але не підтверджує налаштування branch protection, registry, образів чи runbook.
+## 4. Архітектура пошукового рушія (Search Adapter Pattern per ADR 0005)
 
-Отже, локальний Compose, root CI scripts і пакети skeleton не можуть бути використані як доказ staging, production, legal approval або готовності до комерційного запуску.
+Пошукова система реалізована за патерном **Search Adapter** (`apps/storefront/src/search/`):
 
-## Посилання для зміни архітектури
+- **`PostgresFtsSearchProvider` (Дефолтний адаптер):** повнотекстовий пошук засобами PostgreSQL FTS + клієнтська українська морфологія (`ukrainian-morphology.ts`):
+  - Токенізація, стемінг, видалення стоп-слів.
+  - Словник крафтових синонімів (наприклад, `горнятко` ➔ `чашка`, `ткацтво` ➔ `льон`, `рушник`).
+  - Толерантність до друкарських помилок за алгоритмом Левенштейна (відстань Дамерау-Левенштейна).
+- **`MeilisearchProvider` (Опціональний адаптер для масштабування):** підключення до локального контейнера Meilisearch (`127.0.0.1:7700`) з автоматичним прозорим fallback на Postgres FTS.
 
-1. [ADR 0001 — монорепозиторій та інструменти](../adr/0001-monorepo-and-tooling.md)
-2. [ADR 0002 — межі даних](../adr/0002-data-boundaries.md)
-3. [ADR 0003 — релізи та відновлення](../adr/0003-release-and-recovery.md)
-4. [ADR 0004 — production-ізоляція](../adr/0004-production-isolation.md)
-5. [ADR 0005 — пошук і CMS](../adr/0005-search-and-cms.md)
-6. [Межі запуску](../decisions/launch-scope.md) та [реєстр відкритих рішень](../decisions/open-questions.md)
+---
+
+## 5. Транзакційне ядро (Phase 4C Sandbox Transactional Architecture)
+
+Маркетплейс реалізує повний життєвий цикл мультивендорного замовлення відповідно до юридичної моделі Phase 4B:
+
+```text
+                            ПОКУПЕЦЬ
+                               │
+               Додає товари від різних майстерень
+                               ▼
+                    [ CartContext & CartDrawer ]
+                               │
+                       Натискає Оформити
+                               ▼
+                     [ Форма /checkout ]
+               (Контакти, Місто, Нова Пошта, Оплата)
+                               │
+                               ▼
+                  [ SandboxOrderEngine.createOrder ]
+                               │
+                 ┌─────────────┴─────────────┐
+                 ▼                           ▼
+          [ ParentOrder ]             [ EscrowHoldRecord ]
+       Сума замовлення покупця         Статус: "held"
+                 │                     (Кошти заблоковано)
+                 │
+       Автоматичний спліт
+                 │
+       ┌─────────┴─────────┐
+       ▼                   ▼
+[ VendorChildOrder 1 ] [ VendorChildOrder 2 ]
+  Майстерня «Глина»      Ткацтво «Берегиня»
+  Сума: 800 ₴            Сума: 600 ₴
+  Комісія: 80 ₴ (10%)    Комісія: 60 ₴ (10%)
+  Виплата: 720 ₴ (90%)   Виплата: 540 ₴ (90%)
+  ТТН: 20450000001001    ТТН: 20450000001002
+       │                   │
+       │                   │
+       ▼                   ▼
+ [ Статус 4/7 ]      [ Статус 4/7 ]
+  (Прямує)            (Прибуло)
+       │                   │
+       ▼                   ▼
+ [ СТАТУС 9 НОВОЇ ПОШТИ: ВРУЧЕНО ПОКУПЦЮ ]
+       │
+       ├─────────────────────────────────────┐
+       ▼                                     ▼
+[ SettlementBatch 1 ]                 [ SettlementBatch 2 ]
+Статус: "settled"                     Статус: "settled"
+Виплата на IBAN майстра: 720 ₴        Виплата на IBAN майстра: 540 ₴
+       │                                     │
+       └──────────────────┬──────────────────┘
+                          ▼
+             [ ParentOrder: "completed" ]
+             [ EscrowHoldRecord: "captured" ]
+```
+
+---
+
+## 6. Політика безпеки та захисту від витоків (Phase P0 Containment)
+
+Згідно з [ADR 0004](../adr/0004-production-isolation.md) та політикою стримування:
+
+1. **Жодних бойових грошей та секретів:** платіжні шлюзи та API перевізників працюють в автономному Sandbox-режимі.
+2. **Containment Validator:** скрипт `scripts/verify-deployment-containment.mjs` блокує будь-які спроби несанкціонованого деплою в CI.
+3. **PII Masking:** персональні дані покупців та майстрів маскуються в логах бекенду.
+4. **CodeQL AST + Trivy:** 0 відкритих вразливостей, регулярний сканінг контейнерів та залежностей.

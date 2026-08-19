@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" width="180" height="180">
+  <defs>
+    <linearGradient id="applePineGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2a4d3d" />
+      <stop offset="100%" stop-color="#14261e" />
+    </linearGradient>
+    <linearGradient id="appleGoldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e2aa58" />
+      <stop offset="100%" stop-color="#c48b3f" />
+    </linearGradient>
+  </defs>
+
+  <rect width="180" height="180" rx="40" fill="url(#applePineGrad)" />
+  <rect x="8" y="8" width="164" height="164" rx="34" fill="none" stroke="url(#appleGoldGrad)" stroke-width="2" stroke-opacity="0.5" />
+
+  <path d="M 90 36 C 104 36 126 62 126 102 C 126 130 104 142 90 142 C 76 142 54 130 54 102 C 54 62 76 36 90 36 Z" fill="none" stroke="url(#appleGoldGrad)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M 90 58 C 96 72 102 90 102 106 C 102 120 96 128 90 128 C 84 128 78 120 78 106 C 78 90 84 72 90 58 Z" fill="url(#appleGoldGrad)" />
+  <circle cx="90" cy="46" r="5" fill="#faf7f2" />
+  <text x="90" y="160" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="800" letter-spacing="3" fill="#faf7f2">ЛАЙФ</text>
+</svg>

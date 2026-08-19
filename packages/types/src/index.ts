@@ -175,3 +175,53 @@ export type Partner<Slug extends string = string> = Readonly<{
   summary: string;
   websiteLabel: string;
 }>;
+
+export type SearchSortOption =
+  "default" | "price-asc" | "price-desc" | "name-asc";
+
+export type SearchQueryOptions = Readonly<{
+  limit?: number;
+  offset?: number;
+  categorySlug?: string;
+  isOrganic?: boolean;
+  isCertified?: boolean;
+  isVerifiedVendor?: boolean;
+  minPriceUah?: number;
+  maxPriceUah?: number;
+  sortBy?: SearchSortOption;
+}>;
+
+export type ProductSearchResult = Readonly<{
+  items: readonly StorefrontCatalogProduct[];
+  totalCount: number;
+  queryTimeMs: number;
+  providerName: "postgres_fts" | "meilisearch";
+}>;
+
+export type UnifiedSearchSuggestion = Readonly<{
+  id: string;
+  type: "product" | "workshop" | "event";
+  title: string;
+  subtitle?: string;
+  url: string;
+  highlight?: string;
+}>;
+
+export type UnifiedSearchResult = Readonly<{
+  query: string;
+  suggestions: readonly UnifiedSearchSuggestion[];
+  products: readonly StorefrontCatalogProduct[];
+  totalCount: number;
+  queryTimeMs: number;
+  providerName: "postgres_fts" | "meilisearch";
+}>;
+
+export interface SearchProvider {
+  readonly name: "postgres_fts" | "meilisearch";
+  searchProducts(
+    query: string,
+    options?: SearchQueryOptions,
+  ): Promise<ProductSearchResult>;
+  searchUnified(query: string, limit?: number): Promise<UnifiedSearchResult>;
+  indexProducts?(products: readonly StorefrontCatalogProduct[]): Promise<void>;
+}

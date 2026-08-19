@@ -7,6 +7,11 @@ import type {
 } from "@life/types";
 import { ProductCard } from "./product-card";
 import { EmptyState } from "./empty-state";
+import {
+  expandWithSynonyms,
+  matchesWithTypoTolerance,
+  tokenizeUkrainian,
+} from "../search/ukrainian-morphology";
 
 type CatalogBrowserProps = Readonly<{
   categories: readonly StorefrontCatalogCategory[];
@@ -45,8 +50,11 @@ export function CatalogBrowser({
     }));
   }, [products]);
 
-  // Filtered and sorted products
+  // Filtered and sorted products with Ukrainian Morphology & Synonyms
   const filteredProducts = useMemo(() => {
+    const rawTokens = tokenizeUkrainian(searchQuery);
+    const searchTokens = expandWithSynonyms(rawTokens);
+
     return products
       .filter((p) => {
         // Category filter
@@ -67,13 +75,16 @@ export function CatalogBrowser({
         if (filterCertified && !p.certifiedProductBadge) return false;
         if (filterVerified && !p.verifiedVendorBadge) return false;
 
-        // Search text filter
-        if (searchQuery.trim()) {
-          const q = searchQuery.toLowerCase().trim();
-          const matchName = p.name.toLowerCase().includes(q);
-          const matchDesc = p.description.toLowerCase().includes(q);
-          const matchProvider = p.provider?.name.toLowerCase().includes(q);
-          if (!matchName && !matchDesc && !matchProvider) {
+        // Search tokens filter with typo tolerance
+        if (searchTokens.length > 0) {
+          const targetText = `${p.name} ${p.description} ${p.provider?.name || ""}`;
+          const targetTokens = tokenizeUkrainian(targetText);
+
+          const matches = searchTokens.some((st) =>
+            targetTokens.some((tt) => matchesWithTypoTolerance(st, tt)),
+          );
+
+          if (!matches) {
             return false;
           }
         }
@@ -81,10 +92,16 @@ export function CatalogBrowser({
         return true;
       })
       .sort((a, b) => {
-        if (sortBy === "price-asc") return a.priceUah - b.priceUah;
-        if (sortBy === "price-desc") return b.priceUah - a.priceUah;
-        if (sortBy === "name-asc") return a.name.localeCompare(b.name, "uk");
-        return 0;
+        switch (sortBy) {
+          case "price-asc":
+            return a.priceUah - b.priceUah;
+          case "price-desc":
+            return b.priceUah - a.priceUah;
+          case "name-asc":
+            return a.name.localeCompare(b.name, "uk");
+          default:
+            return 0;
+        }
       });
   }, [
     products,
@@ -118,6 +135,7 @@ export function CatalogBrowser({
 
   return (
     <div className="catalog-browser">
+      {/* Controls Box */}
       <div className="catalog-controls">
         {/* Search Bar */}
         <div className="catalog-search-wrapper">
@@ -130,9 +148,9 @@ export function CatalogBrowser({
             </span>
             <input
               id="catalog-search"
-              type="search"
+              type="text"
               className="catalog-search-input"
-              placeholder="Пошук за назвою виробу, описом або майстром..."
+              placeholder="Пошук за назвою, ремеслом чи описом (наприклад, чашка, льон, кераміка)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               aria-label="Пошук у каталозі"
@@ -150,77 +168,69 @@ export function CatalogBrowser({
           </div>
         </div>
 
-        {/* Filter Pills Grid */}
+        {/* Filters Grid */}
         <div className="catalog-filters-grid">
           {/* Category Filter */}
-          {!initialCategorySlug && categories.length > 1 && (
-            <div className="catalog-filter-group">
-              <span className="catalog-control-label">Категорія:</span>
-              <div
-                className="catalog-pill-list"
-                role="radiogroup"
-                aria-label="Фільтр за категорією"
+          <div className="catalog-filter-group">
+            <span className="catalog-filter-title">Категорія:</span>
+            <div
+              className="catalog-pills"
+              role="radiogroup"
+              aria-label="Фільтр за категорією"
+            >
+              <button
+                type="button"
+                className={`catalog-pill ${selectedCategory === "all" ? "catalog-pill--active" : ""}`}
+                onClick={() => setSelectedCategory("all")}
+                aria-checked={selectedCategory === "all"}
+                role="radio"
               >
-                <button
-                  type="button"
-                  className={`catalog-pill ${selectedCategory === "all" ? "catalog-pill--active" : ""}`}
-                  onClick={() => setSelectedCategory("all")}
-                >
-                  Усі напрями ({products.length})
-                </button>
-                {categories.map((c) => {
-                  const count = products.filter(
-                    (p) => p.categorySlug === c.slug,
-                  ).length;
-                  return (
-                    <button
-                      key={c.id}
-                      type="button"
-                      className={`catalog-pill ${selectedCategory === c.slug ? "catalog-pill--active" : ""}`}
-                      onClick={() => setSelectedCategory(c.slug)}
-                    >
-                      {c.name} ({count})
-                    </button>
-                  );
-                })}
-              </div>
+                Усі напрями ({products.length})
+              </button>
+              {categories.map((c) => {
+                const count = products.filter(
+                  (p) => p.categorySlug === c.slug,
+                ).length;
+                return (
+                  <button
+                    type="button"
+                    key={c.id}
+                    className={`catalog-pill ${selectedCategory === c.slug ? "catalog-pill--active" : ""}`}
+                    onClick={() => setSelectedCategory(c.slug)}
+                    aria-checked={selectedCategory === c.slug}
+                    role="radio"
+                  >
+                    {c.name} ({count})
+                  </button>
+                );
+              })}
             </div>
-          )}
+          </div>
 
           {/* Provider Filter */}
           {providers.length > 1 && (
             <div className="catalog-filter-group">
-              <span className="catalog-control-label">Майстер / Виробник:</span>
-              <div
-                className="catalog-pill-list"
-                role="radiogroup"
-                aria-label="Фільтр за майстром"
+              <span className="catalog-filter-title">Майстерня:</span>
+              <select
+                className="catalog-select"
+                value={selectedProvider}
+                onChange={(e) => setSelectedProvider(e.target.value)}
+                aria-label="Фільтр за майстернею"
               >
-                <button
-                  type="button"
-                  className={`catalog-pill ${selectedProvider === "all" ? "catalog-pill--active" : ""}`}
-                  onClick={() => setSelectedProvider("all")}
-                >
-                  Усі виробники
-                </button>
+                <option value="all">Усі майстерні</option>
                 {providers.map((pr) => (
-                  <button
-                    key={pr.handle}
-                    type="button"
-                    className={`catalog-pill ${selectedProvider === pr.handle ? "catalog-pill--active" : ""}`}
-                    onClick={() => setSelectedProvider(pr.handle)}
-                  >
+                  <option key={pr.handle} value={pr.handle}>
                     {pr.name}
-                  </button>
+                  </option>
                 ))}
-              </div>
+              </select>
             </div>
           )}
 
-          {/* Feature Badges & Sorting Row */}
+          {/* Feature Toggles & Sorting */}
           <div className="catalog-feature-row">
             <div className="catalog-feature-toggles">
-              <span className="catalog-control-label">Ознаки:</span>
+              <span className="catalog-filter-title">Ознаки:</span>
               <button
                 type="button"
                 className={`catalog-toggle-btn ${filterOrganic ? "catalog-toggle-btn--active" : ""}`}
@@ -248,7 +258,7 @@ export function CatalogBrowser({
             </div>
 
             <div className="catalog-sort-group">
-              <label htmlFor="catalog-sort" className="catalog-control-label">
+              <label htmlFor="catalog-sort" className="catalog-filter-title">
                 Сортування:
               </label>
               <select
@@ -256,6 +266,7 @@ export function CatalogBrowser({
                 className="catalog-sort-select"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortOption)}
+                aria-label="Сортування товарів"
               >
                 <option value="default">За замовчуванням</option>
                 <option value="name-asc">За назвою (А-Я)</option>
@@ -266,7 +277,7 @@ export function CatalogBrowser({
           </div>
         </div>
 
-        {/* Results Bar */}
+        {/* Results Counter & Reset Button */}
         <div className="catalog-results-bar">
           <p className="catalog-results-count">
             Знайдено <strong>{filteredProducts.length}</strong>{" "}

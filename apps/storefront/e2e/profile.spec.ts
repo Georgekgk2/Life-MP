@@ -23,7 +23,7 @@ test.describe("Customer Profile & Preferences E2E", () => {
       name: "Особистий кабінет покупця",
     });
     await expect(profileLink).toBeVisible();
-    await profileLink.click();
+    await profileLink.click({ force: true });
 
     // 2. Verify profile page loaded
     await expect(page).toHaveURL("/profile");

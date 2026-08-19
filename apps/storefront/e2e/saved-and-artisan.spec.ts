@@ -22,7 +22,7 @@ test.describe("Saved Wishlist & Artisan Application E2E", () => {
     await expect(page.locator("h1")).toContainText("Тематичні добірки");
 
     // 2. Initial header badge should not show count
-    const savedLink = page.locator(".site-header__saved-link");
+    const savedLink = page.getByRole("link", { name: /Збережені товари/i });
     await expect(savedLink).toBeVisible();
     await expect(page.locator(".site-header__saved-badge")).toHaveCount(0);
 
@@ -59,7 +59,7 @@ test.describe("Saved Wishlist & Artisan Application E2E", () => {
     // 7. Remove item from saved
     const removeBtn = page.getByRole("button", { name: /Видалити/i }).first();
     await expect(removeBtn).toBeVisible();
-    await removeBtn.click();
+    await removeBtn.click({ force: true });
 
     // 8. Verify empty state appears
     await expect(

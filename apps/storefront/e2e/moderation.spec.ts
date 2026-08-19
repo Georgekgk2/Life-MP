@@ -60,7 +60,7 @@ test.describe("Moderation Dashboard E2E", () => {
 
     // 6. Verify modal opened
     const modalTitle = page.getByRole("heading", {
-      name: /Модерація: Майстерня «Глина та Світло»/i,
+      name: "Модерація анкети: Майстерня «Глина та Світло»",
     });
     await expect(modalTitle).toBeVisible();
 
@@ -74,7 +74,7 @@ test.describe("Moderation Dashboard E2E", () => {
     });
 
     // 7. Enter reviewer notes and approve application
-    const notesTextarea = page.locator("#review-notes");
+    const notesTextarea = page.locator("#review-app-notes");
     await notesTextarea.fill(
       "Майстерня успішно пройшла перевірку зразків карпатської глини. Схвалено до розміщення.",
     );

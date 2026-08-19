@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 
 import { SiteFooter, SiteHeader } from "@/components";
 import { SavedProvider } from "@/context/saved-context";
+import { ProfileProvider } from "@/context/profile-context";
+
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -22,13 +24,15 @@ export default function RootLayout({
   return (
     <html lang="uk">
       <body>
-        <SavedProvider>
-          <SiteHeader />
-          <main id="main-content" tabIndex={-1}>
-            {children}
-          </main>
-          <SiteFooter />
-        </SavedProvider>
+        <ProfileProvider>
+          <SavedProvider>
+            <SiteHeader />
+            <main id="main-content" tabIndex={-1}>
+              {children}
+            </main>
+            <SiteFooter />
+          </SavedProvider>
+        </ProfileProvider>
       </body>
     </html>
   );

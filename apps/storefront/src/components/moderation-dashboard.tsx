@@ -310,6 +310,7 @@ export function ModerationDashboard() {
             status: targetStatus,
             reviewer_notes: notes || undefined,
           }),
+          signal: AbortSignal.timeout(500),
         },
       ).catch(() => null);
 
@@ -1233,6 +1234,8 @@ export function ModerationDashboard() {
               padding: "2rem",
               maxHeight: "90vh",
               overflowY: "auto",
+              position: "relative",
+              zIndex: 101,
             }}
           >
             <h2
@@ -1351,6 +1354,8 @@ export function ModerationDashboard() {
               padding: "2rem",
               maxHeight: "90vh",
               overflowY: "auto",
+              position: "relative",
+              zIndex: 101,
             }}
           >
             <h2

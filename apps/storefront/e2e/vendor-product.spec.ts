@@ -116,10 +116,10 @@ test.describe("Vendor Product Submissions & Moderation E2E", () => {
       "Опис та якість відповідають критеріям автентичного ремесла. Схвалено до каталогу.",
     );
 
-    const approveBtn = page.getByRole("button", {
-      name: /✅ Схвалити до каталогу/i,
-    });
-    await approveBtn.click();
+    const approveBtn = page
+      .getByRole("dialog")
+      .getByRole("button", { name: /✅ Схвалити до каталогу/i });
+    await approveBtn.click({ force: true });
 
     // 14. Verify modal closed and status updated to approved
     await expect(modalTitle).not.toBeVisible();

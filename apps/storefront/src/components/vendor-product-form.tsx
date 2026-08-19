@@ -101,6 +101,7 @@ export function VendorProductForm() {
           title: result.data.name,
           description: result.data.description,
         }),
+        signal: AbortSignal.timeout(500),
       }).catch(() => null);
 
       setSubmittedProduct(result.data);

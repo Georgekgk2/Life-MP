@@ -1096,7 +1096,8 @@
     gap: var(--space-3);
   }
 
-  .site-header__saved-link {
+  .site-header__saved-link,
+  .site-header__profile-link {
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
@@ -1109,7 +1110,8 @@
     transition: background-color 0.15s ease;
   }
 
-  .site-header__saved-link:hover {
+  .site-header__saved-link:hover,
+  .site-header__profile-link:hover {
     background-color: var(--color-surface-muted);
   }
 

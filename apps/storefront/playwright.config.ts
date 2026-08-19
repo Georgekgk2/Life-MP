@@ -24,7 +24,7 @@ export default defineConfig({
   webServer: {
     command: "pnpm run build && pnpm run start",
     url: "http://127.0.0.1:3100",
-    reuseExistingServer: false,
+    reuseExistingServer: true,
     env: {
       CATALOG_SOURCE: "fixtures",
     },

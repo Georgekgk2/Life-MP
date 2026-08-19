@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { CategoryCard, ProductCard, SectionHeading } from "@/components";
+import { CatalogBrowser, CategoryCard, SectionHeading } from "@/components";
 import { getCatalogSnapshot } from "@/catalog/server";
 
 export const metadata: Metadata = {
@@ -71,19 +71,14 @@ export default async function CatalogPage() {
               </div>
             </div>
           </section>
-
           <section className="page-section" aria-label="Усі матеріали каталогу">
             <div className="page-shell">
               <SectionHeading
-                eyebrow="Усі матеріали"
-                title="Добірка для огляду"
-                description="Скористайтеся категоріями вище, щоб звузити перелік за напрямом."
+                eyebrow="Інтерактивний перегляд"
+                title="Пошук та фільтрація виробів"
+                description="Шукайте за назвою, категорією, майстернею чи характеристиками."
               />
-              <div className="content-grid content-grid--cards">
-                {products.map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </div>
+              <CatalogBrowser categories={categories} products={products} />
             </div>
           </section>
         </>

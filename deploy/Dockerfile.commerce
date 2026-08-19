@@ -2,14 +2,16 @@
 # UNAPPROVED TEMPLATE — DO NOT DEPLOY (Phase P0 Containment)
 # Commerce — Multi-stage Medusa v2 Production Build
 # =============================================================================
+
 # --- Stage 1: Install dependencies ---
 FROM node:22-alpine AS deps
 RUN corepack enable && corepack prepare pnpm@11.4.0 --activate
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps/commerce/package.json ./apps/commerce/
 COPY packages/types/package.json ./packages/types/
+COPY packages/config/package.json ./packages/config/
 
 RUN pnpm install --frozen-lockfile --filter @life/commerce...
 
@@ -20,33 +22,33 @@ WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/commerce/node_modules ./apps/commerce/node_modules
-COPY --from=deps /app/packages/types/node_modules ./packages/types/node_modules
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps/commerce ./apps/commerce
 COPY packages/types ./packages/types
+COPY packages/config ./packages/config
 
 RUN pnpm --filter @life/types build
-RUN pnpm --filter @life/commerce build
+RUN pnpm --filter @life/config build
 
 # --- Stage 3: Production runtime ---
 FROM node:22-alpine AS runner
+RUN corepack enable && corepack prepare pnpm@11.4.0 --activate
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 medusa
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV MEDUSA_DISABLE_ADMIN=true
 ENV PORT=9000
 ENV HOSTNAME=0.0.0.0
 
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=builder /app/apps/commerce/dist ./apps/commerce/dist
-COPY --from=builder /app/apps/commerce/package.json ./apps/commerce/package.json
-COPY --from=builder /app/apps/commerce/src/modules ./apps/commerce/src/modules
-COPY --from=builder /app/packages/types/dist ./packages/types/dist
-COPY --from=builder /app/packages/types/package.json ./packages/types/package.json
-
-COPY package.json pnpm-workspace.yaml ./
+COPY --from=builder --chown=medusa:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=medusa:nodejs /app/apps/commerce/node_modules ./apps/commerce/node_modules
+COPY --from=builder --chown=medusa:nodejs /app/packages/types ./packages/types
+COPY --from=builder --chown=medusa:nodejs /app/packages/config ./packages/config
+COPY --from=builder --chown=medusa:nodejs /app/apps/commerce ./apps/commerce
+COPY --from=builder --chown=medusa:nodejs /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml /app/tsconfig.base.json ./
 
 USER medusa
 EXPOSE 9000
@@ -54,4 +56,4 @@ EXPOSE 9000
 HEALTHCHECK --interval=15s --timeout=5s --retries=5 --start-period=20s \
   CMD node -e "fetch('http://127.0.0.1:9000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-CMD ["node", "node_modules/.bin/medusa", "start"]
+CMD ["pnpm", "--filter", "@life/commerce", "run", "start"]

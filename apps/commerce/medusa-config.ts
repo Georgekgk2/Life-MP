@@ -57,6 +57,11 @@ export default defineConfig({
         "http://localhost:3000,http://127.0.0.1:3100,http://127.0.0.1:7001",
     },
   },
+  admin: {
+    disable:
+      process.env["MEDUSA_DISABLE_ADMIN"] === "true" ||
+      process.env["DISABLE_MEDUSA_ADMIN"] === "true",
+  },
   modules: [
     {
       resolve: "./src/modules/marketplace",

@@ -124,13 +124,11 @@ docker-down-local: ## Зупинити локальне production-подібн�
 	$(PROD_COMPOSE) down --remove-orphans
 
 # =============================================================================
-# Розгортання (через GitHub Actions)
+# Розгортання (ЗАБЛОКОВАНО / CONTAINED)
 # =============================================================================
 
-deploy-staging: ## Тригерити staging deploy через GitHub CLI
-	gh workflow run deploy.yml -f environment=staging
-	@printf '%s\n' "Staging deploy triggered. Track: https://github.com/Georgekgk2/Life-MP/actions/workflows/deploy.yml"
+deploy-staging: ## [ЗАБЛОКОВАНО] Прямий деплой вимкнено політикою безпеки
+	@printf '%s\n' "ПОМИЛКА: Розгортання на staging заблоковано згідно з політикою безпеки (Phase P0 Containment)." >&2; exit 1
 
-deploy-production: ## Тригерити production deploy через GitHub CLI (потрібне схвалення)
-	gh workflow run deploy.yml -f environment=production
-	@printf '%s\n' "Production deploy triggered. Approval required in GitHub Environments."
+deploy-production: ## [ЗАБЛОКОВАНО] Прямий деплой вимкнено політикою безпеки
+	@printf '%s\n' "ПОМИЛКА: Розгортання на production заблоковано згідно з політикою безпеки (Phase P0 Containment)." >&2; exit 1

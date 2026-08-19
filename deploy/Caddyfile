@@ -1,9 +1,9 @@
 # =============================================================================
-# Life-MP Caddyfile — Reverse Proxy with Auto-TLS
+# UNAPPROVED TEMPLATE — DO NOT DEPLOY (Phase P0 Containment)
+# Life-MP Caddyfile — Reverse Proxy Template
 # =============================================================================
-# Замініть life.ua на реальний домен після його реєстрації.
-# Поки домен не зареєстровано, Caddy працюватиме на портах 80/443
-# з self-signed сертифікатом або без TLS (для IP-based доступу).
+# УВАГА: production-розгортання заблоковано.
+# Використовуйте placeholder-домени на зразок marketplace.example.invalid.
 # =============================================================================
 
 {$DOMAIN:localhost} {

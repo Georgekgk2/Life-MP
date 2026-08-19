@@ -1,11 +1,9 @@
 # =============================================================================
-# Life-MP Production Docker Compose
+# UNAPPROVED TEMPLATE — DO NOT DEPLOY (Phase P0 Containment)
+# Life-MP Production Docker Compose Template
 # =============================================================================
-# Використання:
-#   docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.prod up -d
-#
-# Попередження: цей файл призначений для ВИКОРИСТАННЯ НА СЕРВЕРІ.
-# Локальний development використовує docker-compose.dev.yml.
+# УВАГА: цей файл є шаблоном конфігурації. Будь-яке розгортання заборонено
+# політикою безпеки (Phase P0 Containment) до проходження всіх воріт готовності.
 # =============================================================================
 
 services:
@@ -78,7 +76,7 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.commerce
-    image: ${COMMERCE_IMAGE:-life-commerce:latest}
+    image: ${COMMERCE_IMAGE:?COMMERCE_IMAGE_REQUIRED}
     container_name: life-commerce
     environment:
       NODE_ENV: production
@@ -123,7 +121,7 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.storefront
-    image: ${STOREFRONT_IMAGE:-life-storefront:latest}
+    image: ${STOREFRONT_IMAGE:?STOREFRONT_IMAGE_REQUIRED}
     container_name: life-storefront
     environment:
       NODE_ENV: production

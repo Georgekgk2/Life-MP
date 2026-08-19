@@ -1,7 +1,7 @@
 # =============================================================================
+# UNAPPROVED TEMPLATE — DO NOT DEPLOY (Phase P0 Containment)
 # Commerce — Multi-stage Medusa v2 Production Build
 # =============================================================================
-
 # --- Stage 1: Install dependencies ---
 FROM node:22-alpine AS deps
 RUN corepack enable && corepack prepare pnpm@11.4.0 --activate

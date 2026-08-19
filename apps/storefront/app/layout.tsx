@@ -2,11 +2,13 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
 import {
+  CartDrawer,
   InstallPwaPrompt,
   PwaRegister,
   SiteFooter,
   SiteHeader,
 } from "@/components";
+import { CartProvider } from "@/context/cart-context";
 import { SavedProvider } from "@/context/saved-context";
 import { ProfileProvider } from "@/context/profile-context";
 
@@ -59,14 +61,17 @@ export default function RootLayout({
         <PwaRegister />
         <ProfileProvider>
           <SavedProvider>
-            <SiteHeader />
-            <main id="main-content" tabIndex={-1}>
-              <div className="layout-shell">
-                <InstallPwaPrompt />
-              </div>
-              {children}
-            </main>
-            <SiteFooter />
+            <CartProvider>
+              <SiteHeader />
+              <CartDrawer />
+              <main id="main-content" tabIndex={-1}>
+                <div className="layout-shell">
+                  <InstallPwaPrompt />
+                </div>
+                {children}
+              </main>
+              <SiteFooter />
+            </CartProvider>
           </SavedProvider>
         </ProfileProvider>
       </body>

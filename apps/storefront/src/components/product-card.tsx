@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { StorefrontCatalogProduct } from "@life/types";
 import { SaveButton } from "./save-button";
+import { AddToCartButton } from "./add-to-cart-button";
 
 const hryvniaFormatter = new Intl.NumberFormat("uk-UA", {
   style: "currency",
@@ -32,7 +33,10 @@ export function ProductCard({ product }: ProductCardProps) {
               ? `Майстер: ${product.provider.name}`
               : "Виріб спільноти"}
           </p>
-          <SaveButton product={product} size="sm" />
+          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <AddToCartButton product={product} size="sm" />
+            <SaveButton product={product} size="sm" />
+          </div>
         </div>
         <h3 className="card__title">
           <Link
@@ -56,22 +60,6 @@ export function ProductCard({ product }: ProductCardProps) {
                 ? "Синтетичні локальні дані"
                 : "Лише перегляд у демо"}
             </span>
-            {product.verifiedVendorBadge && (
-              <span
-                className="badge badge--verified"
-                style={{ background: "#e6f4ea", color: "#137333" }}
-              >
-                ✓ {product.verifiedVendorBadge}
-              </span>
-            )}
-            {product.certifiedProductBadge && (
-              <span
-                className="badge badge--certified"
-                style={{ background: "#e8f0fe", color: "#1a73e8" }}
-              >
-                ★ {product.certifiedProductBadge}
-              </span>
-            )}
             {product.organicProductBadge && (
               <span
                 className="badge badge--organic"

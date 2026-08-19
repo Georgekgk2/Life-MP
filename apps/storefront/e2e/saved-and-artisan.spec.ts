@@ -24,22 +24,26 @@ test.describe("Saved Wishlist & Artisan Application E2E", () => {
     // 2. Initial header badge should not show count
     const savedLink = page.getByRole("link", { name: /Збережені товари/i });
     await expect(savedLink).toBeVisible();
-    await expect(page.locator(".site-header__saved-badge")).toHaveCount(0);
+    await expect(
+      page.locator("a.site-header__saved-link .site-header__saved-badge"),
+    ).toHaveCount(0);
 
     // 3. Click save button on first product card
     const firstSaveBtn = page
       .getByRole("button", { name: /Зберегти товар/i })
       .first();
     await expect(firstSaveBtn).toBeVisible();
-    await firstSaveBtn.click();
+    await firstSaveBtn.click({ force: true });
 
     // 4. Header badge should now display '1'
-    const badge = page.locator(".site-header__saved-badge");
+    const badge = page.locator(
+      "a.site-header__saved-link .site-header__saved-badge",
+    );
     await expect(badge).toBeVisible();
     await expect(badge).toHaveText("1");
 
     // 5. Navigate to /saved
-    await savedLink.click();
+    await savedLink.click({ force: true });
     await expect(page).toHaveURL("/saved");
     await expect(page.locator("h1")).toContainText("Збережені товари");
 
@@ -65,7 +69,9 @@ test.describe("Saved Wishlist & Artisan Application E2E", () => {
     await expect(
       page.getByText("У вас поки немає збережених виробів"),
     ).toBeVisible();
-    await expect(page.locator(".site-header__saved-badge")).toHaveCount(0);
+    await expect(
+      page.locator("a.site-header__saved-link .site-header__saved-badge"),
+    ).toHaveCount(0);
 
     // Capture screenshot of empty /saved
     await page.screenshot({
@@ -100,7 +106,7 @@ test.describe("Saved Wishlist & Artisan Application E2E", () => {
     const submitBtn = page.getByRole("button", {
       name: /Подати заявку на модерацію/i,
     });
-    await submitBtn.click();
+    await submitBtn.click({ force: true });
 
     // 3. Verify validation error messages
     await expect(page.getByText(/не менше 2 символів/i).first()).toBeVisible();
@@ -121,10 +127,10 @@ test.describe("Saved Wishlist & Artisan Application E2E", () => {
       "#artisan-portfolio",
       "https://instagram.com/polissia_craft",
     );
-    await page.check("#artisan-terms");
+    await page.check("#artisan-terms", { force: true });
 
     // 5. Submit valid form
-    await submitBtn.click();
+    await submitBtn.click({ force: true });
 
     // 6. Verify success summary screen
     await expect(

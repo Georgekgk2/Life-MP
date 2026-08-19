@@ -7,6 +7,7 @@ const repositoryRoot = join(storefrontDirectory, "../..");
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
   turbopack: {
     root: repositoryRoot,
   },

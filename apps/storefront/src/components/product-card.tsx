@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { StorefrontCatalogProduct } from "@life/types";
+import { SaveButton } from "./save-button";
 
 const hryvniaFormatter = new Intl.NumberFormat("uk-UA", {
   style: "currency",
@@ -18,11 +19,21 @@ export function ProductCard({ product }: ProductCardProps) {
         <span className="card__visual-label">{product.name}</span>
       </div>
       <div className="card__content">
-        <p className="card__eyebrow">
-          {product.provider?.name
-            ? `Майстер: ${product.provider.name}`
-            : "Виріб спільноти"}
-        </p>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            gap: "0.5rem",
+          }}
+        >
+          <p className="card__eyebrow">
+            {product.provider?.name
+              ? `Майстер: ${product.provider.name}`
+              : "Виріб спільноти"}
+          </p>
+          <SaveButton product={product} size="sm" />
+        </div>
         <h3 className="card__title">
           <Link
             className="card__title-link"

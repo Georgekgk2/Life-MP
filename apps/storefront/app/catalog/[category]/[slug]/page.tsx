@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { ProductCard, SectionHeading } from "@/components";
+import { ProductCard, SaveButton, SectionHeading } from "@/components";
 import { getCatalogSnapshot } from "@/catalog/server";
 import { products as fixtureProducts } from "@/fixtures";
 
@@ -218,6 +218,19 @@ export default async function ProductDetailPage({
                     🌿 {product.organicProductBadge}
                   </span>
                 )}
+              </div>
+
+              {/* Product Actions */}
+              <div
+                className="product-detail-actions"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "1rem",
+                  marginBottom: "1.5rem",
+                }}
+              >
+                <SaveButton product={product} size="lg" showLabel={true} />
               </div>
 
               <div

@@ -8,6 +8,7 @@ type SectionHeadingProps = Readonly<{
   description?: string;
   actionHref?: InternalHref;
   actionLabel?: string;
+  level?: "h1" | "h2" | "h3";
 }>;
 
 export function SectionHeading({
@@ -16,14 +17,16 @@ export function SectionHeading({
   description,
   actionHref,
   actionLabel,
+  level = "h2",
 }: SectionHeadingProps) {
   const hasAction = actionHref !== undefined && actionLabel !== undefined;
+  const HeadingTag = level;
 
   return (
     <header className="section-heading">
       <div className="section-heading__content">
         {eyebrow ? <p className="section-heading__eyebrow">{eyebrow}</p> : null}
-        <h2>{title}</h2>
+        <HeadingTag>{title}</HeadingTag>
         {description ? (
           <p className="section-heading__description">{description}</p>
         ) : null}

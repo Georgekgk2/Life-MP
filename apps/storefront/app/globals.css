@@ -1039,6 +1039,97 @@
     color: var(--color-primary-strong);
     text-align: center;
   }
+
+  /* Wishlist & Save Button */
+  .save-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    background-color: rgba(255, 255, 255, 0.92);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-pill, 9999px);
+    color: var(--color-ink);
+    cursor: pointer;
+    transition:
+      transform 0.15s ease,
+      background-color 0.15s ease,
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .save-button:hover {
+    transform: scale(1.06);
+    background-color: #ffffff;
+    border-color: var(--color-primary);
+  }
+
+  .save-button--sm {
+    width: 2.25rem;
+    height: 2.25rem;
+    font-size: 1rem;
+    padding: 0;
+  }
+
+  .save-button--md {
+    padding: var(--space-1) var(--space-3);
+    font-size: var(--text-sm);
+  }
+
+  .save-button--lg {
+    padding: var(--space-2) var(--space-4);
+    font-size: var(--text-base);
+    font-weight: var(--weight-medium);
+  }
+
+  .save-button--active {
+    background-color: #fff0f0;
+    border-color: #f87171;
+    color: #b91c1c;
+  }
+
+  /* Header Actions & Wishlist Badge */
+  .site-header__actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .site-header__saved-link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    color: var(--color-ink);
+    text-decoration: none;
+    transition: background-color 0.15s ease;
+  }
+
+  .site-header__saved-link:hover {
+    background-color: var(--color-surface-muted);
+  }
+
+  .site-header__saved-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding: 0 0.35rem;
+    background-color: #b91c1c;
+    color: #ffffff;
+    font-size: 0.75rem;
+    font-weight: var(--weight-bold);
+    border-radius: 9999px;
+  }
+
+  .site-header__artisan-btn {
+    white-space: nowrap;
+  }
 }
 
 @layer utilities {

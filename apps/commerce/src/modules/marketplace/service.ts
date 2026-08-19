@@ -14,6 +14,7 @@ import {
   VendorChildOrder,
   VendorPayable,
   SettlementBatch,
+  ArtisanApplication,
 } from "./models/index.js";
 
 class MarketplaceModuleService extends MedusaService({
@@ -31,6 +32,7 @@ class MarketplaceModuleService extends MedusaService({
   VendorChildOrder,
   VendorPayable,
   SettlementBatch,
+  ArtisanApplication,
 }) {}
 
 export default MarketplaceModuleService;

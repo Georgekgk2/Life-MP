@@ -12,3 +12,4 @@ export * from "./parent-order.js";
 export * from "./vendor-child-order.js";
 export * from "./vendor-payable.js";
 export * from "./settlement-batch.js";
+export * from "./artisan-application.js";

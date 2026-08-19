@@ -127,8 +127,15 @@ export type Story<
   relatedProductSlugs: readonly ProductSlug[];
 }>;
 
+export type EventAgendaItem = Readonly<{
+  time: string;
+  title: string;
+  description: string;
+}>;
+
 export type Event<
   PersonSlug extends string = string,
+  ProductSlug extends string = string,
   Slug extends string = string,
 > = Readonly<{
   id: string;
@@ -136,8 +143,13 @@ export type Event<
   title: string;
   summary: string;
   dateLabel: string;
+  timeLabel?: string;
+  typeLabel?: string;
   location: string;
   personSlug: PersonSlug;
+  description?: string;
+  agenda?: readonly EventAgendaItem[];
+  relatedProductSlugs?: readonly ProductSlug[];
 }>;
 
 export type CharityProject<

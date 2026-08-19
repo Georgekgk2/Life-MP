@@ -75,6 +75,14 @@ export function SiteHeader() {
               )}
             </Link>
             <Link
+              href="/profile"
+              className="site-header__profile-link"
+              aria-label="Особистий кабінет покупця"
+            >
+              <span aria-hidden="true">👤</span>
+              <span className="site-header__saved-text">Профіль</span>
+            </Link>
+            <Link
               href="/join-as-artisan"
               className="button button--secondary button--sm site-header__artisan-btn"
             >

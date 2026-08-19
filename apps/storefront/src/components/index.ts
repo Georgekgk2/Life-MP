@@ -1,6 +1,7 @@
 export { ArtisanForm } from "./artisan-form";
 export { CatalogBrowser } from "./catalog-browser";
 export { CategoryCard } from "./category-card";
+export { CustomerProfileView } from "./customer-profile-view";
 export { EmptyState } from "./empty-state";
 export { EventCard } from "./event-card";
 export { ModerationDashboard } from "./moderation-dashboard";

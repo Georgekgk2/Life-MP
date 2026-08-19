@@ -79,8 +79,10 @@ test.describe("Moderation Dashboard E2E", () => {
       "Майстерня успішно пройшла перевірку зразків карпатської глини. Схвалено до розміщення.",
     );
 
-    const approveBtn = page.getByRole("button", { name: /✅ Схвалити/i });
-    await approveBtn.click();
+    const approveBtn = page
+      .getByRole("dialog")
+      .getByRole("button", { name: /✅ Схвалити/i });
+    await approveBtn.click({ force: true });
 
     // 8. Verify modal closed and application status updated
     await expect(modalTitle).not.toBeVisible();

@@ -9,6 +9,7 @@ __pycache__/
 .env
 .env.*
 !.env.example
+!deploy/.env.prod.template
 
 # IDE
 .idea/
@@ -27,11 +28,11 @@ build/
 # TypeScript incremental build metadata
 *.tsbuildinfo
 
-# Next.js and Turborepo
+# Next.js, Medusa, and Turborepo
 .next/
 out/
+.medusa/
 .turbo/
-
 # Test output
 coverage/
 playwright-report/
@@ -44,7 +45,8 @@ logs/
 
 # Tool-generated orchestration artifact
 /artifacts/omp-logs*.txt
-
+/artifacts/perpl*.txt
+.omx/
 # Local database backups
 backups/
 

@@ -367,158 +367,158 @@
 | 278                                                                                                                                                                                                             |
 +-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
- Completing the plan                                                                                                                                                                                               
-                                                                                                                                                                                                                   
- I'm ready to write the proposed slug to xd://propose. The plan file is local://catalog-provider-core-plan.md, so the slug is catalog-provider-core-plan. I’m going to write that string now. Everything is lined  
- up, so let's finalize this!                                                                                                                                                                                       
+ Completing the plan
 
-                                                                                                                                                                                                                   
- * propose                                                                                                                                                                                                         
-                                                                                                                                                                                                                   
- Args                                                                                                                                                                                                              
- '-- [F] title: "catalog-provider-core-plan"                                                                                                                                                                       
-                                                                                                                                                                                                                   
- Plan ready for review.                                                                                                                                                                                            
-                                                                                                                                                                                                                   
+ I'm ready to write the proposed slug to xd://propose. The plan file is local://catalog-provider-core-plan.md, so the slug is catalog-provider-core-plan. I’m going to write that string now. Everything is lined
+ up, so let's finalize this!
+
+
+ * propose
+
+ Args
+ '-- [F] title: "catalog-provider-core-plan"
+
+ Plan ready for review.
+
 
 --------------------------------------------------------------------------------------------- [o] compacted - ctrl+o ----------------------------------------------------------------------------------------------
 
-                                                                                                                                                                                                                   
- Compacted from 596,859 tokens                                                                                                                                                                                     
-                                                                                                                                                                                                                   
- Goal                                                                                                                                                                                                              
-                                                                                                                                                                                                                   
- Establish Phase 2 (Catalog & Provider Core) for the Ukrainian multi-vendor marketplace ЛАЙФ (Life-MP) based on the detailed execution plan created at local://catalog-provider-core-plan.md.                      
-                                                                                                                                                                                                                   
- Constraints & Preferences                                                                                                                                                                                         
-                                                                                                                                                                                                                   
- - Language: All user-facing copy, documentation, and error/status strings must be in Ukrainian (lang="uk").                                                                                                       
- - Non-Transactional Scope: Phase 2 strictly excludes cart, checkout, payment, order splitting, fiscalization (РРО), shipment/delivery APIs, affiliate payouts, booking, and production deployment.                
- - Authority: Medusa v2.18.0 is the sole authority for vendors, product eligibility, listing states, and catalog moderation. Payload CMS remains uninstalled/blocked per ADR 0005.                                 
- - Environment & Port Isolation: Local dev data services run via Docker Compose on loopback ports 127.0.0.1:54329 (PostgreSQL 16) and 127.0.0.1:56379 (Redis 7).                                                   
- - Security & Supply Chain: No committed secrets or .env exposure; sharp native build script remains explicitly denied (allowBuilds.sharp: false in pnpm-workspace.yaml).                                          
- - Storefront Defaults: Default catalog source remains CATALOG_SOURCE=fixtures until Medusa API integration is enabled via environment variables (NODE_ENV=development|test, ALLOW_SYNTHETIC_CATALOG=true).        
-                                                                                                                                                                                                                   
- Progress                                                                                                                                                                                                          
-                                                                                                                                                                                                                   
- ### Done                                                                                                                                                                                                          
-                                                                                                                                                                                                                   
- - Monorepo & CI Foundation: Configured pnpm workspaces (Node 22), strict TypeScript, ESLint flat config, Prettier, Vitest, and GitHub Actions workflow (.github/workflows/ci.yml).                                
- - Decision & Governance Documentation: Created decision register (docs/decisions/open-questions.md), launch scope boundaries (docs/decisions/launch-scope.md), customer questionnaire                             
- (customer-questionnaire.md), readiness gate (production-readiness-gate.md), server discovery runbook (production-server-discovery.md), and ADRs 0001–0005.                                                        
- - Storefront Prototype: Implemented Next.js 16.2.11 App Router storefront (apps/storefront) with static Ukrainian demo fixtures (apps/storefront/src/fixtures.ts), design system (globals.css), and dynamic       
- routes (/catalog, /people, /stories, /events, /charity, /partners).                                                                                                                                               
- - Repository & Branch Governance: Initialized private GitHub repo (Georgekgk2/Life-MP), configured branch protection on main (required Verify check, linear history, enforce admins), enabled Dependabot, and     
- resolved all dependency advisories (0 open vulnerabilities).                                                                                                                                                      
- - Phase 2 Planning: Conducted planning analysis and authored the execution plan at local://catalog-provider-core-plan.md.                                                                                         
-                                                                                                                                                                                                                   
- ### Blocked                                                                                                                                                                                                       
-                                                                                                                                                                                                                   
- - Commercial Checkout & Payments: Blocked by open client decisions (COM-1 legal seller, COM-2 funds recipient, COM-3 РРО issuer, COM-5 order splitting, LOG-1 fulfillment model).                                 
- - Production Deployment: Blocked by mandatory authorized read-only server discovery gate (docs/runbooks/production-server-discovery.md).                                                                          
-                                                                                                                                                                                                                   
- Key Decisions                                                                                                                                                                                                     
-                                                                                                                                                                                                                   
- - Phase 2 Architecture: Medusa v2.18.0 app in apps/commerce with a custom marketplace module (Vendor, VendorMember, VendorProfile, CatalogListing, ModerationDecision, StaffRoleAssignment, AuditEvent) linked to 
- Medusa's native Product module.                                                                                                                                                                                   
- - Tenant Isolation: VendorMember enforces a globally unique active membership per auth_identity_id. All vendor routes derive tenant context strictly from the authenticated actor token.                          
- - Native Store API Lockdown: A middleware returns 404 for native Medusa store endpoints (/store/products, /store/product-categories, cart routes), allowing access only to the custom GET /store/catalog          
- endpoint.                                                                                                                                                                                                         
- - Database Ownership & Bootstrap: Idempotent SQL script (infra/compose/postgres/001-catalog-provider-core.sql) creates database roles (life_medusa_dev, life_medusa_test, life_medusa_migration_test) as owners   
- of their respective databases without superuser privileges.                                                                                                                                                       
- - Storefront Integration Seam: Atomically routes storefront catalog data through apps/storefront/src/catalog/server.ts supporting CATALOG_SOURCE=fixtures|medusa.                                                 
-                                                                                                                                                                                                                   
- Next Steps                                                                                                                                                                                                        
-                                                                                                                                                                                                                   
- 1. Propose the plan by writing the slug catalog-provider-core-plan to xd://propose.                                                                                                                               
- 2. Upon approval, execute the steps specified in local://catalog-provider-core-plan.md:                                                                                                                           
-   - Step 1: Update architecture documentation (overview.md, erd-v1.md, launch-scope.md) and create ADR 0006.                                                                                                      
-   - Step 2: Convert apps/commerce to a Medusa v2.18.0 application and configure Postgres/Redis databases and local env wrappers (scripts/with-local-commerce-env.sh).                                             
-   - Step 3: Implement the custom marketplace module, models, links, and migrations in apps/commerce.                                                                                                              
-   - Step 4: Implement middleware, role guards, moderation workflows, and API routes.                                                                                                                              
-   - Step 5: Implement synthetic catalog seeding (seed-catalog-provider-core.ts) and DTO mapping.                                                                                                                  
-   - Step 6: Integrate the storefront catalog reader (apps/storefront/src/catalog/server.ts) and update catalog pages.                                                                                             
-   - Step 7: Add integration tests, migration tests, Playwright E2E tests, and update CI workflows.                                                                                                                
-                                                                                                                                                                                                                   
- Critical Context                                                                                                                                                                                                  
-                                                                                                                                                                                                                   
- - Authoritative execution spec: local://catalog-provider-core-plan.md                                                                                                                                             
- - Repository status: main branch, clean working tree, up to date with origin/main (latest commit 2b29dcb).                                                                                                        
- - Local environment: Node v22.22.3, pnpm 11.4.0, Docker Compose v5.1.2 on OrbStack.                                                                                                                               
-                                                                                                                                                                                                                   
- --------------------------------------------------------------------------------                                                                                                                                  
-                                                                                                                                                                                                                   
- Turn Context (split turn):                                                                                                                                                                                        
-                                                                                                                                                                                                                   
- Original Request                                                                                                                                                                                                  
-                                                                                                                                                                                                                   
- Address all findings raised by the FinalPlanExecutionReview agent on local://catalog-provider-core-plan.md.                                                                                                       
-                                                                                                                                                                                                                   
- Early Progress                                                                                                                                                                                                    
-                                                                                                                                                                                                                   
- - Read full execution plan critique from agent://FinalPlanExecutionReview.                                                                                                                                        
- - Tenant selection: Updated models/vendor-member.ts model definition in the plan to enforce a unique active membership per auth_identity_id globally in this phase.                                               
- - Listing creation: Specified VendorListingCreateInput Zod schema (title, description) and detailed the exact atomic creation transaction for POST /vendor/marketplace/listings.                                  
- - Database isolation / Environment wrappers: Added three committed shell scripts (with-local-commerce-env.sh, with-commerce-test-env.sh, with-commerce-migration-test-env.sh) and updated package scripts         
- (test:integration:http, test:migrations) to explicitly wrap database environment bindings.                                                                                                                        
- - Jest config: Updated jest.config.cjs specification to handle TEST_TYPE=integration:migrations.                                                                                                                  
- - Compose execution: Added explicit --env-file .env.example -f docker-compose.dev.yml flags to database role check commands in the verification section.                                                          
- - Seed guard: Extracted pure pre-configuration function assertSyntheticSeedAllowed into apps/commerce/src/scripts/seed-guard.ts and updated step 5 and the verification section to test it via unit tests before  
- database resolution or application bootstrap.                                                                                                                                                                     
-                                                                                                                                                                                                                   
- Context for Suffix                                                                                                                                                                                                
-                                                                                                                                                                                                                   
- The edits to local://catalog-provider-core-plan.md were successfully applied using patch tool calls, addressing all priority 1 and priority 2 review findings. The plan file is currently at revision #F001.      
-                                                                                                                                                                                                                   
- <files>                                                                                                                                                                                                           
- .env.example (Read)                                                                                                                                                                                               
- .gitignore (Read)                                                                                                                                                                                                 
- .opencode (Read)                                                                                                                                                                                                  
- .pi (Read)                                                                                                                                                                                                        
- AGENTS.md (Read)                                                                                                                                                                                                  
- Makefile (Read)                                                                                                                                                                                                   
- README.md (Read)                                                                                                                                                                                                  
- TZ.txt (Read)                                                                                                                                                                                                     
- # .github/                                                                                                                                                                                                        
- CODEOWNERS (Read)                                                                                                                                                                                                 
- ## workflows/                                                                                                                                                                                                     
- ci.yml (Read)                                                                                                                                                                                                     
- # .opencode/                                                                                                                                                                                                      
- config.json (Read)                                                                                                                                                                                                
- # .pi/                                                                                                                                                                                                            
- settings.json (Read)                                                                                                                                                                                              
- # /Users/george/Projects/                                                                                                                                                                                         
- Life-MP (Read)                                                                                                                                                                                                    
- ## Jorvis/                                                                                                                                                                                                        
- artifacts (Read)                                                                                                                                                                                                  
- ### artifacts/                                                                                                                                                                                                    
- Server (Read)                                                                                                                                                                                                     
- #### Server/                                                                                                                                                                                                      
- backups (Read)                                                                                                                                                                                                    
- # apps/                                                                                                                                                                                                           
- commerce (Read)                                                                                                                                                                                                   
- ## commerce/                                                                                                                                                                                                      
- package.json (Read)                                                                                                                                                                                               
- ### src/                                                                                                                                                                                                          
- index.ts (Read)                                                                                                                                                                                                   
- ## storefront/app/catalog/[category]/                                                                                                                                                                             
- page.tsx (Read)                                                                                                                                                                                                   
- […26 files elided…]                                                                                                                                                                                               
- </files> 
+
+ Compacted from 596,859 tokens
+
+ Goal
+
+ Establish Phase 2 (Catalog & Provider Core) for the Ukrainian multi-vendor marketplace ЛАЙФ (Life-MP) based on the detailed execution plan created at local://catalog-provider-core-plan.md.
+
+ Constraints & Preferences
+
+ - Language: All user-facing copy, documentation, and error/status strings must be in Ukrainian (lang="uk").
+ - Non-Transactional Scope: Phase 2 strictly excludes cart, checkout, payment, order splitting, fiscalization (РРО), shipment/delivery APIs, affiliate payouts, booking, and production deployment.
+ - Authority: Medusa v2.18.0 is the sole authority for vendors, product eligibility, listing states, and catalog moderation. Payload CMS remains uninstalled/blocked per ADR 0005.
+ - Environment & Port Isolation: Local dev data services run via Docker Compose on loopback ports 127.0.0.1:54329 (PostgreSQL 16) and 127.0.0.1:56379 (Redis 7).
+ - Security & Supply Chain: No committed secrets or .env exposure; sharp native build script remains explicitly denied (allowBuilds.sharp: false in pnpm-workspace.yaml).
+ - Storefront Defaults: Default catalog source remains CATALOG_SOURCE=fixtures until Medusa API integration is enabled via environment variables (NODE_ENV=development|test, ALLOW_SYNTHETIC_CATALOG=true).
+
+ Progress
+
+ ### Done
+
+ - Monorepo & CI Foundation: Configured pnpm workspaces (Node 22), strict TypeScript, ESLint flat config, Prettier, Vitest, and GitHub Actions workflow (.github/workflows/ci.yml).
+ - Decision & Governance Documentation: Created decision register (docs/decisions/open-questions.md), launch scope boundaries (docs/decisions/launch-scope.md), customer questionnaire
+ (customer-questionnaire.md), readiness gate (production-readiness-gate.md), server discovery runbook (production-server-discovery.md), and ADRs 0001–0005.
+ - Storefront Prototype: Implemented Next.js 16.2.11 App Router storefront (apps/storefront) with static Ukrainian demo fixtures (apps/storefront/src/fixtures.ts), design system (globals.css), and dynamic
+ routes (/catalog, /people, /stories, /events, /charity, /partners).
+ - Repository & Branch Governance: Initialized private GitHub repo (Georgekgk2/Life-MP), configured branch protection on main (required Verify check, linear history, enforce admins), enabled Dependabot, and
+ resolved all dependency advisories (0 open vulnerabilities).
+ - Phase 2 Planning: Conducted planning analysis and authored the execution plan at local://catalog-provider-core-plan.md.
+
+ ### Blocked
+
+ - Commercial Checkout & Payments: Blocked by open client decisions (COM-1 legal seller, COM-2 funds recipient, COM-3 РРО issuer, COM-5 order splitting, LOG-1 fulfillment model).
+ - Production Deployment: Blocked by mandatory authorized read-only server discovery gate (docs/runbooks/production-server-discovery.md).
+
+ Key Decisions
+
+ - Phase 2 Architecture: Medusa v2.18.0 app in apps/commerce with a custom marketplace module (Vendor, VendorMember, VendorProfile, CatalogListing, ModerationDecision, StaffRoleAssignment, AuditEvent) linked to
+ Medusa's native Product module.
+ - Tenant Isolation: VendorMember enforces a globally unique active membership per auth_identity_id. All vendor routes derive tenant context strictly from the authenticated actor token.
+ - Native Store API Lockdown: A middleware returns 404 for native Medusa store endpoints (/store/products, /store/product-categories, cart routes), allowing access only to the custom GET /store/catalog
+ endpoint.
+ - Database Ownership & Bootstrap: Idempotent SQL script (infra/compose/postgres/001-catalog-provider-core.sql) creates database roles (life_medusa_dev, life_medusa_test, life_medusa_migration_test) as owners
+ of their respective databases without superuser privileges.
+ - Storefront Integration Seam: Atomically routes storefront catalog data through apps/storefront/src/catalog/server.ts supporting CATALOG_SOURCE=fixtures|medusa.
+
+ Next Steps
+
+ 1. Propose the plan by writing the slug catalog-provider-core-plan to xd://propose.
+ 2. Upon approval, execute the steps specified in local://catalog-provider-core-plan.md:
+   - Step 1: Update architecture documentation (overview.md, erd-v1.md, launch-scope.md) and create ADR 0006.
+   - Step 2: Convert apps/commerce to a Medusa v2.18.0 application and configure Postgres/Redis databases and local env wrappers (scripts/with-local-commerce-env.sh).
+   - Step 3: Implement the custom marketplace module, models, links, and migrations in apps/commerce.
+   - Step 4: Implement middleware, role guards, moderation workflows, and API routes.
+   - Step 5: Implement synthetic catalog seeding (seed-catalog-provider-core.ts) and DTO mapping.
+   - Step 6: Integrate the storefront catalog reader (apps/storefront/src/catalog/server.ts) and update catalog pages.
+   - Step 7: Add integration tests, migration tests, Playwright E2E tests, and update CI workflows.
+
+ Critical Context
+
+ - Authoritative execution spec: local://catalog-provider-core-plan.md
+ - Repository status: main branch, clean working tree, up to date with origin/main (latest commit 2b29dcb).
+ - Local environment: Node v22.22.3, pnpm 11.4.0, Docker Compose v5.1.2 on OrbStack.
+
+ --------------------------------------------------------------------------------
+
+ Turn Context (split turn):
+
+ Original Request
+
+ Address all findings raised by the FinalPlanExecutionReview agent on local://catalog-provider-core-plan.md.
+
+ Early Progress
+
+ - Read full execution plan critique from agent://FinalPlanExecutionReview.
+ - Tenant selection: Updated models/vendor-member.ts model definition in the plan to enforce a unique active membership per auth_identity_id globally in this phase.
+ - Listing creation: Specified VendorListingCreateInput Zod schema (title, description) and detailed the exact atomic creation transaction for POST /vendor/marketplace/listings.
+ - Database isolation / Environment wrappers: Added three committed shell scripts (with-local-commerce-env.sh, with-commerce-test-env.sh, with-commerce-migration-test-env.sh) and updated package scripts
+ (test:integration:http, test:migrations) to explicitly wrap database environment bindings.
+ - Jest config: Updated jest.config.cjs specification to handle TEST_TYPE=integration:migrations.
+ - Compose execution: Added explicit --env-file .env.example -f docker-compose.dev.yml flags to database role check commands in the verification section.
+ - Seed guard: Extracted pure pre-configuration function assertSyntheticSeedAllowed into apps/commerce/src/scripts/seed-guard.ts and updated step 5 and the verification section to test it via unit tests before
+ database resolution or application bootstrap.
+
+ Context for Suffix
+
+ The edits to local://catalog-provider-core-plan.md were successfully applied using patch tool calls, addressing all priority 1 and priority 2 review findings. The plan file is currently at revision #F001.
+
+ <files>
+ .env.example (Read)
+ .gitignore (Read)
+ .opencode (Read)
+ .pi (Read)
+ AGENTS.md (Read)
+ Makefile (Read)
+ README.md (Read)
+ TZ.txt (Read)
+ # .github/
+ CODEOWNERS (Read)
+ ## workflows/
+ ci.yml (Read)
+ # .opencode/
+ config.json (Read)
+ # .pi/
+ settings.json (Read)
+ # /Users/george/Projects/
+ Life-MP (Read)
+ ## Jorvis/
+ artifacts (Read)
+ ### artifacts/
+ Server (Read)
+ #### Server/
+ backups (Read)
+ # apps/
+ commerce (Read)
+ ## commerce/
+ package.json (Read)
+ ### src/
+ index.ts (Read)
+ ## storefront/app/catalog/[category]/
+ page.tsx (Read)
+ […26 files elided…]
+ </files>
 
 ---
 
-Let's initialize the todo list tracking execution steps outlined in local://catalog-provider-core-plan.md.                                                                                                        
-                                                                                                                                                                                                                   
- Phase 1: Step 1 - Architecture & Decision Docs                                                                                                                                                                    
- Phase 2: Step 2 - Medusa App Conversion & DB Environment                                                                                                                                                          
- Phase 3: Step 3 - Marketplace Custom Module & Models                                                                                                                                                              
- Phase 4: Step 4 - Server-side Tenancy, Workflows & APIs                                                                                                                                                           
- Phase 5: Step 5 - Seed Data & Public DTO Mapper                                                                                                                                                                   
- Phase 6: Step 6 - Storefront Catalog Seam & UI Updates                                                                                                                                                            
- Phase 7: Step 7 - Integration Tests, Migrations, E2E & CI                                                                                                                                                         
+Let's initialize the todo list tracking execution steps outlined in local://catalog-provider-core-plan.md.
 
- Cognitive processing engaged: I will now initialize the todo tracker based on the authoritative execution plan local://catalog-provider-core-plan.md.                                                             
+ Phase 1: Step 1 - Architecture & Decision Docs
+ Phase 2: Step 2 - Medusa App Conversion & DB Environment
+ Phase 3: Step 3 - Marketplace Custom Module & Models
+ Phase 4: Step 4 - Server-side Tenancy, Workflows & APIs
+ Phase 5: Step 5 - Seed Data & Public DTO Mapper
+ Phase 6: Step 6 - Storefront Catalog Seam & UI Updates
+ Phase 7: Step 7 - Integration Tests, Migrations, E2E & CI
+
+ Cognitive processing engaged: I will now initialize the todo tracker based on the authoritative execution plan local://catalog-provider-core-plan.md.
 
 +--- [x] Todo 23 tasks -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 | I. Phase 1 Architecture Boundaries                                                                                                                                                                              |
@@ -553,31 +553,31 @@ Let's initialize the todo list tracking execution steps outlined in local://cata
 |   '-- [ ] Create bootstrap-ci-test-database.ts and update CI workflow                                                                                                                                           |
 +-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
- * Read (4)                                                                                                                                                                                                        
-   |-- docs/architecture/overview.md                                                                                                                                                                               
-   |-- docs/architecture/erd-v1.md                                                                                                                                                                                 
-   |-- docs/decisions/launch-scope.md                                                                                                                                                                              
-   '-- docs/decisions/production-readiness-gate.md                                                                                                                                                                 
+ * Read (4)
+   |-- docs/architecture/overview.md
+   |-- docs/architecture/erd-v1.md
+   |-- docs/decisions/launch-scope.md
+   '-- docs/decisions/production-readiness-gate.md
 
- Defining Architecture Baseline                                                                                                                                                                                    
-                                                                                                                                                                                                                   
- I'm focusing now on solidifying the initial architectural boundaries. I've updated docs/architecture/overview.md to clearly define the current baseline. This includes a local Next.js storefront UI, operating   
- against local fixtures, but lacking any connection to live commerce APIs, CMS, or catalog systems.                                                                                                                
+ Defining Architecture Baseline
 
- [/] Glob: docs/adr/*.md 5 files - in docs/adr                                                                                                                                                                     
- |-- md docs/adr/0005-search-and-cms.md                                                                                                                                                                            
- |-- md docs/adr/0004-production-isolation.md                                                                                                                                                                      
- |-- md docs/adr/0003-release-and-recovery.md                                                                                                                                                                      
- |-- md docs/adr/0002-data-boundaries.md                                                                                                                                                                           
- '-- md docs/adr/0001-monorepo-and-tooling.md                                                                                                                                                                      
+ I'm focusing now on solidifying the initial architectural boundaries. I've updated docs/architecture/overview.md to clearly define the current baseline. This includes a local Next.js storefront UI, operating
+ against local fixtures, but lacking any connection to live commerce APIs, CMS, or catalog systems.
 
- * Read (2)                                                                                                                                                                                                        
-   |-- docs/adr/0001-monorepo-and-tooling.md:1-30                                                                                                                                                                  
-   '-- docs/adr/0002-data-boundaries.md:1-30                                                                                                                                                                       
+ [/] Glob: docs/adr/*.md 5 files - in docs/adr
+ |-- md docs/adr/0005-search-and-cms.md
+ |-- md docs/adr/0004-production-isolation.md
+ |-- md docs/adr/0003-release-and-recovery.md
+ |-- md docs/adr/0002-data-boundaries.md
+ '-- md docs/adr/0001-monorepo-and-tooling.md
 
- Defining Catalog Provider                                                                                                                                                                                         
-                                                                                                                                                                                                                   
- Okay, I'm defining the docs/adr/0006-catalog-provider-core.md document now. My focus is on outlining the role of Medusa v2.18.0 as the authoritative source for several key functions, specifically Vendor        
+ * Read (2)
+   |-- docs/adr/0001-monorepo-and-tooling.md:1-30
+   '-- docs/adr/0002-data-boundaries.md:1-30
+
+ Defining Catalog Provider
+
+ Okay, I'm defining the docs/adr/0006-catalog-provider-core.md document now. My focus is on outlining the role of Medusa v2.18.0 as the authoritative source for several key functions, specifically Vendor
  information, native Product eligibility, moderation of listings, and public catalog publication. I am noting the exclusion of a Payload CMS from these roles.
 
 +--- +f Write: md docs/adr/0006-catalog-provider-core.md · 35 lines ----------------------------------------------------------------------------------------------------------------------------------------------+
@@ -625,10 +625,96 @@ Let's initialize the todo list tracking execution steps outlined in local://cata
 |  35                                                                                                                                                                                                             |
 +-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
- [x] Read docs/architecture/overview.md:1-60                                                                                                                                                                       
+ [x] Read docs/architecture/overview.md:1-60
 
- Updating Baseline Status                                                                                                                                                                                          
-                                                                                                                                                                                                                   
- I'm working on updating the baseline status, specifically in docs/architecture/overview.md. The focus is on documenting the current state: a local Next.js App Router storefront prototype is operational. This   
+ Updating Baseline Status
+
+ I'm working on updating the baseline status, specifically in docs/architecture/overview.md. The focus is on documenting the current state: a local Next.js App Router storefront prototype is operational. This
  prototype, located in apps/storefront, utilizes static Ukrainian demo fixtures and has dynamic catalog seams integrated...
 
+
+===
+
+детальний план:
+
+ - Документ: docs/decisions/phase3-4a-deferred-decision-development-plan.md
+ - PR: https://github.com/Georgekgk2/Life-MP/pull/18
+ - Commit: e95f43e
+
+ ### Що можна реалізовувати вже зараз
+
+ План містить дев’ять безпечних хвиль розробки:
+
+ 1. Єдина матриця capability gates — усі blocked-функції тільки disabled або sandbox_internal; режим enabled неможливий до окремого post-decision PR.
+ 2. Sandbox domain core — deterministic split алгоритм і state machine для synthetic fixtures без customer checkout, settlement або реальних замовлень.
+ 3. Контракти адаптерів — payment/shipping/fiscal/media/CMS interfaces з in-memory fake реалізаціями, без URL, ключів, webhooks чи зовнішнього трафіку.
+ 4. Hardening вендорської верифікації, документів і claims — synthetic-only fixtures, RBAC, moderation, audit, MIME/size/checksum validation.
+ 5. Каталог, FTS і storefront — DTO contracts, synthetic Postgres FTS proof, accessibility, error/empty states, без CTA «Купити», «Оплатити» чи обіцянок доставки.
+ 6. Security та privacy — tenant isolation, PII redaction, request limits, security headers, audit trail, dependency governance.
+ 7. Observability — sanitized health/readiness contracts, correlation IDs, structured logs, failure injection без зовнішніх monitoring providers.
+ 8. Міграції та local recovery — additive migrations, idempotence, rollback compatibility, disposable local-only restore rehearsal.
+ 9. Локальні container artifacts і CI — digest-pinned non-root images, local Compose validation, hermetic/no-egress application test lanes, SBOM і image smoke tests.
+
+ ### Важливе уточнення щодо сервера
+
+ Я не підключався до сервера і не використовував ключі, контейнери, конфігурації, backups або будь-які Jorvis-ресурси.
+
+ Наданий SSH transcript показує лише історичний snapshot від 2026-07-26. Він не відповідає обов’язковим умовам docs/runbooks/production-server-discovery.md: немає одноразового письмового дозволу із власником,
+ виконавцем, часовим вікном, exact read-only command allowlist і санітизованим каналом звіту.
+
+ Тому план правильно розділяє:
+
+ - зараз: локальні Dockerfiles, isolated local Compose, CI image tests;
+ - після формального дозволу: лише санітизований read-only server discovery;
+ - після прийнятого discovery evidence: окремий infrastructure-design PR;
+ - після всіх legal/financial/fiscal/logistics/catalog/brand gates: окремі activation packs;
+ - лише потім: окремо авторизований remote provisioning.
+
+ План пройшов незалежний release/security review: APPROVE. Локальне форматування та diff integrity пройдені. Remote CI для PR #18 ще виконується.
+
+ Claim Ledger
+
+ Verified:
+ - Детальний decision-safe development plan створено — evidence: docs/decisions/phase3-4a-deferred-decision-development-plan.md, commit e95f43e.
+ - План опубліковано для рев’ю в PR #18 — evidence: https://github.com/Georgekgk2/Life-MP/pull/18.
+ - Markdown плану відформатовано та diff не має whitespace-помилок — evidence: pnpm exec prettier --check docs/decisions/phase3-4a-deferred-decision-development-plan.md; git diff --check.
+ - Незалежний release/security review прийняв виправлений план — evidence: current-session independent review result APPROVE.
+ - Віддалене server discovery не виконувалося — evidence: виконувались лише локальні read/validation-команди; remote SSH/Docker command не запускалися.
+
+ Partially verified:
+ - План узгоджений із чинними source-level boundaries і readiness documents — missing: незалежне людське PR review та завершення remote CI.
+ - Можливість ізольованого хостингу на вказаному сервері — missing: формальний дозвіл, санітизований discovery evidence, capacity profile, network/isolation attestations і owner assignments.
+
+ Not verified:
+ - Місткість сервера, доступність Docker/Compose, ізоляція мережі, backups, ingress, TLS, DNS і rollback на віддаленому хості.
+ - Проходження CI та CodeQL для commit e95f43e; на момент перевірки jobs були IN_PROGRESS.
+ - Готовність до production або live commerce.
+
+ Failed:
+ - None.
+
+ Risks:
+ - Історичний server snapshot із високим використанням root filesystem не можна використовувати як доказ місткості або дозвіл на контейнеризацію.
+ - Будь-яке remote provisioning до формального discovery та окремої авторизації порушить ADR 0004 і server-discovery runbook.
+
+ Blocked Claims:
+ - I cannot claim "ready/stabilized/verified" for remote hosting or live commerce because server-discovery authorization, незалежна ізоляція Life-MP, зовнішні business/legal/fiscal/logistics рішення та remote
+   CI verification відсутні.
+
+ Readiness: Draft
+ Role: Executor
+
+ Executor report only. Independent verification required.
+
+ Default model: opencode-go/mimo-v2.5-pro
+
+
+ налаштуй CI/CD по прикладу проєкта /Users/george/Projects/Jorvis - всі необхідні для цього креди є в /Users/george/Projects/Jorvis/artifacts/Server
+
+
+ The user wants me to set up CI/CD for the Life-MP project based on the Jorvis project example, using credentials from /Users/george/Projects/Jorvis/artifacts/Server.
+
+ Let me first understand what's in the Jorvis project's CI/CD setup, then adapt it for Life-MP. I need to be careful about security - I should NOT copy secrets, credentials, or .env files into the Life-MP
+ repository.
+
+ Let me start by examining the Jorvis project structure for CI/CD patterns...

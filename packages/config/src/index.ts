@@ -11,3 +11,10 @@ const toolingMetadata: ToolingFoundationMetadata = {
 export function getToolingMetadata(): ToolingFoundationMetadata {
   return toolingMetadata;
 }
+
+export {
+  scanDeploymentContainment,
+  type DeploymentContainmentViolation,
+  type DeploymentContainmentResult,
+  type DeploymentPolicyFile,
+} from "./deployment-containment.js";

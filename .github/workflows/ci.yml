@@ -40,6 +40,9 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Verify deployment containment
+        run: node scripts/verify-deployment-containment.mjs
+
       - name: Typecheck
         run: pnpm typecheck
 

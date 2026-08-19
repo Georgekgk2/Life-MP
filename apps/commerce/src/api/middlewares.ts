@@ -56,12 +56,19 @@ export default defineMiddlewares({
           const rawUrl = req.originalUrl || req.path || req.url || "";
           const targetPath = rawUrl.split("?")[0];
 
-          if (
+          const isCatalogGet =
             req.method === "GET" &&
             (targetPath === "/store/catalog" ||
               targetPath === "/catalog" ||
-              targetPath.endsWith("/catalog"))
-          ) {
+              targetPath.endsWith("/catalog"));
+
+          const isArtisanApplicationPost =
+            req.method === "POST" &&
+            (targetPath === "/store/artisan-applications" ||
+              targetPath === "/artisan-applications" ||
+              targetPath.endsWith("/artisan-applications"));
+
+          if (isCatalogGet || isArtisanApplicationPost) {
             return next();
           }
 

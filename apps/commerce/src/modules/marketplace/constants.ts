@@ -20,3 +20,12 @@ export type ListingState = (typeof listingStates)[number];
 
 export const listingVisibilities = ["internal", "local_demo"] as const;
 export type ListingVisibility = (typeof listingVisibilities)[number];
+
+export const artisanApplicationStatuses = [
+  "pending",
+  "under_review",
+  "approved",
+  "rejected",
+] as const;
+export type ArtisanApplicationStatus =
+  (typeof artisanApplicationStatuses)[number];

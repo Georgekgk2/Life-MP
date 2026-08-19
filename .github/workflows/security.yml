@@ -96,7 +96,7 @@ jobs:
             .
 
       - name: Run Trivy vulnerability scanner (Fail-Closed)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # master
         with:
           image-ref: "${{ matrix.image }}:scan"
           format: "table"

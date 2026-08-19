@@ -1,7 +1,14 @@
 # =============================================================================
 # Life-MP Trivy Ignore Rules (Phase P1B / P1C Governance)
 # =============================================================================
-# Upstream Go stdlib CVEs bundled inside @esbuild binary (devDependency build tool).
+# Scope: Build tool native binary (@esbuild linux-arm64/linux-x64 @ 0.25.0)
+# Reason: Upstream Go standard library CVEs statically compiled into esbuild binary.
+# Exposure: Zero. esbuild is a build-time bundler tool, not exposed to user traffic or production runtime.
+# TTL / Review Date: 2026-11-19 (Quarterly security audit review trigger)
+# Review Trigger: Any bump to esbuild or tsx dependencies in pnpm-workspace.yaml
+# =============================================================================
+
+# Go stdlib crypto/tls, net/url, crypto/x509 in esbuild binary:
 CVE-2025-68121
 CVE-2025-61726
 CVE-2025-61729
@@ -23,6 +30,8 @@ CVE-2026-56853
 CVE-2026-56858
 CVE-2026-56859
 CVE-2026-56860
+CVE-2026-56862
+
+# Upstream js-yaml omap quadratic regex (patched via override to ^4.1.0):
 CVE-2026-59870
 GHSA-5p4m-2wfm-xmqj
-CVE-2026-56862

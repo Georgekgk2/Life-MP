@@ -33,7 +33,7 @@ RUN pnpm --filter @life/config build
 
 # --- Stage 3: Production runtime ---
 FROM node:22-alpine AS runner
-RUN corepack enable && corepack prepare pnpm@11.4.0 --activate
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx /root/.cache
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 medusa
 WORKDIR /app
@@ -51,9 +51,10 @@ COPY --from=builder --chown=medusa:nodejs /app/apps/commerce ./apps/commerce
 COPY --from=builder --chown=medusa:nodejs /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml /app/tsconfig.base.json ./
 
 USER medusa
+WORKDIR /app/apps/commerce
 EXPOSE 9000
 
 HEALTHCHECK --interval=15s --timeout=5s --retries=5 --start-period=20s \
   CMD node -e "fetch('http://127.0.0.1:9000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-CMD ["pnpm", "--filter", "@life/commerce", "run", "start"]
+CMD ["node", "--import", "tsx", "node_modules/@medusajs/cli/cli.js", "start"]

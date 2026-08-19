@@ -215,7 +215,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright Chromium
-        run: pnpm --filter @life/storefront exec playwright install --with-deps chromium
+        run: pnpm --filter @life/storefront exec playwright install chromium
 
       - name: Run Storefront E2E Tests
         run: pnpm --filter @life/storefront run test:e2e

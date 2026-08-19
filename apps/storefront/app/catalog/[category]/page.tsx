@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { EmptyState, ProductCard, SectionHeading } from "@/components";
+import { CatalogBrowser, EmptyState, SectionHeading } from "@/components";
 import { getCatalogSnapshot } from "@/catalog/server";
 import { categories as fixtureCategories } from "@/fixtures";
 
@@ -110,14 +110,14 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
           <SectionHeading
             eyebrow="Матеріали"
             title={`Усі матеріали напряму «${category.name}»`}
-            description="Перелік сформовано за обраною категорією."
+            description="Використовуйте пошук та фільтри нижче для звуження переліку."
           />
           {categoryProducts.length > 0 ? (
-            <div className="content-grid content-grid--cards">
-              {categoryProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
+            <CatalogBrowser
+              categories={catalogResult.snapshot.categories}
+              products={categoryProducts}
+              initialCategorySlug={category.slug}
+            />
           ) : (
             <EmptyState
               title="У цій добірці поки немає матеріалів"

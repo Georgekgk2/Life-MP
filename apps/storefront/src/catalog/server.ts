@@ -58,10 +58,18 @@ export async function getCatalogSnapshot(): Promise<CatalogReadResult> {
     }
 
     try {
+      const publishableKey =
+        process.env["MEDUSA_PUBLISHABLE_KEY"] ||
+        process.env["NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY"];
+      const headers: Record<string, string> = {};
+      if (publishableKey) {
+        headers["x-publishable-api-key"] = publishableKey;
+      }
+
       const response = await fetch(`${backendUrl}/store/catalog`, {
         cache: "no-store",
+        headers,
       });
-
       if (!response.ok) {
         return {
           kind: "unavailable",
@@ -114,6 +122,30 @@ export async function getCatalogProductsBySlugs(
 
   const filteredProducts = result.snapshot.products.filter((p) =>
     slugs.includes(p.slug),
+  );
+
+  return {
+    kind: "ready",
+    snapshot: {
+      ...result.snapshot,
+      products: filteredProducts,
+    },
+  };
+}
+
+export async function getCatalogProductsByProvider(
+  providerHandleOrName: string,
+): Promise<CatalogReadResult> {
+  const result = await getCatalogSnapshot();
+  if (result.kind === "unavailable") {
+    return result;
+  }
+
+  const lowerQuery = providerHandleOrName.toLowerCase();
+  const filteredProducts = result.snapshot.products.filter(
+    (p) =>
+      p.provider?.handle.toLowerCase() === lowerQuery ||
+      p.provider?.name.toLowerCase().includes(lowerQuery),
   );
 
   return {

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { StorefrontCatalogProduct } from "@life/types";
 
 const hryvniaFormatter = new Intl.NumberFormat("uk-UA", {
@@ -22,7 +23,14 @@ export function ProductCard({ product }: ProductCardProps) {
             ? `Майстер: ${product.provider.name}`
             : "Виріб спільноти"}
         </p>
-        <h3 className="card__title">{product.name}</h3>
+        <h3 className="card__title">
+          <Link
+            className="card__title-link"
+            href={`/catalog/${product.categorySlug}/${product.slug}`}
+          >
+            {product.name}
+          </Link>
+        </h3>
         <p className="card__description">{product.description}</p>
         <div className="card__meta">
           <data value={product.priceUah}>

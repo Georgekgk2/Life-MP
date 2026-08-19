@@ -1,3 +1,4 @@
+export { CatalogBrowser } from "./catalog-browser";
 export { CategoryCard } from "./category-card";
 export { EmptyState } from "./empty-state";
 export { EventCard } from "./event-card";

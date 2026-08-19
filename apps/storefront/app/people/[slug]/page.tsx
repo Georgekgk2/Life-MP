@@ -9,7 +9,7 @@ import {
   StoryCard,
 } from "@/components";
 import { events, people, stories } from "@/fixtures";
-import { getCatalogProductsBySlugs } from "@/catalog/server";
+import { getCatalogSnapshot } from "@/catalog/server";
 
 type PersonPageProps = Readonly<{
   params: Promise<{
@@ -45,15 +45,22 @@ export default async function PersonPage({ params }: PersonPageProps) {
     notFound();
   }
 
-  const catalogResult = await getCatalogProductsBySlugs(
-    person.featuredProductSlugs,
-  );
-
+  const catalogResult = await getCatalogSnapshot();
   const isCatalogReady = catalogResult.kind === "ready";
   const featuredProducts = isCatalogReady
-    ? catalogResult.snapshot.products
+    ? catalogResult.snapshot.products.filter(
+        (p) =>
+          (person.featuredProductSlugs as readonly string[]).includes(p.slug) ||
+          (p.provider?.name &&
+            (p.provider.name
+              .toLowerCase()
+              .includes(person.name.toLowerCase()) ||
+              person.role
+                .toLowerCase()
+                .includes(p.provider.name.toLowerCase()) ||
+              p.provider.handle.includes(person.slug))),
+      )
     : [];
-
   const personStories = stories.filter(
     (story) => story.personSlug === person.slug,
   );

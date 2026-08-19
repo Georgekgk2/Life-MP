@@ -1,94 +1,108 @@
-# Runbook: локальна розробка
+# Посібник розробника: Локальне середовище ЛАЙФ (Local Development Runbook)
 
-## Призначення та межа
+## 1. Загальний огляд та архітектурні межі
 
-Цей runbook описує локальне середовище розробки на Node.js 22, pnpm і OrbStack/Docker Compose. `docker-compose.dev.yml` запускає **тільки** PostgreSQL 16 і Redis 7. Commerce backend (`apps/commerce`) та Storefront (`apps/storefront`) запускаються у локальних вузлах розробника.
+Локальне середовище розробки маркетплейсу «ЛАЙФ» побудоване на базі **Node.js 22, pnpm 11.4 та Docker Compose**.
 
-PostgreSQL та Redis опубліковані виключно на `127.0.0.1`. Це обмеження захищає локальну машину від доступу з мережі.
+Сервіси баз даних (PostgreSQL 16, Redis 7, Meilisearch) запускаються в Docker-контейнерах виключно на локальному loopback-інтерфейсі `127.0.0.1`. Storefront (`apps/storefront`) та Commerce Backend (`apps/commerce`) працюють локально на робочій станції розробника.
 
-## Передумови
+---
 
-1. Встановлено Node.js 22.
-2. Доступний pnpm (через Corepack).
-3. Docker Compose доступний у терміналі (наприклад, через OrbStack).
-4. Робоча копія не містить і не потребує production credentials.
+## 2. Швидкий старт (Quick Start)
 
-Встановіть залежності з кореня репозиторію:
+### 2.1. Встановлення залежностей
 
 ```bash
 corepack enable
 pnpm install
 ```
 
-## Керування локальними data-services та бд
-
-1. Запуск PostgreSQL і Redis:
+### 2.2. Запуск інфраструктури (PostgreSQL, Redis, Meilisearch)
 
 ```bash
 make dev-infra-up
 make dev-infra-wait
 ```
 
-2. Ініціалізація баз даних і ролей застосунку (`life_medusa_dev`, `life_medusa_test`, `life_medusa_migration_test`):
+- **PostgreSQL 16:** `127.0.0.1:54329`
+- **Redis 7:** `127.0.0.1:56379`
+- **Meilisearch:** `127.0.0.1:7700`
+
+### 2.3. Ініціалізація баз даних та міграцій
 
 ```bash
 make db-bootstrap
-```
-
-3. Виконання міграцій розробницької БД Medusa:
-
-```bash
 scripts/with-local-commerce-env.sh pnpm --filter @life/commerce run db:migrate
-```
-
-4. Засів локальної БД некомерційними синтетичними даними каталогу:
-
-```bash
 ALLOW_SYNTHETIC_CATALOG=true scripts/with-local-commerce-env.sh pnpm --filter @life/commerce run seed
 ```
 
-## Запуск Commerce та Storefront
+---
 
-Для повноцінної перевірки каталогу розробки виконайте наступні кроки у двох терміналах:
+## 3. Запуск застосунків
 
-**Термінал A (Medusa Commerce Backend):**
+### 3.1. Вітрина Storefront (Next.js 16)
+
+```bash
+# Автономний режим зі статичними даними та PWA:
+pnpm --filter @life/storefront dev --port 3100
+
+# Режим з інтеграцією Medusa API:
+CATALOG_SOURCE=medusa MEDUSA_BACKEND_URL=http://127.0.0.1:9000 pnpm --filter @life/storefront dev --port 3100
+```
+
+- **URL Вітрини:** [http://127.0.0.1:3100](http://127.0.0.1:3100)
+- **Web App Manifest:** [http://127.0.0.1:3100/manifest.webmanifest](http://127.0.0.1:3100/manifest.webmanifest)
+- **Кабінет модератора:** [http://127.0.0.1:3100/moderation](http://127.0.0.1:3100/moderation)
+- **Кабінет покупця:** [http://127.0.0.1:3100/profile](http://127.0.0.1:3100/profile)
+- **Подача товару майстром:** [http://127.0.0.1:3100/vendor/products/new](http://127.0.0.1:3100/vendor/products/new)
+- **Оформлення замовлення:** [http://127.0.0.1:3100/checkout](http://127.0.0.1:3100/checkout)
+- **Трекінг та Escrow-симулятор:** [http://127.0.0.1:3100/orders/LF-20260819-1001](http://127.0.0.1:3100/orders/LF-20260819-1001)
+
+### 3.2. Бекенд Commerce (Medusa v2)
+
 ```bash
 scripts/with-local-commerce-env.sh pnpm --filter @life/commerce run dev
 ```
-Зачекайте, поки `http://127.0.0.1:9000/store/catalog` почне повертати 200 OK.
 
-**Термінал B (Next.js Storefront у Medusa-режимі):**
-```bash
-CATALOG_SOURCE=medusa MEDUSA_BACKEND_URL=http://127.0.0.1:9000 NODE_ENV=development pnpm --filter @life/storefront dev
-```
-Storefront за адресою [http://127.0.0.1:3100](http://127.0.0.1:3100) завантажуватиме публічний синтетичний каталог безпосередньо з Medusa API.
+- **URL Medusa API:** [http://127.0.0.1:9000](http://127.0.0.1:9000)
+- **Публічний каталог:** `GET http://127.0.0.1:9000/store/catalog`
 
-За замовчуванням (`CATALOG_SOURCE=fixtures`) Storefront працює автономно у fixture-режимі.
+---
 
-## Перевірки якості та інфотести
+## 4. Набір перевірок якості та автоматизовані тести
 
-Запуск юніт-тестів та статичних перевірок з кореня:
+### 4.1. Локальна валідація всього монорепозиторію
 
 ```bash
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm build
-pnpm format:check
+pnpm format:check       # Перевірка форматування коду Prettier
+pnpm lint               # Статичний аналіз ESLint
+pnpm typecheck          # Строга перевірка типів TypeScript
+pnpm test               # 48 юніт-тестів Vitest
+pnpm build              # Збірка всіх пакетів та App Router
+node scripts/verify-deployment-containment.mjs # Перевірка політики безпеки
 ```
 
-Запуск інтеграційних тестів авторизації, модерації та публікації каталогу:
+### 4.2. Наскрізні Playwright E2E тести (28 тестів)
 
 ```bash
-make test-integration
+pnpm --filter @life/storefront run test:e2e
 ```
 
-Запуск тестів ідемпотентності міграцій:
+Покриває:
+
+1. Завантаження каталогу та інваріанти некомерційного режиму (`catalog.spec.ts`).
+2. Мультивендорний кошик, чекаут, спліт замовлень та Escrow-виплати Нової Пошти (`checkout-and-escrow.spec.ts`).
+3. Історії майстрів та динамічні події з розкладом (`community.spec.ts`).
+4. Дворівневий кабінет модератора для анкет та товарів (`moderation.spec.ts`).
+5. Кабінет покупця з 4 розділами та налаштуваннями сповіщень (`profile.spec.ts`).
+6. Progressive Web App: Manifest, Service Worker та бренд-іконки (`pwa.spec.ts`).
+7. Список бажань (Wishlist) та онбординг майстерень (`saved-and-artisan.spec.ts`).
+8. Швидкий пошук (Cmd+K), українська морфологія, синоніми та автокомпліт (`search.spec.ts`).
+9. Подача товарів майстрами з live-прев'ю картки (`vendor-product.spec.ts`).
+
+### 4.3. Інтеграційні тести бекенду Medusa
 
 ```bash
-make test-migrations
+make test-integration   # 7 HTTP тестів авторизації, комплаєнсу та модерації
+make test-migrations    # 2 тести ідемпотентності міграцій PostgreSQL
 ```
-
-## Межі розробки
-
-Будь-які комерційні операції (кошик, замовлення, checkout, оплата, фіскалізація, відправлення) суворо заблоковані. Всі публічні товари маркуються позначкою "Синтетичні локальні дані".

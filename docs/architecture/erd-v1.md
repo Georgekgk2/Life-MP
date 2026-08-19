@@ -1,78 +1,111 @@
-# ERD v1: межа майбутньої commerce-моделі
+# ERD v1: Структура сутностей маркетплейсу «ЛАЙФ» (Data Models & Entity Relationships)
 
-У цьому репозиторії реалізовано **Catalog & Provider Core** на базе Medusa v2.18.0 для розробки та локальних тестувань. `@life/types` містить публічні DTO каталогу, а `@life/commerce` реалізує кастомні модульні таблиці вендорів, членства, модерації лістингів та аудиту, пов'язані з нативними сутностями Medusa `Product` і `ProductCategory`.
+## 1. Огляд та статус схем даних
 
-Ця ERD фіксує схему Phase 2 для некомерційного синтетичного каталогу. Всі транзакційні сутності (`Customer`, `Cart`, `Order`, `Payment`, `Shipment`, `FiscalDocument`, `CommissionEntry`) залишаються **[ЗАБЛОКОВАНО]**.
-Позначки:
+Цей документ фіксує **структуру сутностей та реляційні зв'язки** кодової бази маркетплейсу «ЛАЙФ» (Medusa v2.18.0 Backend + Storefront Sandbox Models).
 
-- **[SKELETON]** — наявна лише source-level межа пакета; не означає таблицю чи runtime.
-- **[ПЛАН]** — можлива майбутня сутність, яку не можна реалізовувати без окремого затвердженого контракту.
-- **[ЗАБЛОКОВАНО]** — сутність або її ключові зв’язки залежать від невирішеного рішення; не створювати реалізацію до його прийняття.
+- **Реалізовані сутності бекенду (`@life/commerce` / PostgreSQL 16):**
+  - Модуль `marketplace`: `Vendor`, `VendorMember`, `VendorProfile`, `CatalogListing`, `ModerationDecision`, `StaffRoleAssignment`, `AuditEvent`, `VendorVerification`, `ComplianceDocument`, `ProductClaim`.
+  - Моделі замовлень: `ParentOrder`, `VendorChildOrder`, `VendorPayable`, `SettlementBatch`.
+- **Реалізовані типи та контракти (`@life/types`):**
+  - DTO каталогу: `StorefrontCatalogProduct`, `StorefrontCatalogCategory`, `StorefrontCatalogSnapshot`.
+  - Транзакційний Sandbox: `CartItem`, `CartVendorGroup`, `MultiVendorCart`, `CheckoutCustomerInput`, `ParentOrder`, `VendorChildOrder`, `EscrowHoldRecord`, `SettlementBatchRecord`.
 
-## Що реалізовано в Phase 2 (Catalog & Provider Core)
+---
 
-| Межа | Статус | Дані / Сутності |
-|---|---|---|
-| `@life/types` | Реалізовано DTO | Публічні контракти `StorefrontCatalogSnapshot`, `StorefrontCatalogProduct`, `StorefrontCatalogCategory`, `VendorVerificationDTO`, `ComplianceDocumentDTO`, `ProductClaimDTO`. |
-| `@life/commerce` | Реалізовано Medusa Module | Модуль `marketplace`: `Vendor`, `VendorMember`, `VendorProfile`, `CatalogListing`, `ModerationDecision`, `StaffRoleAssignment`, `AuditEvent`. |
-| `Compliance & Verification` | Модель розроблена (ADR 0007) | `VendorVerification` (ЄДРПОУ/РНОКПП), `ComplianceDocument` (декларації/сертифікати), `ProductClaim` (eco/natural/handmade/organic/medical). |
-| `Fulfillment & Sales Model` | Модель розроблена (ADR 0008) | `fulfillment_mode` (`vendor_direct` \| `platform_warehouse` \| `hybrid`), `seller_model` (`vendor_is_seller` \| `platform_is_seller` \| `lead_only`). |
-| PostgreSQL у локальному Compose | Реалізовано розмежування | Окремі бази `life_medusa_dev`, `life_medusa_test`, `life_medusa_migration_test` із розмежованими привілеями. |
-
-## Планована карта сутностей
+## 2. Діаграма сутностей (ERD Diagram)
 
 ```text
-[ПЛАН] Vendor --------< [ПЛАН] Product --------< [ПЛАН] ProductVariant
-   |                         |                         |
-   |                         +--------< [ПЛАН] ProductCategory >-------- [ПЛАН] Category
-   |                                                   |
-   |                                                   +--< [ПЛАН] InventoryRecord
-   |
-   +-- майбутній owner catalog/fulfillment; не визначений для запуску
+┌───────────────────────────┐           ┌───────────────────────────┐
+│          Vendor           │ 1       * │       VendorMember        │
+│───────────────────────────│───────────│───────────────────────────│
+│ id: string (PK)           │           │ id: string (PK)           │
+│ handle: string (Unique)   │           │ vendor_id: string (FK)    │
+│ name: string              │           │ auth_identity_id: string  │
+│ status: active/suspended  │           │ role: owner/admin/member  │
+│ fulfillment_mode: string  │           │ is_active: boolean        │
+│ seller_model: string      │           └───────────────────────────┘
+└─────────────┬─────────────┘
+              │ 1
+              │
+              │ *
+┌─────────────▼─────────────┐           ┌───────────────────────────┐
+│      CatalogListing       │ 1       * │    ModerationDecision     │
+│───────────────────────────│───────────│───────────────────────────│
+│ id: string (PK)           │           │ id: string (PK)           │
+│ vendor_id: string (FK)    │           │ listing_id: string (FK)   │
+│ title: string             │           │ decision: approved/reject │
+│ description: string       │           │ reviewer_notes: string    │
+│ status: draft/review/pub  │           │ staff_id: string          │
+│ medusa_product_id: string │           │ decided_at: timestamp     │
+└─────────────┬─────────────┘           └───────────────────────────┘
+              │ (Link)
+              ▼
+┌───────────────────────────┐
+│      Medusa Product       │
+│───────────────────────────│
+│ id: string (PK)           │
+│ title: string             │
+│ handle: string            │
+│ status: published/draft   │
+└───────────────────────────┘
 
-[ЗАБЛОКОВАНО] Customer --< [ЗАБЛОКОВАНО] Address
-       |
-       +--< [ЗАБЛОКОВАНО] Cart --< [ЗАБЛОКОВАНО] CartLine >-- [ПЛАН] ProductVariant
-                                      |
-                                      +--? [ЗАБЛОКОВАНО] OrderLine
+─────────────────────────────────────────────────────────────────────────────
+                  ТРАНЗАКЦІЙНЕ ЯДРО ТА РОЗЩЕПЛЕННЯ ЗАМОВЛЕНЬ
+─────────────────────────────────────────────────────────────────────────────
 
-[ЗАБЛОКОВАНО] Order --< [ЗАБЛОКОВАНО] OrderLine >-- [ПЛАН] ProductVariant
-       |                       |
-       |                       +--? [ЗАБЛОКОВАНО] Vendor
-       |
-       +--? [ЗАБЛОКОВАНО] Payment
-       +--? [ЗАБЛОКОВАНО] FiscalDocument
-       +--? [ЗАБЛОКОВАНО] Refund
-       +--? [ЗАБЛОКОВАНО] Shipment --? [ЗАБЛОКОВАНО] Fulfillment
-       +--? [ЗАБЛОКОВАНО] Address
-       +--? [ЗАБЛОКОВАНО] CommissionEntry
+┌───────────────────────────┐           ┌───────────────────────────┐
+│        ParentOrder        │ 1       1 │      EscrowHoldRecord     │
+│───────────────────────────│───────────│───────────────────────────│
+│ id: string (PK)           │           │ id: string (PK)           │
+│ order_number: LF-YYYYMMDD │           │ parent_order_id: string   │
+│ customer_name: string     │           │ amount_uah: number        │
+│ customer_phone: string    │           │ status: held/captured/ref │
+│ total_amount_uah: number  │           │ provider: sandbox_escrow  │
+│ status: escrow_held/compl │           │ held_at: timestamp        │
+└─────────────┬─────────────┘           └───────────────────────────┘
+              │ 1
+              │
+              │ *
+┌─────────────▼─────────────┐           ┌───────────────────────────┐
+│     VendorChildOrder      │ 1       1 │      SettlementBatch      │
+│───────────────────────────│───────────│───────────────────────────│
+│ id: string (PK)           │           │ id: string (PK)           │
+│ parent_order_id: (FK)     │           │ vendor_handle: string     │
+│ vendor_handle: string     │           │ child_order_id: (FK)      │
+│ vendor_name: string       │           │ payout_amount_uah (90%)   │
+│ subtotal_uah: number      │           │ commission_uah (10%)      │
+│ platform_commission (10%) │           │ status: pending/settled   │
+│ vendor_payout_uah (90%)   │           │ iban: string (UA...)      │
+│ status: pending/shipped/  │           │ settled_at: timestamp     │
+│         delivered/settled │           └───────────────────────────┘
+│ tracking_number: (2045..) │
+│ tracking_status_code: 1..9│
+└───────────────────────────┘
 ```
 
-`<` позначає можливу майбутню cardinality «один до багатьох». `?` означає, що навіть наявність, напрямок або cardinality зв’язку не прийняті. Діаграма навмисно не визначає поля, nullable-значення, унікальні індекси, життєві цикли, гроші, податки, статуси чи id-формати.
+---
 
-## Сутності та блокери
+## 3. Детальний опис ключових сутностей
 
-| Сутність | Статус | Передбачена роль без деталізації schema | Блокер або передумова |
-|---|---|---|---|
-| `Vendor` | [ЗАБЛОКОВАНО] | Майбутня межа постачальника каталогу | CAT-2: немає підтверджених кандидатів, даних, договорів або owner onboarding; не створювати production vendor records. |
-| `Category`, `Product`, `ProductVariant` | [ПЛАН] | Майбутній каталог | CAT-1/3/4/5: не визначені перша хвиля, документи, контент і moderation; не публікувати категорії чи claims. |
-| `ProductCategory`, `InventoryRecord` | [ПЛАН] | Можливі зв’язки каталогу та доступності | Залежать від затверджених категорій, source-of-truth і fulfillment-моделі; не моделюють склад як увімкнену можливість. |
-| `Customer`, `Address` | [ЗАБЛОКОВАНО] | Можлива клієнтська/адресна межа | LOG-4 визначає лише майбутню адресу/кур’єра, але не вмикає checkout; LOG-1/3 не вирішують fulfillment або оплату доставки. |
-| `Cart`, `CartLine` | [ЗАБЛОКОВАНО] | Можлива передзамовна група позицій | COM-5 і LOG-6 не визначають мультивендорний або змішаний кошик; не створювати cart flow. |
-| `Order`, `OrderLine` | [ЗАБЛОКОВАНО] | Можлива фіксація майбутнього замовлення | COM-1, COM-5 і LOG-1 не визначають продавця, split або fulfillment; не створювати order model. |
-| `Payment`, `FiscalDocument`, `Refund` | [ЗАБЛОКОВАНО] | Можливі фінансові та фіскальні записи | COM-2/3/6/7/8 не визначають одержувача коштів, чек, refund, provider або COD; не приймати гроші та не створювати фінансові записи. |
-| `Shipment`, `Fulfillment` | [ЗАБЛОКОВАНО] | Можлива логістична межа | LOG-1/2/3 не визначають owner, carrier account або оплату доставки; не створювати shipment flow. |
-| `CommissionEntry` | [ЗАБЛОКОВАНО] | Можливий майбутній облік комісії платформи | COM-4 підтверджує лише факт комісії, не ставку/базу/податки/момент утримання; ledger заборонений до моделі. |
+### 🏛️ 1. Вендори та Лістинги
 
-## Неприпустимі висновки з ERD
+- **`Vendor`**: Профіль крафтової майстерні або виробника. Зберігає налаштування комплаєнсу, бізнес-модель (`seller_model: vendor_is_seller`) та спосіб виконання замовлень (`fulfillment_mode: vendor_direct`).
+- **`VendorMember`**: Забезпечує ізоляцію тенантів (Vendor Multi-Tenancy). Кожен автентифікований користувач (`auth_identity_id`) прив'язується строго до своєї майстерні.
+- **`CatalogListing`**: Проміжна сутність модерації. Дозволяє майстрам редагувати чернетки без зміни опублікованого товару. Тільки після рішення `ModerationDecision: approved` зміни синхронізуються з нативним `Product` Medusa.
 
-З цієї карти не можна робити висновок, що:
+### 💳 2. Замовлення та Escrow-розподіл
 
-- продавцем буде платформа або вендор;
-- один кошик/замовлення/платіж може містити кількох вендорів;
-- існує payment provider, фіскалізація, refund policy чи COD;
-- vendor або product дані дозволено збирати, публікувати чи продавати;
-- відправлення, carrier account, склад або адресна доставка реалізовані;
-- існує staging, production database, migration plan або legal approval.
+- **`ParentOrder`**: Головне замовлення клієнта. Об'єднує всі товари від різних майстерень та фіксує загальну суму оплати.
+- **`VendorChildOrder`**: Окреме відправлення для кожної майстерні. Містить власний номер ЕН Нової Пошти, розраховує комісію платформи (**10%**) та суму виплати майстру (**90%**).
+- **`EscrowHoldRecord`**: Фіксує стан зарезервованих коштів покупця. Статус `held` гарантує безпеку до підтвердження доставки, а статус `captured` встановлюється після вручення.
+- **`SettlementBatch`**: Запис реєстру взаєморозрахунків (Ledger). Створюється автоматично при переході статусу доставки ЕН у `Статус 9: Вручено` та спрямовує кошти на IBAN продавця.
 
-Переходити від цієї карти до schema-design можна лише після датованих письмових рішень і оновлення відповідних рядків у [реєстрі відкритих рішень](../decisions/open-questions.md). Для меж даних після цього також обов’язковий [ADR 0002](../adr/0002-data-boundaries.md): окремі databases/login-roles для майбутніх commerce і CMS/Payload меж без прямого доступу до чужих таблиць.
+---
+
+## 4. Контур комплаєнсу та безпеки
+
+- **`VendorVerification`**: Зберігає результати перевірки ЄДРПОУ/РНОКПП та податковий статус (ФОП 2-ї або 3-ї групи).
+- **`ComplianceDocument`**: Реєстр висновків СЕС, сертифікатів органічності та декларацій відповідності.
+- **`ProductClaim`**: Модерація тверджень про органічність (`organic`), ручну роботу (`handmade`) та екологічність (`eco`).
+- **`AuditEvent`**: Незмінний журнал дій модераторів та адміністраторів для гарантії прозорості.

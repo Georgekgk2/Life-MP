@@ -121,6 +121,8 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.storefront
+      args:
+        NEXT_PUBLIC_MEDUSA_API_URL: ${NEXT_PUBLIC_MEDUSA_API_URL:-/api}
     image: ${STOREFRONT_IMAGE:?STOREFRONT_IMAGE_REQUIRED}
     container_name: life-storefront
     environment:
@@ -174,19 +176,11 @@ services:
     networks:
       - life-net
     healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--no-verbose",
-          "--tries=1",
-          "--spider",
-          "http://localhost:80/health",
-        ]
+      test: ["CMD-SHELL", "caddy version || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 5s
     restart: unless-stopped
     deploy:
       resources:

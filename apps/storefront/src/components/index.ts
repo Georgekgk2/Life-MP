@@ -8,6 +8,7 @@ export { ModerationDashboard } from "./moderation-dashboard";
 export { PersonCard } from "./person-card";
 export { ProductCard } from "./product-card";
 export { SaveButton } from "./save-button";
+export { SearchAutocompleteModal } from "./search-autocomplete-modal";
 export { SectionHeading } from "./section-heading";
 export { SiteFooter } from "./site-footer";
 export { SiteHeader } from "./site-header";

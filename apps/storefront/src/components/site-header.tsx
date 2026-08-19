@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSaved } from "@/context/saved-context";
+import { SearchAutocompleteModal } from "./search-autocomplete-modal";
 
 type NavigationItem = Readonly<{
   href: `/${string}`;
@@ -20,9 +21,20 @@ const primaryNavigation: readonly NavigationItem[] = [
 export function SiteHeader() {
   const { count, isHydrated } = useSaved();
   const [mounted, setMounted] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setIsSearchOpen((prev) => !prev);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   const savedCount = mounted && isHydrated ? count : 0;
@@ -57,6 +69,21 @@ export function SiteHeader() {
             </ul>
           </nav>
           <div className="site-header__actions">
+            <button
+              type="button"
+              onClick={() => setIsSearchOpen(true)}
+              className="site-header__search-btn site-header__saved-link"
+              aria-label="Швидкий пошук (Cmd+K)"
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              <span aria-hidden="true">🔍</span>
+              <span className="site-header__saved-text">Пошук</span>
+            </button>
             <Link
               href="/saved"
               className="site-header__saved-link"
@@ -91,6 +118,10 @@ export function SiteHeader() {
           </div>
         </div>
       </header>
+      <SearchAutocompleteModal
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+      />
     </>
   );
 }

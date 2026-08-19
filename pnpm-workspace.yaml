@@ -11,10 +11,11 @@ overrides:
   react-router-dom: 7.18.1
   lodash: 4.18.1
   uuid: 11.1.1
-  # Security pins for CVE mitigations (brace-expansion, fast-uri, nanoid)
+  # Security pins for CVE mitigations (brace-expansion, fast-uri, nanoid, js-yaml)
   brace-expansion: 5.0.9
   fast-uri: ^3.1.5
   nanoid: ^3.3.18
+  js-yaml: ^4.1.0
   "@rushstack/node-core-library>ajv": 8.18.0
 allowBuilds:
   "@medusajs/telemetry": false

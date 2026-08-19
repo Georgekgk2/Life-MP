@@ -12,6 +12,7 @@ const footerNavigation: readonly NavigationItem[] = [
   { href: "/events", label: "Події" },
   { href: "/charity", label: "Підтримка" },
   { href: "/partners", label: "Партнери" },
+  { href: "/moderation", label: "Модерація" },
 ];
 
 export function SiteFooter() {

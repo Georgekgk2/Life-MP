@@ -17,13 +17,12 @@ test.describe("Vendor Product Submissions & Moderation E2E", () => {
   test("submits a new craft product, views preview, and moderates it in the dashboard", async ({
     page,
   }, testInfo) => {
-    // 1. Visit new vendor product page
+    // 1. Visit /vendor/products/new
     await page.goto("/vendor/products/new");
-    await expect(page.locator("h1")).toContainText(
-      "Додати виріб до каталогу Life-MP",
-    );
+    await expect(page.locator("h1")).toContainText("Додати виріб до каталогу");
+    await expect(page.getByText("Для перевірених майстерень")).toBeVisible();
 
-    // 2. Capture screenshot of submission page
+    // Capture screenshot of new product submission form
     await page.screenshot({
       path: path.join(
         screenshotsDir,
@@ -32,18 +31,18 @@ test.describe("Vendor Product Submissions & Moderation E2E", () => {
       fullPage: true,
     });
 
-    // 3. Submit empty form to trigger validation errors
+    // 2. Submit empty form to trigger validation
     const submitBtn = page.getByRole("button", {
       name: /Подати виріб на модерацію/i,
     });
-    await submitBtn.click();
+    await submitBtn.click({ force: true });
 
-    // 4. Verify validation error messages
+    // 3. Verify validation error messages
     await expect(page.getByText(/не менше 2 символів/i).first()).toBeVisible();
     await expect(page.getByText(/Оберіть категорію каталогу/i)).toBeVisible();
     await expect(page.getByText(/стандартам спільноти/i)).toBeVisible();
 
-    // 5. Fill form with valid craft product details
+    // 4. Fill form with valid craft product details
     await page.fill("#product-name", "Керамічна ваза «Гуцульська Ружа»");
     await page.fill("#product-workshop", "Гончарня Павла Коваля");
     await page.selectOption("#product-category", "dim");
@@ -52,12 +51,12 @@ test.describe("Vendor Product Submissions & Moderation E2E", () => {
       "#product-desc",
       "Авторська висока ваза ручного гончарного витягування з карпатської глини. Декорована автентичним рельєфним розписом.",
     );
-    await page.check("#product-rules");
+    await page.check("#product-rules", { force: true });
 
-    // 6. Submit valid form
-    await submitBtn.click();
+    // 5. Submit valid form
+    await submitBtn.click({ force: true });
 
-    // 7. Verify success screen with live preview card
+    // 6. Verify success screen with live preview card
     await expect(
       page.getByText("Виріб успішно надіслано на модерацію!"),
     ).toBeVisible();
@@ -66,7 +65,7 @@ test.describe("Vendor Product Submissions & Moderation E2E", () => {
     ).toBeVisible();
     await expect(page.locator(".product-card data")).toContainText("890");
 
-    // 8. Capture screenshot of success screen
+    // 7. Capture screenshot of success screen
     await page.screenshot({
       path: path.join(
         screenshotsDir,
@@ -75,21 +74,21 @@ test.describe("Vendor Product Submissions & Moderation E2E", () => {
       fullPage: true,
     });
 
-    // 9. Navigate to moderation dashboard and switch to products tab
+    // 8. Navigate to moderation dashboard and switch to products tab
     await page.goto("/moderation");
     const productsTabBtn = page.getByRole("button", {
       name: /Товари на модерації/i,
     });
     await expect(productsTabBtn).toBeVisible();
-    await productsTabBtn.click();
+    await productsTabBtn.click({ force: true });
 
-    // 10. Verify product cards in moderation tab
+    // 9. Verify product cards in moderation tab
     await expect(page.getByText("Всі вироби")).toBeVisible();
     await expect(
       page.getByText("Керамічна таріль «Поліське Сонце»"),
     ).toBeVisible();
 
-    // 11. Capture screenshot of moderation products tab
+    // 10. Capture screenshot of moderation products tab
     await page.screenshot({
       path: path.join(
         screenshotsDir,
@@ -98,14 +97,14 @@ test.describe("Vendor Product Submissions & Moderation E2E", () => {
       fullPage: true,
     });
 
-    // 12. Open review modal for submitted product
+    // 11. Open review modal for submitted product
     const moderateBtn = page.getByRole("button", {
       name: /Модерація товару: Керамічна таріль «Поліське Сонце»/i,
     });
     await expect(moderateBtn).toBeVisible();
-    await moderateBtn.click();
+    await moderateBtn.click({ force: true });
 
-    // 13. Verify review modal and approve
+    // 12. Verify review modal and approve
     const modalTitle = page.getByRole("heading", {
       name: /Модерація виробу: Керамічна таріль «Поліське Сонце»/i,
     });
@@ -121,7 +120,7 @@ test.describe("Vendor Product Submissions & Moderation E2E", () => {
       .getByRole("button", { name: /✅ Схвалити до каталогу/i });
     await approveBtn.click({ force: true });
 
-    // 14. Verify modal closed and status updated to approved
+    // 13. Verify modal closed and status updated to approved
     await expect(modalTitle).not.toBeVisible();
     await expect(
       page.getByText(

@@ -225,3 +225,117 @@ export interface SearchProvider {
   searchUnified(query: string, limit?: number): Promise<UnifiedSearchResult>;
   indexProducts?(products: readonly StorefrontCatalogProduct[]): Promise<void>;
 }
+
+// --------------------------------------------------------------------------
+// Multi-Vendor Transactional Sandbox Contracts (Phase 4C)
+// --------------------------------------------------------------------------
+
+export type CartItem = Readonly<{
+  id: string;
+  slug: string;
+  name: string;
+  categorySlug: string;
+  priceUah: number;
+  quantity: number;
+  vendorHandle: string;
+  vendorName: string;
+  imageUrl?: string;
+}>;
+
+export type CartVendorGroup = Readonly<{
+  vendorHandle: string;
+  vendorName: string;
+  items: readonly CartItem[];
+  subtotalUah: number;
+}>;
+
+export type MultiVendorCart = Readonly<{
+  items: readonly CartItem[];
+  vendorGroups: readonly CartVendorGroup[];
+  totalItems: number;
+  totalAmountUah: number;
+}>;
+
+export type CheckoutCustomerInput = Readonly<{
+  fullName: string;
+  phone: string;
+  email: string;
+  city: string;
+  novaPoshtaBranch: string;
+  paymentMethod: "sandbox_escrow" | "card_on_delivery";
+  comment?: string;
+}>;
+
+export type ParentOrderStatus =
+  | "pending_payment"
+  | "escrow_held"
+  | "processing"
+  | "partially_fulfilled"
+  | "completed"
+  | "cancelled";
+
+export type VendorChildOrderStatus =
+  "pending" | "accepted" | "shipped" | "delivered" | "settled" | "cancelled";
+
+export type NovaPoshtaTrackingStatus =
+  | 1 // Створено ЕН
+  | 4 // Посилка прямує до отримувача
+  | 5 // Посилка прямує до отримувача
+  | 7 // Прибуло у відділення
+  | 8 // Прибуло у поштомат
+  | 9 // Отримано та оплачено (Вручено)
+  | 102 // Відмова від отримання
+  | 103; // Повернення відправнику
+
+export type ParentOrder = Readonly<{
+  id: string;
+  orderNumber: string;
+  customer: CheckoutCustomerInput;
+  items: readonly CartItem[];
+  totalAmountUah: number;
+  status: ParentOrderStatus;
+  childOrderIds: readonly string[];
+  escrowHoldId?: string;
+  createdAt: string;
+}>;
+
+export type VendorChildOrder = Readonly<{
+  id: string;
+  parentOrderId: string;
+  parentOrderNumber: string;
+  vendorHandle: string;
+  vendorName: string;
+  items: readonly CartItem[];
+  subtotalUah: number;
+  platformCommissionUah: number;
+  vendorPayoutUah: number;
+  status: VendorChildOrderStatus;
+  trackingNumber: string;
+  trackingStatusCode: NovaPoshtaTrackingStatus;
+  trackingStatusName: string;
+  createdAt: string;
+  deliveredAt?: string;
+  settledAt?: string;
+}>;
+
+export type EscrowHoldRecord = Readonly<{
+  id: string;
+  parentOrderId: string;
+  amountUah: number;
+  status: "held" | "captured" | "refunded";
+  provider: "sandbox_escrow";
+  heldAt: string;
+  capturedAt?: string;
+}>;
+
+export type SettlementBatchRecord = Readonly<{
+  id: string;
+  vendorHandle: string;
+  vendorName: string;
+  childOrderId: string;
+  payoutAmountUah: number;
+  commissionAmountUah: number;
+  status: "pending" | "approved" | "settled";
+  settledAt: string;
+  iban?: string;
+}>;

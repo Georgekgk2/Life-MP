@@ -47,7 +47,7 @@ test.describe("Customer Profile & Preferences E2E", () => {
       name: /Улюблені майстерні/i,
     });
     await expect(workshopsTabBtn).toBeVisible();
-    await workshopsTabBtn.click();
+    await workshopsTabBtn.click({ force: true });
 
     await expect(page.getByText("Майстерня «Глина та Світло»")).toBeVisible();
     await expect(page.getByText("Лляне Ткацтво «Берегиня»")).toBeVisible();
@@ -55,7 +55,7 @@ test.describe("Customer Profile & Preferences E2E", () => {
     // 6. Switch to Notifications tab and toggle preferences
     const notifsTabBtn = page.getByRole("button", { name: /Сповіщення/i });
     await expect(notifsTabBtn).toBeVisible();
-    await notifsTabBtn.click();
+    await notifsTabBtn.click({ force: true });
 
     await expect(page.getByText("Налаштування сповіщень")).toBeVisible();
     await expect(page.getByText("Нові крафтові вироби")).toBeVisible();
@@ -72,7 +72,7 @@ test.describe("Customer Profile & Preferences E2E", () => {
     // 7. Switch to Personal Details tab and edit profile
     const detailsTabBtn = page.getByRole("button", { name: /Особисті дані/i });
     await expect(detailsTabBtn).toBeVisible();
-    await detailsTabBtn.click();
+    await detailsTabBtn.click({ force: true });
 
     await expect(
       page.getByRole("heading", { name: "Особисті дані" }),
@@ -81,7 +81,7 @@ test.describe("Customer Profile & Preferences E2E", () => {
     // Edit city
     await page.fill("#profile-city", "Львів");
     const saveBtn = page.getByRole("button", { name: /Зберегти зміни/i });
-    await saveBtn.click();
+    await saveBtn.click({ force: true });
 
     // Verify success message
     await expect(

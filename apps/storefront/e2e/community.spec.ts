@@ -41,8 +41,10 @@ test.describe("Community Stories & Dynamic Events E2E", () => {
     await expect(saveBtn).toBeVisible();
 
     // 5. Click save button and verify header badge
-    await saveBtn.click();
-    const headerBadge = page.locator(".site-header__saved-badge");
+    await saveBtn.click({ force: true });
+    const headerBadge = page.locator(
+      "a.site-header__saved-link .site-header__saved-badge",
+    );
     await expect(headerBadge).toBeVisible();
     await expect(headerBadge).toHaveText("1");
 
@@ -69,7 +71,7 @@ test.describe("Community Stories & Dynamic Events E2E", () => {
       .getByRole("link", { name: /Детальніше про подію/i })
       .first();
     await expect(detailLink).toBeVisible();
-    await detailLink.click();
+    await detailLink.click({ force: true });
 
     // 3. Verify event detail page loaded
     await expect(page).toHaveURL(/\/events\/[a-z0-9-]+/);

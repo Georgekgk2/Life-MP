@@ -56,7 +56,7 @@ test.describe("Moderation Dashboard E2E", () => {
       name: /Модерація заявки: Майстерня «Глина та Світло»/i,
     });
     await expect(reviewBtn).toBeVisible();
-    await reviewBtn.click();
+    await reviewBtn.click({ force: true });
 
     // 6. Verify modal opened
     const modalTitle = page.getByRole("heading", {

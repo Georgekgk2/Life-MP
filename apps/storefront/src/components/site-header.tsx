@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSaved } from "@/context/saved-context";
+import { useCart } from "@/context/cart-context";
 import { SearchAutocompleteModal } from "./search-autocomplete-modal";
 
 type NavigationItem = Readonly<{
@@ -19,7 +20,8 @@ const primaryNavigation: readonly NavigationItem[] = [
 ];
 
 export function SiteHeader() {
-  const { count, isHydrated } = useSaved();
+  const { count, isHydrated: isSavedHydrated } = useSaved();
+  const { totalItems, isHydrated: isCartHydrated, toggleCart } = useCart();
   const [mounted, setMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
@@ -37,7 +39,8 @@ export function SiteHeader() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const savedCount = mounted && isHydrated ? count : 0;
+  const savedCount = mounted && isSavedHydrated ? count : 0;
+  const cartCount = mounted && isCartHydrated ? totalItems : 0;
 
   return (
     <>
@@ -101,6 +104,29 @@ export function SiteHeader() {
                 </span>
               )}
             </Link>
+            <button
+              type="button"
+              onClick={toggleCart}
+              className="site-header__saved-link site-header__cart-btn"
+              aria-label={cartCount > 0 ? `Кошик: ${cartCount}` : "Кошик"}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              <span aria-hidden="true">🧺</span>
+              <span className="site-header__saved-text">Кошик</span>
+              {cartCount > 0 && (
+                <span
+                  className="site-header__cart-badge site-header__saved-badge"
+                  aria-hidden="true"
+                >
+                  {cartCount}
+                </span>
+              )}
+            </button>
             <Link
               href="/profile"
               className="site-header__profile-link"

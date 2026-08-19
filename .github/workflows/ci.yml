@@ -217,5 +217,8 @@ jobs:
       - name: Install Playwright Chromium
         run: pnpm --filter @life/storefront exec playwright install chromium
 
+      - name: Build Storefront
+        run: pnpm --filter @life/storefront build
+
       - name: Run Storefront E2E Tests
         run: pnpm --filter @life/storefront run test:e2e

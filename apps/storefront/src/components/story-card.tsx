@@ -8,7 +8,26 @@ type StoryCardProps = Readonly<{
 export function StoryCard({ story }: StoryCardProps) {
   return (
     <article className="card story-card">
-      <div aria-hidden="true" className="card__visual story-card__visual">
+      <div
+        className="card__visual story-card__visual"
+        style={{
+          position: "relative",
+          overflow: "hidden",
+          height: "200px",
+          backgroundColor: "var(--color-sand-200)",
+        }}
+      >
+        <img
+          src={`/images/stories/story-${story.slug}.webp`}
+          alt={story.title}
+          loading="lazy"
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            display: "block",
+          }}
+        />
         <span className="card__visual-label">{story.title}</span>
       </div>
       <div className="card__content">

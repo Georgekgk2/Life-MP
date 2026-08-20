@@ -8,7 +8,26 @@ type EventCardProps = Readonly<{
 export function EventCard({ event }: EventCardProps) {
   return (
     <article className="card event-card">
-      <div aria-hidden="true" className="card__visual event-card__visual">
+      <div
+        className="card__visual event-card__visual"
+        style={{
+          position: "relative",
+          overflow: "hidden",
+          height: "200px",
+          backgroundColor: "var(--color-sand-200)",
+        }}
+      >
+        <img
+          src={`/images/events/event-${event.slug}.webp`}
+          alt={event.title}
+          loading="lazy"
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            display: "block",
+          }}
+        />
         <span className="card__visual-label">{event.title}</span>
       </div>
       <div className="card__content">

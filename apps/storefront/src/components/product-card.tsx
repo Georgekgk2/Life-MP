@@ -16,7 +16,26 @@ type ProductCardProps = Readonly<{
 export function ProductCard({ product }: ProductCardProps) {
   return (
     <article className="card product-card">
-      <div aria-hidden="true" className="card__visual product-card__visual">
+      <div
+        className="card__visual product-card__visual"
+        style={{
+          position: "relative",
+          overflow: "hidden",
+          height: "220px",
+          backgroundColor: "var(--color-sand-200)",
+        }}
+      >
+        <img
+          src={`/images/products/${product.slug}.webp`}
+          alt={product.name}
+          loading="lazy"
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            display: "block",
+          }}
+        />
         <span className="card__visual-label">{product.name}</span>
       </div>
       <div className="card__content">

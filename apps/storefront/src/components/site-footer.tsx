@@ -13,6 +13,7 @@ const footerNavigation: readonly NavigationItem[] = [
   { href: "/charity", label: "Підтримка" },
   { href: "/partners", label: "Партнери" },
   { href: "/moderation", label: "Модерація" },
+  { href: "/vendor/dashboard", label: "Кабінет майстра" },
   { href: "/vendor/products/new", label: "Додати виріб" },
 ];
 

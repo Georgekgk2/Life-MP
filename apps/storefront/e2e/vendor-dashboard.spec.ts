@@ -43,13 +43,17 @@ test.describe("Vendor Management & Logistics Workspace E2E (Phase 2)", () => {
 
     // 3. Inspect Orders tab and update tracking status
     const updateBtn = page
-      .getByRole("button", { name: /Передати перевізнику|Прибуло у відділення|Вручено покупцю/i })
+      .getByRole("button", {
+        name: /Передати перевізнику|Прибуло у відділення|Вручено покупцю/i,
+      })
       .first();
 
     if (await updateBtn.isVisible()) {
       await updateBtn.click({ force: true });
       await expect(
-        page.getByRole("status").or(page.locator('text=/Оновлено статус|вручено/i')),
+        page
+          .getByRole("status")
+          .or(page.locator("text=/Оновлено статус|вручено/i")),
       ).toBeVisible();
     }
 
@@ -93,8 +97,6 @@ test.describe("Vendor Management & Logistics Workspace E2E (Phase 2)", () => {
     await complianceTabBtn.click({ force: true });
 
     await expect(page.getByText("Податкова реєстрація")).toBeVisible();
-    await expect(
-      page.getByText("Агентський договір приєднання"),
-    ).toBeVisible();
+    await expect(page.getByText("Агентський договір приєднання")).toBeVisible();
   });
 });

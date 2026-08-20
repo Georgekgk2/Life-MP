@@ -2,7 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { ProductCard, SaveButton, SectionHeading } from "@/components";
+import {
+  AddToCartButton,
+  ProductCard,
+  ProductReviewsSection,
+  SaveButton,
+  SectionHeading,
+} from "@/components";
 import { getCatalogSnapshot } from "@/catalog/server";
 import { products as fixtureProducts } from "@/fixtures";
 
@@ -40,7 +46,8 @@ export async function generateMetadata({
 
   if (catalogResult.kind === "unavailable") {
     return {
-      title: "Виріб | Life-MP",
+      title: "Каталог недоступний",
+      description: "Сервіс каталогу тимчасово недоступний.",
     };
   }
 
@@ -50,12 +57,13 @@ export async function generateMetadata({
 
   if (!product) {
     return {
-      title: "Виріб не знайдено | Life-MP",
+      title: "Матеріал не знайдено",
+      description: "Запитуваний матеріал каталогу відсутній.",
     };
   }
 
   return {
-    title: `${product.name} — каталог виробів`,
+    title: `${product.name} — ${product.categorySlug}`,
     description: product.description,
   };
 }
@@ -68,32 +76,33 @@ export default async function ProductDetailPage({
 
   if (catalogResult.kind === "unavailable") {
     return (
-      <section className="page-section page-section--spacious">
-        <div className="page-shell">
-          <aside className="notice notice--warning">
-            <h2 className="notice__title">Каталог тимчасово недоступний</h2>
-            <p>
-              Не вдалося завантажити актуальні дані каталогу з сервісу Medusa.
-              Будь ласка, перевірте з'єднання або спробуйте пізніше.
-            </p>
-          </aside>
+      <div className="page-shell page-section">
+        <SectionHeading
+          eyebrow="Помилка каталогу"
+          title="Каталог тимчасово недоступний"
+          description="Сервіс каталогу тимчасово недоступний. Будь ласка, спробуйте пізніше."
+        />
+        <div style={{ marginTop: "2rem" }}>
+          <Link href="/catalog" className="button button-primary">
+            Повернутися до каталогу
+          </Link>
         </div>
-      </section>
+      </div>
     );
   }
 
-  const { categories, products } = catalogResult.snapshot;
-  const category = categories.find((c) => c.slug === categorySlug);
-  const product = products.find(
+  const { snapshot } = catalogResult;
+  const category = snapshot.categories.find((c) => c.slug === categorySlug);
+  const product = snapshot.products.find(
     (p) => p.slug === productSlug && p.categorySlug === categorySlug,
   );
 
-  if (!product || !category) {
+  if (!category || !product) {
     notFound();
   }
 
-  const relatedProducts = products
-    .filter((p) => p.categorySlug === category.slug && p.id !== product.id)
+  const relatedProducts = snapshot.products
+    .filter((p) => p.categorySlug === categorySlug && p.id !== product.id)
     .slice(0, 3);
 
   return (
@@ -112,27 +121,52 @@ export default async function ProductDetailPage({
                 gap: "0.5rem",
                 listStyle: "none",
                 padding: 0,
+                margin: 0,
                 fontSize: "0.875rem",
               }}
             >
               <li>
-                <Link href="/catalog" style={{ color: "var(--color-primary)" }}>
+                <Link
+                  href="/"
+                  style={{
+                    color: "var(--color-ink-muted)",
+                    textDecoration: "none",
+                  }}
+                >
+                  Головна
+                </Link>
+              </li>
+              <li style={{ color: "var(--color-sand-300)" }}>/</li>
+              <li>
+                <Link
+                  href="/catalog"
+                  style={{
+                    color: "var(--color-ink-muted)",
+                    textDecoration: "none",
+                  }}
+                >
                   Каталог
                 </Link>
               </li>
-              <li aria-hidden="true">/</li>
+              <li style={{ color: "var(--color-sand-300)" }}>/</li>
               <li>
                 <Link
                   href={`/catalog/${category.slug}`}
-                  style={{ color: "var(--color-primary)" }}
+                  style={{
+                    color: "var(--color-ink-muted)",
+                    textDecoration: "none",
+                  }}
                 >
                   {category.name}
                 </Link>
               </li>
-              <li aria-hidden="true">/</li>
+              <li style={{ color: "var(--color-sand-300)" }}>/</li>
               <li
                 aria-current="page"
-                style={{ color: "var(--color-ink-muted)" }}
+                style={{
+                  color: "var(--color-pine-900)",
+                  fontWeight: "600",
+                }}
               >
                 {product.name}
               </li>
@@ -140,53 +174,50 @@ export default async function ProductDetailPage({
           </nav>
 
           <div className="product-detail-layout">
-            {/* Visual Box */}
-            <div className="product-detail-visual-box">
-              <div aria-hidden="true" className="product-detail-visual">
-                <span>{product.name}</span>
+            {/* Visual preview */}
+            <div className="product-detail-media">
+              <div
+                className="card__visual product-card__visual"
+                style={{
+                  position: "relative",
+                  overflow: "hidden",
+                  height: "380px",
+                  borderRadius: "var(--radius-md)",
+                  backgroundColor: "var(--color-sand-200)",
+                }}
+              >
+                <img
+                  src={`/images/products/${product.slug}.webp`}
+                  alt={product.name}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    display: "block",
+                  }}
+                />
+                <span className="card__visual-label">{product.name}</span>
               </div>
             </div>
 
-            {/* Product Meta & Info */}
+            {/* Information panel */}
             <div className="product-detail-info">
-              <p className="page-intro__eyebrow">
-                {product.provider?.name
-                  ? `Виробник: ${product.provider.name}`
-                  : "Майстерня Life-MP"}
-              </p>
+              <p className="card__eyebrow">{category.name}</p>
               <h1
-                style={{
-                  fontSize: "2rem",
-                  marginBottom: "0.75rem",
-                  color: "var(--color-ink)",
-                }}
+                className="page-heading__title"
+                style={{ margin: "0.5rem 0" }}
               >
                 {product.name}
               </h1>
 
-              <div
-                className="product-detail-price-box"
-                style={{ marginBottom: "1.25rem" }}
-              >
-                <span
-                  style={{
-                    fontSize: "1.75rem",
-                    fontWeight: "700",
-                    color: "var(--color-primary-strong)",
-                  }}
-                >
-                  {hryvniaFormatter.format(product.priceUah)}
-                </span>
-              </div>
-
-              {/* Badges */}
+              {/* Badges & Trust Signals */}
               <div
                 className="badge-group"
                 style={{
                   display: "flex",
                   gap: "0.5rem",
                   flexWrap: "wrap",
-                  marginBottom: "1.5rem",
+                  marginBottom: "1rem",
                 }}
               >
                 <span className="badge badge--demo">
@@ -194,22 +225,6 @@ export default async function ProductDetailPage({
                     ? "Синтетичні локальні дані"
                     : "Лише перегляд у демо"}
                 </span>
-                {product.verifiedVendorBadge && (
-                  <span
-                    className="badge badge--verified"
-                    style={{ background: "#e6f4ea", color: "#137333" }}
-                  >
-                    ✓ {product.verifiedVendorBadge}
-                  </span>
-                )}
-                {product.certifiedProductBadge && (
-                  <span
-                    className="badge badge--certified"
-                    style={{ background: "#e8f0fe", color: "#1a73e8" }}
-                  >
-                    ★ {product.certifiedProductBadge}
-                  </span>
-                )}
                 {product.organicProductBadge && (
                   <span
                     className="badge badge--organic"
@@ -220,37 +235,46 @@ export default async function ProductDetailPage({
                 )}
               </div>
 
-              {/* Product Actions */}
+              {/* Pricing & Cart Action */}
               <div
-                className="product-detail-actions"
                 style={{
                   display: "flex",
-                  alignItems: "center",
+                  alignItems: "baseline",
                   gap: "1rem",
                   marginBottom: "1.5rem",
                 }}
               >
-                <SaveButton product={product} size="lg" showLabel={true} />
+                <data
+                  value={product.priceUah}
+                  style={{
+                    fontSize: "2rem",
+                    fontWeight: "bold",
+                    color: "var(--color-pine-900)",
+                  }}
+                >
+                  {hryvniaFormatter.format(product.priceUah)}
+                </data>
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <AddToCartButton product={product} size="md" />
+                  <SaveButton product={product} size="md" />
+                </div>
               </div>
 
-              <div
-                className="product-detail-description"
-                style={{ marginBottom: "2rem", lineHeight: "1.6" }}
-              >
+              {/* Description */}
+              <div style={{ marginBottom: "2rem", lineHeight: "1.6" }}>
                 <h2
                   style={{
-                    fontSize: "1.125rem",
+                    fontSize: "1.25rem",
                     marginBottom: "0.5rem",
-                    color: "var(--color-ink)",
+                    color: "var(--color-pine-900)",
                   }}
                 >
                   Опис виробу
                 </h2>
-                <p style={{ color: "var(--color-ink-subtle)" }}>
-                  {product.description}
-                </p>
+                <p>{product.description}</p>
               </div>
 
+              {/* Data specifications */}
               <dl className="data-list" style={{ marginBottom: "2rem" }}>
                 <div className="data-list__item">
                   <dt className="data-list__label">Категорія</dt>
@@ -266,18 +290,35 @@ export default async function ProductDetailPage({
                 )}
               </dl>
 
-              {/* Status Notice */}
-              <aside className="notice" aria-label="Статус замовлення">
-                <h3 className="notice__title">Демонстраційний перегляд</h3>
-                <p>
-                  Оформлення замовлень, кошик, онлайн-оплата та доставка
-                  перебувають на етапі погодження бізнес-рішень. Виріб
-                  представлено для ознайомлення з асортиментом та структурою
-                  каталогу.
+              {/* Escrow Guarantee Notice */}
+              <aside
+                className="notice"
+                aria-label="Гарантія безпеки"
+                style={{
+                  padding: "1rem",
+                  backgroundColor: "#e6f4ea",
+                  border: "1px solid #ceead6",
+                  borderRadius: "var(--radius-sm)",
+                  color: "#137333",
+                }}
+              >
+                <h3 style={{ margin: "0 0 0.25rem 0", fontSize: "0.95rem" }}>
+                  🛡️ Захист покупки через Escrow
+                </h3>
+                <p style={{ margin: 0, fontSize: "0.85rem", lineHeight: 1.4 }}>
+                  Кошти зарезервовано. Майстер отримує виплату на IBAN тільки
+                  після того, як ви отримаєте та оглянете посилку у відділенні
+                  Нової Пошти.
                 </p>
               </aside>
             </div>
           </div>
+
+          {/* Product Reviews Section */}
+          <ProductReviewsSection
+            productSlug={product.slug}
+            productName={product.name}
+          />
         </div>
       </article>
 

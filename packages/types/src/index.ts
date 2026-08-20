@@ -339,3 +339,33 @@ export type SettlementBatchRecord = Readonly<{
   settledAt: string;
   iban?: string;
 }>;
+
+// --------------------------------------------------------------------------
+// Reviews, Ratings & Community Trust Contracts (Phase 3)
+// --------------------------------------------------------------------------
+
+export type ProductReview = Readonly<{
+  id: string;
+  productSlug: string;
+  productName: string;
+  authorName: string;
+  authorCity: string;
+  rating: number; // 1 to 5
+  comment: string;
+  verifiedPurchase: boolean;
+  moderationStatus: "approved" | "pending" | "rejected";
+  moderatorNotes?: string;
+  createdAt: string;
+}>;
+
+export type ProductRatingSummary = Readonly<{
+  averageRating: number;
+  totalReviews: number;
+  ratingBreakdown: Readonly<{
+    5: number;
+    4: number;
+    3: number;
+    2: number;
+    1: number;
+  }>;
+}>;

@@ -8,7 +8,26 @@ type PersonCardProps = Readonly<{
 export function PersonCard({ person }: PersonCardProps) {
   return (
     <article className="card person-card">
-      <div aria-hidden="true" className="card__visual person-card__visual">
+      <div
+        className="card__visual person-card__visual"
+        style={{
+          position: "relative",
+          overflow: "hidden",
+          height: "220px",
+          backgroundColor: "var(--color-sand-200)",
+        }}
+      >
+        <img
+          src={`/images/people/person-${person.slug}.webp`}
+          alt={person.name}
+          loading="lazy"
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            display: "block",
+          }}
+        />
         <span className="card__visual-label">{person.name}</span>
       </div>
       <div className="card__content">

@@ -8,7 +8,26 @@ type CategoryCardProps = Readonly<{
 export function CategoryCard({ category }: CategoryCardProps) {
   return (
     <article className="card category-card">
-      <div aria-hidden="true" className="card__visual category-card__visual">
+      <div
+        className="card__visual category-card__visual"
+        style={{
+          position: "relative",
+          overflow: "hidden",
+          height: "180px",
+          backgroundColor: "var(--color-sand-200)",
+        }}
+      >
+        <img
+          src={`/images/categories/category-${category.slug}.webp`}
+          alt={category.name}
+          loading="lazy"
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            display: "block",
+          }}
+        />
         <span className="card__visual-label">{category.name}</span>
       </div>
       <div className="card__content">

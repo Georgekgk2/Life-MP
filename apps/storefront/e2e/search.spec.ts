@@ -40,6 +40,7 @@ test.describe("Instant Search & Ukrainian Morphology E2E", () => {
 
     // Capture screenshot of search modal with suggestions
     await page.screenshot({
+      caret: "initial",
       path: path.join(
         screenshotsDir,
         `search-modal-${testInfo.project.name}.png`,
@@ -53,8 +54,8 @@ test.describe("Instant Search & Ukrainian Morphology E2E", () => {
       page.getByRole("dialog").getByRole("link", { name: /Шопер «Разом»/i }),
     ).toBeVisible();
 
-    // Capture screenshot of synonym search
     await page.screenshot({
+      caret: "initial",
       path: path.join(
         screenshotsDir,
         `search-synonyms-${testInfo.project.name}.png`,

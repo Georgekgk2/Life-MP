@@ -26,6 +26,7 @@ test.describe("Catalog E2E & Visual Artifacts", () => {
 
     // Capture homepage screenshot
     await page.screenshot({
+      caret: "initial",
       path: path.join(screenshotsDir, `homepage-${testInfo.project.name}.png`),
       fullPage: true,
     });
@@ -42,6 +43,7 @@ test.describe("Catalog E2E & Visual Artifacts", () => {
 
     // Capture catalog screenshot
     await page.screenshot({
+      caret: "initial",
       path: path.join(screenshotsDir, `catalog-${testInfo.project.name}.png`),
       fullPage: true,
     });
@@ -53,6 +55,7 @@ test.describe("Catalog E2E & Visual Artifacts", () => {
 
     // Capture category screenshot
     await page.screenshot({
+      caret: "initial",
       path: path.join(screenshotsDir, `category-${testInfo.project.name}.png`),
       fullPage: true,
     });

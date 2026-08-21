@@ -24,6 +24,7 @@ test.describe("Vendor Product Submissions & Moderation E2E", () => {
 
     // Capture screenshot of new product submission form
     await page.screenshot({
+      caret: "initial",
       path: path.join(
         screenshotsDir,
         `vendor-product-new-${testInfo.project.name}.png`,
@@ -67,6 +68,7 @@ test.describe("Vendor Product Submissions & Moderation E2E", () => {
 
     // 7. Capture screenshot of success screen
     await page.screenshot({
+      caret: "initial",
       path: path.join(
         screenshotsDir,
         `vendor-product-success-${testInfo.project.name}.png`,
@@ -90,6 +92,7 @@ test.describe("Vendor Product Submissions & Moderation E2E", () => {
 
     // 10. Capture screenshot of moderation products tab
     await page.screenshot({
+      caret: "initial",
       path: path.join(
         screenshotsDir,
         `moderation-products-${testInfo.project.name}.png`,

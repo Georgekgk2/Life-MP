@@ -50,6 +50,7 @@ test.describe("Community Stories & Dynamic Events E2E", () => {
 
     // 6. Capture screenshot
     await page.screenshot({
+      caret: "initial",
       path: path.join(
         screenshotsDir,
         `story-detail-${testInfo.project.name}.png`,
@@ -94,6 +95,7 @@ test.describe("Community Stories & Dynamic Events E2E", () => {
 
     // 7. Capture screenshot
     await page.screenshot({
+      caret: "initial",
       path: path.join(
         screenshotsDir,
         `event-detail-${testInfo.project.name}.png`,

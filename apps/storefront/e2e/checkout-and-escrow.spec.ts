@@ -43,6 +43,7 @@ test.describe("Multi-Vendor Cart & Checkout Draft Containment (Phase 4D)", () =>
 
     // Capture screenshot of checkout form
     await page.screenshot({
+      caret: "initial",
       path: testInfo.outputPath("checkout-form.png"),
       fullPage: true,
     });
@@ -83,6 +84,7 @@ test.describe("Multi-Vendor Cart & Checkout Draft Containment (Phase 4D)", () =>
 
     // Capture screenshot of contained draft state
     await page.screenshot({
+      caret: "initial",
       path: testInfo.outputPath("checkout-draft-state.png"),
       fullPage: true,
     });

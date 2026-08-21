@@ -42,6 +42,7 @@ test.describe("Product Reviews, Ratings & Social Proof (Phase 4D)", () => {
     await expect(page.getByText("✓ Перевірений покупець")).toHaveCount(0);
 
     await page.screenshot({
+      caret: "initial",
       path: path.join(
         screenshotsDir,
         `product-reviews-fail-closed-${testInfo.project.name}.png`,

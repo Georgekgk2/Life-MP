@@ -44,6 +44,7 @@ test.describe("Moderation Dashboard E2E", () => {
 
     // 4. Capture screenshot of dashboard
     await page.screenshot({
+      caret: "initial",
       path: path.join(
         screenshotsDir,
         `moderation-dashboard-${testInfo.project.name}.png`,
@@ -66,6 +67,7 @@ test.describe("Moderation Dashboard E2E", () => {
 
     // Capture screenshot of review modal
     await page.screenshot({
+      caret: "initial",
       path: path.join(
         screenshotsDir,
         `moderation-modal-${testInfo.project.name}.png`,

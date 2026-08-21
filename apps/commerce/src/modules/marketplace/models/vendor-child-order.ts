@@ -1,6 +1,8 @@
 import { model } from "@medusajs/framework/utils";
 import { ParentOrder } from "./parent-order.js";
 import { Vendor } from "./vendor.js";
+import { Shipment } from "./shipment.js";
+import { OrderLine } from "./order-line.js";
 
 export const VendorChildOrder = model.define("vendor_child_order", {
   id: model.id().primaryKey(),
@@ -13,6 +15,7 @@ export const VendorChildOrder = model.define("vendor_child_order", {
   gross_amount_uah: model.number(),
   commission_amount_uah: model.number(),
   net_payable_uah: model.number(),
+  // Legacy fields remain mapped so an older image can read the same additive schema.
   status: model
     .enum([
       "pending",
@@ -24,4 +27,23 @@ export const VendorChildOrder = model.define("vendor_child_order", {
     ])
     .default("pending"),
   ttn_number: model.text().nullable(),
+  fulfillment_status: model
+    .enum([
+      "pending",
+      "accepted",
+      "shipped",
+      "delivered",
+      "returned",
+      "cancelled",
+    ])
+    .default("pending"),
+  payout_status: model
+    .enum(["not_applicable", "pending", "settled", "reversed"])
+    .default("not_applicable"),
+  order_lines: model.hasMany(() => OrderLine, {
+    mappedBy: "child_order",
+  }),
+  shipments: model.hasMany(() => Shipment, {
+    mappedBy: "child_order",
+  }),
 });

@@ -13,90 +13,38 @@ test.beforeAll(() => {
   }
 });
 
-test.describe("Vendor Management & Logistics Workspace E2E (Phase 2)", () => {
-  test("artisan can switch workshops, manage orders, track Nova Poshta status, and inspect IBAN payouts", async ({
+test.describe("Vendor Dashboard containment E2E (Phase 4D)", () => {
+  test("fails closed until server authentication and authorization are available", async ({
     page,
   }, testInfo) => {
-    // 1. Visit Vendor Dashboard
     await page.goto("/vendor/dashboard");
-    await expect(page.locator("h1")).toContainText("Кабінет Майстра");
-    await expect(page.getByText("✓ Перевірена майстерня")).toBeVisible();
 
-    // Capture screenshot of default orders tab
-    await page.screenshot({
-      path: path.join(
-        screenshotsDir,
-        `vendor-dashboard-orders-${testInfo.project.name}.png`,
-      ),
-      fullPage: true,
-    });
-
-    // 2. Switch workshop in selector
-    const vendorSelector = page.locator("#vendor-selector");
-    await expect(vendorSelector).toBeVisible();
-    await vendorSelector.selectOption("berehynia");
-    await expect(vendorSelector).toHaveValue("berehynia");
-
-    // Switch back to Olena
-    await vendorSelector.selectOption("olena");
-    await expect(vendorSelector).toHaveValue("olena");
-
-    // 3. Inspect Orders tab and update tracking status
-    const updateBtn = page
-      .getByRole("button", {
-        name: /Передати перевізнику|Прибуло у відділення|Вручено покупцю/i,
-      })
-      .first();
-
-    if (await updateBtn.isVisible()) {
-      await updateBtn.click({ force: true });
-      await expect(
-        page
-          .getByRole("status")
-          .or(page.locator("text=/Оновлено статус|вручено/i")),
-      ).toBeVisible();
-    }
-
-    // 4. Switch to Finances & Settlement tab
-    const financesTabBtn = page.getByRole("button", {
-      name: /💰 Фінанси та виплати/i,
-    });
-    await expect(financesTabBtn).toBeVisible();
-    await financesTabBtn.click({ force: true });
-
-    await expect(page.getByText("Загальний виторг майстерні:")).toBeVisible();
-    await expect(page.getByText("Комісія маркетплейсу (10%):")).toBeVisible();
-    await expect(page.getByText("Виплачено на IBAN (Settled):")).toBeVisible();
-
-    // Capture screenshot of finances tab
-    await page.screenshot({
-      path: path.join(
-        screenshotsDir,
-        `vendor-dashboard-finances-${testInfo.project.name}.png`,
-      ),
-      fullPage: true,
-    });
-
-    // 5. Switch to Products tab
-    const productsTabBtn = page.getByRole("button", {
-      name: /🏺 Товари майстерні/i,
-    });
-    await expect(productsTabBtn).toBeVisible();
-    await productsTabBtn.click({ force: true });
-
+    await expect(page.locator("h1")).toContainText(
+      "Кабінет майстра недоступний",
+    );
     await expect(
-      page.getByRole("heading", { name: /Товари майстерні/i }),
+      page.getByText(/потрібна автентифікація майстра/i),
     ).toBeVisible();
-    await expect(page.getByText("Чашка «Ранок»")).toBeVisible();
+    await expect(page.getByRole("status")).toContainText("Безпечний режим");
 
-    // 6. Switch to Compliance tab
-    const complianceTabBtn = page.getByRole("button", {
-      name: /📜 Комплаєнс та оферти/i,
+    // No browser-side vendor selection or order/tracking mutations are exposed.
+    await expect(page.locator("#vendor-selector")).toHaveCount(0);
+    const dashboard = page.locator(
+      'section[aria-labelledby="vendor-dashboard-unavailable-title"]',
+    );
+    await expect(dashboard.locator("button")).toHaveCount(0);
+
+    // Sensitive financial and identity data must not be rendered by this route.
+    await expect(
+      page.getByText(/tax_identifier|iban|комісі|виплат/i),
+    ).toHaveCount(0);
+
+    await page.screenshot({
+      path: path.join(
+        screenshotsDir,
+        `vendor-dashboard-contained-${testInfo.project.name}.png`,
+      ),
+      fullPage: true,
     });
-    await expect(complianceTabBtn).toBeVisible();
-    await complianceTabBtn.click({ force: true });
-
-    await expect(page.getByText("Податкова реєстрація")).toBeVisible();
-    await expect(page.getByText("Агентський договір приєднання")).toBeVisible();
   });
 });

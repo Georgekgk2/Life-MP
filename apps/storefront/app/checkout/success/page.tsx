@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import { CheckoutSuccessView } from "@/components";
 
 export const metadata: Metadata = {
-  title: "Замовлення прийнято",
-  description: "Підтвердження оформлення замовлення на маркетплейсі ЛАЙФ",
+  title: "Чернетка оформлення",
+  description: "Тестовий стан без створення авторитетного замовлення",
 };
 
 export default function CheckoutSuccessPage() {
@@ -15,7 +15,7 @@ export default function CheckoutSuccessPage() {
           className="section"
           style={{ textAlign: "center", padding: "4rem 1rem" }}
         >
-          Завантаження деталей замовлення...
+          Завантаження стану чернетки...
         </div>
       }
     >

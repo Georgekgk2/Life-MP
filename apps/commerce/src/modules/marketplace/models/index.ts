@@ -13,3 +13,8 @@ export * from "./vendor-child-order.js";
 export * from "./vendor-payable.js";
 export * from "./settlement-batch.js";
 export * from "./artisan-application.js";
+export * from "./order-line.js";
+export * from "./shipment.js";
+export * from "./tracking-event.js";
+export * from "./product-review.js";
+export * from "./review-moderation-decision.js";

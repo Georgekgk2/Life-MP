@@ -22,8 +22,11 @@ export const CatalogListing = model.define("catalog_listing", {
       "archived",
     ])
     .default("draft"),
-  visibility: model.enum(["internal", "local_demo"]).default("internal"),
+  visibility: model
+    .enum(["internal", "local_demo", "synthetic"])
+    .default("internal"),
   synthetic: model.boolean().default(false),
+  price_uah: model.number().nullable(),
   submitted_at: model.dateTime().nullable(),
   published_at: model.dateTime().nullable(),
   moderation_decisions: model.hasMany(() => ModerationDecision, {

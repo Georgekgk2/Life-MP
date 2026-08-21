@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "policy_name": "Life-MP Phase P0 Deployment Containment Policy",
-  "last_updated": "2026-08-19",
+  "last_updated": "2026-08-21",
   "status": "CONTAINED",
   "gates": {
     "allow_remote_deployment": false,
@@ -13,5 +13,5 @@
     "allow_live_fiscalization": false
   },
   "rationale": "Commercial readiness, legal roles (COM-1..COM-5), fiscalization (FSC-1), shipping (LOG-1), and formal infrastructure readiness gates remain pending approval. All deployment capabilities are strictly contained.",
-  "canonical_runbook": "docs/runbooks/production-readiness-gate.md"
+  "canonical_runbook": "docs/decisions/production-readiness-gate.md"
 }

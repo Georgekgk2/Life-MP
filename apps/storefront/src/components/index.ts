@@ -6,6 +6,7 @@ export { CategoryCard } from "./category-card";
 export { CheckoutSuccessView } from "./checkout-success-view";
 export { CheckoutView } from "./checkout-view";
 export { CustomerProfileView } from "./customer-profile-view";
+export { CustomerOrdersPanel } from "./customer-orders-panel";
 export { EmptyState } from "./empty-state";
 export { EventCard } from "./event-card";
 export { InstallPwaPrompt } from "./install-pwa-prompt";

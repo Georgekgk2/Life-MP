@@ -2,12 +2,7 @@
 
 import Link from "next/link";
 import { useCart } from "@/context/cart-context";
-
-const hryvniaFormatter = new Intl.NumberFormat("uk-UA", {
-  style: "currency",
-  currency: "UAH",
-  maximumFractionDigits: 0,
-});
+import { formatHryvnia } from "@/formatters";
 
 export function CartDrawer() {
   const {
@@ -251,7 +246,7 @@ export function CartDrawer() {
                             marginTop: "2px",
                           }}
                         >
-                          {hryvniaFormatter.format(item.priceUah)}
+                          {formatHryvnia(item.priceUah)}
                         </div>
                       </div>
 
@@ -350,7 +345,7 @@ export function CartDrawer() {
                 >
                   <span>Підсумок майстерні:</span>
                   <strong style={{ color: "var(--color-pine-900)" }}>
-                    {hryvniaFormatter.format(group.subtotalUah)}
+                    {formatHryvnia(group.subtotalUah)}
                   </strong>
                 </div>
               </div>
@@ -391,7 +386,7 @@ export function CartDrawer() {
                   color: "var(--color-pine-900)",
                 }}
               >
-                {hryvniaFormatter.format(totalAmountUah)}
+                {formatHryvnia(totalAmountUah)}
               </span>
             </div>
 
@@ -438,8 +433,8 @@ export function CartDrawer() {
                 margin: "0.75rem 0 0 0",
               }}
             >
-              🔒 Безпечний Escrow-холдинг коштів до моменту отримання посилки на
-              Новій Пошті
+              🧪 Чернетка кошика: серверне замовлення, оплата й доставка не
+              створюються
             </p>
           </div>
         )}

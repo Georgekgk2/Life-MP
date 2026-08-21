@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { VendorDashboard } from "@/components";
 
 export const metadata: Metadata = {
-  title: "Кабінет Майстра — керування замовленнями та виплатами",
+  title: "Кабінет майстра — потрібна автентифікація",
   description:
-    "Робочий простір майстерні: облік замовлень, ТТН Нової Пошти, розрахунки та виплати на IBAN",
+    "Доступ до кабінету майстра буде відкрито після підключення серверної автентифікації та перевірки дозволів.",
 };
 
 export default function VendorDashboardPage() {

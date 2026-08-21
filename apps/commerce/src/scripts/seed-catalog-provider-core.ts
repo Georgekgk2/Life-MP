@@ -2,6 +2,7 @@ import type { ExecArgs } from "@medusajs/framework/types";
 import { Modules } from "@medusajs/framework/utils";
 import { assertSyntheticSeedAllowed } from "./seed-guard";
 import { MARKETPLACE_MODULE } from "../modules/marketplace/constants";
+import type { SyntheticOrderCreateInput } from "../modules/marketplace/customer-orders";
 import type {
   MarketplaceServiceType,
   ProductServiceType,
@@ -21,6 +22,15 @@ type ApiKeyServiceType = {
   createApiKeys(
     data: Record<string, unknown>,
   ): Promise<{ id: string; token: string }>;
+};
+
+type CustomerServiceType = {
+  listCustomers(
+    filters: Record<string, unknown>,
+  ): Promise<Array<Record<string, unknown>>>;
+  createCustomers(
+    data: Record<string, unknown>,
+  ): Promise<Record<string, unknown>>;
 };
 
 export default async function seedCatalogProviderCore({ container }: ExecArgs) {
@@ -279,13 +289,15 @@ export default async function seedCatalogProviderCore({ container }: ExecArgs) {
     },
   ];
 
+  const syntheticOrderItems: SyntheticOrderCreateInput["items"] = [];
+
   for (const item of fixtureProducts) {
     const category = categoryMap.get(item.categorySlug);
     const [existingProduct] = await productService.listProducts({
       handle: item.slug,
     });
 
-    let productId = existingProduct?.id;
+    let productId = existingProduct?.id as string | undefined;
     if (!existingProduct) {
       const product = await productService.createProducts({
         title: item.title,
@@ -294,7 +306,7 @@ export default async function seedCatalogProviderCore({ container }: ExecArgs) {
         status: "published",
         category_ids: category ? [category.id] : [],
       });
-      productId = product.id;
+      productId = product.id as string;
     }
 
     const existingListings = await marketplaceService.listCatalogListings({
@@ -302,22 +314,100 @@ export default async function seedCatalogProviderCore({ container }: ExecArgs) {
       title: item.title,
     });
 
-    let listingId = existingListings[0]?.id;
+    let listingId = existingListings[0]?.id as string | undefined;
     if (!listingId) {
       const listing = await marketplaceService.createCatalogListings({
         vendor_id: item.vendorId,
         title: item.title,
         description: item.description,
         state: "published",
-        visibility: "synthetic",
+        visibility: "local_demo",
+        synthetic: true,
+        price_uah: item.price,
         submitted_at: new Date(),
         published_at: new Date(),
       });
-      listingId = listing.id;
+      listingId = listing.id as string;
 
       await remoteLink.create({
         [MARKETPLACE_MODULE]: { catalog_listing_id: listingId },
         [Modules.PRODUCT]: { product_id: productId! },
+      });
+    } else {
+      await marketplaceService.updateCatalogListings({
+        id: listingId,
+        state: "published",
+        visibility: "local_demo",
+        synthetic: true,
+        price_uah: item.price,
+        published_at: new Date(),
+      });
+    }
+
+    syntheticOrderItems.push({
+      catalogListingId: listingId,
+      productId: productId!,
+      vendorId: item.vendorId,
+      productName: item.title,
+      unitPriceUah: item.price,
+      quantity: 1,
+    });
+  }
+
+  if (process.env.ALLOW_SYNTHETIC_ORDERS === "true") {
+    const customerService = container.resolve(
+      Modules.CUSTOMER,
+    ) as unknown as CustomerServiceType;
+    const fixtureEmail = "customer.fixture@life.ua";
+    const existingCustomers = await customerService.listCustomers({
+      email: fixtureEmail,
+    });
+    const customer =
+      existingCustomers[0] ||
+      (await customerService.createCustomers({
+        first_name: "Олена",
+        last_name: "Мельник",
+        email: fixtureEmail,
+        phone: "+380678901234",
+        has_account: true,
+        metadata: { synthetic_fixture: true },
+      }));
+    const customerId =
+      typeof customer["id"] === "string" ? customer["id"] : null;
+    if (!customerId) {
+      throw new Error(
+        "[seed-catalog-provider-core] Не вдалося створити customer fixture для synthetic order.",
+      );
+    }
+
+    const orderNumber = "SYN-CUSTOMER-FIXTURE-DELIVERED-1";
+    const existingSyntheticOrders = await marketplaceService.listParentOrders({
+      order_number: orderNumber,
+    });
+    if (
+      existingSyntheticOrders.length === 0 &&
+      syntheticOrderItems.length > 0
+    ) {
+      const firstVendorId = syntheticOrderItems[0]?.vendorId;
+      const fixtureOrderItems = syntheticOrderItems
+        .filter((item) => item.vendorId === firstVendorId)
+        .slice(0, 2);
+      const secondVendorItem = syntheticOrderItems.find(
+        (item) => item.vendorId !== firstVendorId,
+      );
+      if (secondVendorItem) {
+        fixtureOrderItems.push(secondVendorItem);
+      }
+      if (new Set(fixtureOrderItems.map((item) => item.vendorId)).size < 2) {
+        throw new Error(
+          "[seed-catalog-provider-core] Multi-vendor synthetic order fixture requires at least two active vendors.",
+        );
+      }
+      await marketplaceService.createSyntheticOrder({
+        customerId,
+        orderNumber,
+        initialFulfillmentStatus: "delivered",
+        items: fixtureOrderItems,
       });
     }
   }
@@ -344,13 +434,13 @@ export default async function seedCatalogProviderCore({ container }: ExecArgs) {
     },
     {
       title: "Приховано Крафт",
-      state: "unpublished",
+      state: "archived",
       visibility: "internal",
       vendorId: vendorB["id"] as string,
     },
     {
       title: "Призупинено Етно",
-      state: "suspended",
+      state: "archived",
       visibility: "internal",
       vendorId: vendorA["id"] as string,
     },
@@ -366,8 +456,7 @@ export default async function seedCatalogProviderCore({ container }: ExecArgs) {
         vendor_id: probe.vendorId,
         title: probe.title,
         description: "Probe record for moderation state filtering validation.",
-        state: probe.state as
-          "draft" | "submitted" | "rejected" | "unpublished" | "suspended",
+        state: probe.state as "draft" | "submitted" | "rejected" | "archived",
         visibility: probe.visibility as "internal" | "synthetic" | "local_demo",
       });
     }

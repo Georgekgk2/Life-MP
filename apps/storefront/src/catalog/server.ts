@@ -14,7 +14,26 @@ export type CatalogReadResult =
 
 export async function getCatalogSnapshot(): Promise<CatalogReadResult> {
   const source = process.env["CATALOG_SOURCE"] || "fixtures";
+  const isProduction = process.env["NODE_ENV"] === "production";
+  const isLocalOrTest =
+    process.env["NODE_ENV"] === "development" ||
+    process.env["NODE_ENV"] === "test";
+  const allowSyntheticCatalog =
+    process.env["ALLOW_SYNTHETIC_CATALOG"] === "true";
 
+  // Production must never silently serve fixtures or a non-commercial Medusa
+  // catalog. An explicit synthetic flag is reserved for controlled local/test
+  // runs; commercial publication remains a separate approved capability.
+  if (
+    isProduction ||
+    (source === "medusa" && (!isLocalOrTest || !allowSyntheticCatalog))
+  ) {
+    return {
+      kind: "unavailable",
+      source: "medusa",
+      reason: "missing_configuration",
+    };
+  }
   if (source === "fixtures") {
     const categories = fixtureCategories.map((c) => ({
       id: c.id,

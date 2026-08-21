@@ -10,8 +10,8 @@ test.beforeAll(() => {
   }
 });
 
-test.describe("Multi-Vendor Cart, Checkout, Order Splitting & Escrow Sandbox (Phase 4C)", () => {
-  test("user can add multi-vendor items, complete checkout, inspect split child orders, and simulate delivery settlement", async ({
+test.describe("Multi-Vendor Cart & Checkout Draft Containment (Phase 4D)", () => {
+  test("keeps checkout customer-facing state draft-only when server order writer is unavailable", async ({
     page,
   }, testInfo) => {
     // 1. Visit Catalog
@@ -43,65 +43,48 @@ test.describe("Multi-Vendor Cart, Checkout, Order Splitting & Escrow Sandbox (Ph
 
     // Capture screenshot of checkout form
     await page.screenshot({
-      path: path.join(
-        screenshotsDir,
-        `checkout-form-${testInfo.project.name}.png`,
-      ),
-      fullPage: false,
+      path: testInfo.outputPath("checkout-form.png"),
+      fullPage: true,
     });
 
-    // 6. Submit Checkout Form
-    const submitOrderBtn = page.locator(
-      'button:has-text("Підтвердити замовлення")',
+    // 6. Submit Checkout Form as a non-authoritative draft
+    const submitDraftBtn = page.locator(
+      'button:has-text("Переглянути стан чернетки")',
     );
-    await expect(submitOrderBtn).toBeVisible();
-    await submitOrderBtn.click({ force: true });
+    await expect(submitDraftBtn).toBeVisible();
+    await submitDraftBtn.click({ force: true });
 
-    // 7. Verify Success Page
-    await page.waitForURL("**/checkout/success?orderNumber=**");
+    // 7. Verify explicit unavailable/draft-only state
+    await page.waitForURL("**/checkout/success?mode=draft");
+    await expect(
+      page.getByRole("heading", { name: "Чернетка оформлення" }),
+    ).toBeVisible();
+    await expect(page.getByRole("status")).toContainText(
+      "Серверне оформлення наразі недоступне",
+    );
+    await expect(page.getByRole("status")).toContainText(
+      "Платіж, Escrow-холдинг, комісія, IBAN, ТТН і виплата майстерні не створюються",
+    );
     await expect(
       page.getByRole("heading", { name: "Дякуємо! Ваше замовлення прийнято" }),
-    ).toBeVisible();
-
-    // Capture screenshot of success page
-    await page.screenshot({
-      path: path.join(
-        screenshotsDir,
-        `checkout-success-${testInfo.project.name}.png`,
-      ),
-      fullPage: false,
-    });
-
-    // 8. Navigate to Order Tracking Page
-    const trackOrderBtn = page.locator(
-      'a:has-text("Відстежувати посилки в реальному часі")',
+    ).not.toBeVisible();
+    await expect(page.locator("body")).not.toContainText("Олена Мельник");
+    await expect(page.locator("body")).not.toContainText(
+      "Відстежувати посилки в реальному часі",
     );
-    await expect(trackOrderBtn).toBeVisible();
-    await trackOrderBtn.click({ force: true });
 
-    // 9. Inspect Order Tracking View
-    await page.waitForURL("**/orders/**");
+    // Navigation remains available without exposing an order-tracking mutation.
     await expect(
-      page.getByRole("heading", { name: /Замовлення #LF-/ }),
-    ).toBeVisible();
-    await expect(page.getByText("Escrow-холдинг")).toBeVisible();
-    await expect(page.getByText("Симулятор трекінгу")).toBeVisible();
+      page.getByRole("link", { name: "Повернутися до чернетки" }),
+    ).toHaveAttribute("href", "/checkout");
+    await expect(
+      page.getByRole("link", { name: "Повернутися до каталогу" }),
+    ).toHaveAttribute("href", "/catalog");
 
-    // 10. Simulate Nova Poshta Delivery Trigger (Status 9)
-    const deliverBtn = page.locator('button:has-text("Вручено (9)")').first();
-    await expect(deliverBtn).toBeVisible();
-    await deliverBtn.click({ force: true });
-
-    // 11. Verify Settlement payout creation
-    await expect(page.getByText("Виплату проведено")).toBeVisible();
-
-    // Capture screenshot of settled order tracking
+    // Capture screenshot of contained draft state
     await page.screenshot({
-      path: path.join(
-        screenshotsDir,
-        `order-settlement-tracking-${testInfo.project.name}.png`,
-      ),
-      fullPage: false,
+      path: testInfo.outputPath("checkout-draft-state.png"),
+      fullPage: true,
     });
   });
 });

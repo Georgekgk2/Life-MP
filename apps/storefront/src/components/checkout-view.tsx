@@ -4,19 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/cart-context";
-import { SandboxOrderEngine } from "@/sandbox/order-engine";
 import type { CheckoutCustomerInput } from "@life/types";
-
-const hryvniaFormatter = new Intl.NumberFormat("uk-UA", {
-  style: "currency",
-  currency: "UAH",
-  maximumFractionDigits: 0,
-});
+import { formatHryvnia } from "@/formatters";
 
 export function CheckoutView() {
   const router = useRouter();
-  const { items, vendorGroups, totalItems, totalAmountUah, clearCart } =
-    useCart();
+  const { items, vendorGroups, totalItems, totalAmountUah } = useCart();
 
   const [formData, setFormData] = useState<CheckoutCustomerInput>({
     fullName: "Олена Мельник",
@@ -46,18 +39,10 @@ export function CheckoutView() {
     setIsSubmitting(true);
     setError(null);
 
-    try {
-      const { parentOrder } = SandboxOrderEngine.createOrder({
-        customer: formData,
-        items,
-      });
-
-      clearCart();
-      router.push(`/checkout/success?orderNumber=${parentOrder.orderNumber}`);
-    } catch {
-      setError("Не вдалося створити замовлення. Спробуйте ще раз.");
-      setIsSubmitting(false);
-    }
+    // The server-side order writer is not available yet. Keep the cart draft
+    // intact and show an explicit non-authoritative sandbox state instead of
+    // writing customer data or payment/order records to localStorage.
+    router.push("/checkout/success?mode=draft");
   };
 
   if (items.length === 0) {
@@ -95,8 +80,8 @@ export function CheckoutView() {
           Оформлення замовлення
         </h1>
         <p style={{ color: "var(--color-ink-muted)", margin: 0 }}>
-          Пряма доставка від українських майстерень через Нову Пошту із захистом
-          платежу (Escrow)
+          Лише тестова чернетка: серверне замовлення, оплата та доставка не
+          створюються.
         </p>
       </div>
 
@@ -385,7 +370,7 @@ export function CheckoutView() {
                   color: "var(--color-pine-900)",
                 }}
               >
-                3. Спосіб оплати
+                3. Тестовий спосіб оплати
               </h2>
 
               <div
@@ -433,7 +418,7 @@ export function CheckoutView() {
                         color: "var(--color-pine-900)",
                       }}
                     >
-                      Онлайн-оплата з Escrow-захистом (рекомендовано)
+                      Тестова онлайн-оплата (не виконується)
                     </div>
                     <div
                       style={{
@@ -442,8 +427,8 @@ export function CheckoutView() {
                         marginTop: "2px",
                       }}
                     >
-                      Кошти холдуються безпечно та виплачуються майстерням
-                      тільки після отримання вами посилки
+                      Платіж, Escrow-холдинг і виплата майстерням не створюються
+                      у режимі чернетки
                     </div>
                   </div>
                 </label>
@@ -486,7 +471,7 @@ export function CheckoutView() {
                         color: "var(--color-pine-900)",
                       }}
                     >
-                      Оплата карткою при отриманні
+                      Оплата при отриманні (лише чернетка)
                     </div>
                     <div
                       style={{
@@ -495,8 +480,7 @@ export function CheckoutView() {
                         marginTop: "2px",
                       }}
                     >
-                      Оплата у відділенні Нової Пошти під час огляду
-                      відправлення
+                      Реальна оплата та відправлення не створюються
                     </div>
                   </div>
                 </label>
@@ -525,7 +509,7 @@ export function CheckoutView() {
                   color: "var(--color-pine-900)",
                 }}
               >
-                Склад замовлення ({totalItems} тов.)
+                Склад чернетки ({totalItems} тов.)
               </h2>
 
               <p
@@ -535,8 +519,9 @@ export function CheckoutView() {
                   marginBottom: "1rem",
                 }}
               >
-                Оскільки ви замовляєте у різних майстерень, замовлення буде
-                розщеплено на {vendorGroups.length} окремих відправлень:
+                У чернетці товари згруповано за майстернями (
+                {vendorGroups.length}
+                груп). Відправлення не створюються:
               </p>
 
               {/* Vendor Groups Summary */}
@@ -576,7 +561,7 @@ export function CheckoutView() {
                         Посилка #{idx + 1}: {group.vendorName}
                       </span>
                       <strong style={{ fontSize: "0.9rem" }}>
-                        {hryvniaFormatter.format(group.subtotalUah)}
+                        {formatHryvnia(group.subtotalUah)}
                       </strong>
                     </div>
 
@@ -591,7 +576,7 @@ export function CheckoutView() {
                       {group.items.map((it) => (
                         <li key={it.id}>
                           {it.name} × {it.quantity} (
-                          {hryvniaFormatter.format(it.priceUah)})
+                          {formatHryvnia(it.priceUah)})
                         </li>
                       ))}
                     </ul>
@@ -616,7 +601,7 @@ export function CheckoutView() {
                   }}
                 >
                   <span>Вартість товарів:</span>
-                  <span>{hryvniaFormatter.format(totalAmountUah)}</span>
+                  <span>{formatHryvnia(totalAmountUah)}</span>
                 </div>
                 <div
                   style={{
@@ -642,8 +627,8 @@ export function CheckoutView() {
                     borderTop: "1px dashed var(--color-sand-200)",
                   }}
                 >
-                  <span>До сплати:</span>
-                  <span>{hryvniaFormatter.format(totalAmountUah)}</span>
+                  <span>Сума чернетки:</span>
+                  <span>{formatHryvnia(totalAmountUah)}</span>
                 </div>
               </div>
 
@@ -664,8 +649,8 @@ export function CheckoutView() {
                 }}
               >
                 {isSubmitting
-                  ? "Створення замовлення..."
-                  : `Підтвердити замовлення (${hryvniaFormatter.format(totalAmountUah)})`}
+                  ? "Відкриття стану чернетки..."
+                  : `Переглянути стан чернетки (${formatHryvnia(totalAmountUah)})`}
               </button>
 
               <div
@@ -677,8 +662,9 @@ export function CheckoutView() {
                   lineHeight: 1.4,
                 }}
               >
-                🛡️ Тестовий Sandbox-режим: реальні кошти не списуються,
-                створюються тестові ЕН та емулюється Escrow-холдинг.
+                ⚠️ Серверне створення замовлення недоступне: кошти, комісія,
+                IBAN, Escrow, ТТН і виплати не створюються. Дані форми не
+                передаються на сервер і не показуються на сторінці стану.
               </div>
             </div>
           </div>

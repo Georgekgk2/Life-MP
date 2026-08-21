@@ -18,6 +18,33 @@ const createMemberSchema = z
   })
   .strict();
 
+type DatabaseErrorLike = {
+  code?: unknown;
+  constraint?: unknown;
+  cause?: unknown;
+};
+
+export function isActiveVendorMembershipUniqueViolation(
+  error: unknown,
+): boolean {
+  const seen = new Set<unknown>();
+  let current: unknown = error;
+
+  while (current && typeof current === "object" && !seen.has(current)) {
+    seen.add(current);
+    const candidate = current as DatabaseErrorLike;
+    if (
+      candidate.code === "23505" &&
+      candidate.constraint === "UQ_vendor_member_active_auth_identity_id"
+    ) {
+      return true;
+    }
+    current = candidate.cause;
+  }
+
+  return false;
+}
+
 export async function POST(req: MedusaRequest, res: MedusaResponse) {
   const reqWithAuth = req as unknown as AuthenticatedReq;
   await assertStaffRole(reqWithAuth.auth_context, "platform_admin", req.scope);
@@ -54,12 +81,23 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     );
   }
 
-  const member = await marketplaceService.createVendorMembers({
-    vendor_id: vendor["id"],
-    auth_identity_id: parseResult.data.auth_identity_id,
-    role: parseResult.data.role,
-    active: true,
-  });
+  let member: Record<string, unknown>;
+  try {
+    member = (await marketplaceService.createVendorMembers({
+      vendor_id: vendor["id"],
+      auth_identity_id: parseResult.data.auth_identity_id,
+      role: parseResult.data.role,
+      active: true,
+    })) as Record<string, unknown>;
+  } catch (error) {
+    if (isActiveVendorMembershipUniqueViolation(error)) {
+      throw new MedusaError(
+        MedusaError.Types.DUPLICATE_ERROR,
+        `Identity ${parseResult.data.auth_identity_id} already has an active vendor membership.`,
+      );
+    }
+    throw error;
+  }
 
   await marketplaceService.createAuditEvents({
     actor_id:

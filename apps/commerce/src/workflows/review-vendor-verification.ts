@@ -32,6 +32,22 @@ export const reviewVendorVerificationStep = createStep(
         `Verification record ${input.verificationId} not found.`,
       );
     }
+    const currentStatus = verification["verification_status"];
+    const allowedTransitions: Record<string, readonly string[]> = {
+      pending: ["verified", "rejected", "suspended"],
+      verified: ["suspended"],
+      rejected: [],
+      suspended: [],
+    };
+    if (
+      typeof currentStatus !== "string" ||
+      !allowedTransitions[currentStatus]?.includes(input.targetStatus)
+    ) {
+      throw new MedusaError(
+        MedusaError.Types.INVALID_DATA,
+        "Недозволений перехід статусу верифікації.",
+      );
+    }
 
     const updated = await marketplaceService.updateVendorVerifications({
       id: verification["id"],

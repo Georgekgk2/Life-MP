@@ -42,7 +42,20 @@ test.describe("Customer Profile & Preferences E2E", () => {
       fullPage: true,
     });
 
-    // 5. Switch to Favorite Workshops tab
+    // 5. Verify order history is a server-backed, fail-closed tab.
+    const ordersTabBtn = page.getByRole("button", {
+      name: /Мої замовлення/i,
+    });
+    await expect(ordersTabBtn).toBeVisible();
+    await ordersTabBtn.click({ force: true });
+    await expect(
+      page.getByRole("heading", { name: "Моя серверна історія замовлень" }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/sandbox-режимі|облікового запису покупця/i),
+    ).toBeVisible();
+
+    // 6. Switch to Favorite Workshops tab
     const workshopsTabBtn = page.getByRole("button", {
       name: /Улюблені майстерні/i,
     });
@@ -52,7 +65,7 @@ test.describe("Customer Profile & Preferences E2E", () => {
     await expect(page.getByText("Майстерня «Глина та Світло»")).toBeVisible();
     await expect(page.getByText("Лляне Ткацтво «Берегиня»")).toBeVisible();
 
-    // 6. Switch to Notifications tab and toggle preferences
+    // 7. Switch to Notifications tab and toggle preferences
     const notifsTabBtn = page.getByRole("button", { name: /Сповіщення/i });
     await expect(notifsTabBtn).toBeVisible();
     await notifsTabBtn.click({ force: true });
@@ -69,7 +82,7 @@ test.describe("Customer Profile & Preferences E2E", () => {
       fullPage: true,
     });
 
-    // 7. Switch to Personal Details tab and edit profile
+    // 8. Switch to Personal Details tab and edit profile
     const detailsTabBtn = page.getByRole("button", { name: /Особисті дані/i });
     await expect(detailsTabBtn).toBeVisible();
     await detailsTabBtn.click({ force: true });

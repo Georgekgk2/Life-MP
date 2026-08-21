@@ -43,7 +43,7 @@
 
 Поточний public API уже обмежує listing visibility значеннями `internal` і `local_demo` (`apps/commerce/src/modules/marketplace/constants.ts:21-22`), а застосунок прямо декларує checkout/payment/fiscalization/shipment як неімплементовані до рішень (`apps/commerce/src/index.ts:1-12`). Ці two guards не можна послаблювати в межах цього плану.
 
-## 2. Вихідні факти і проблеми синхронізації
+## 2. Вихідні факти та проблеми синхронізації
 
 | Факт                                                                                                                               | Доказ                                                                                             | Наслідок для плану                                                                                           |
 | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -55,7 +55,7 @@
 | Документація містить різні зрізи рішення щодо fulfillment і seller model.                                                          | `docs/adr/0008-fulfillment-modes.md:17-39`; `docs/decisions/launch-scope.md:22-57`                | Першим deliverable є canonical capability/decision matrix; жоден ADR не вмикає live integration сам по собі. |
 | Існує ранній серверний snapshot із високим використанням root filesystem, але він застарілий і не є дозволеним discovery evidence. | Наданий замовником transcript від 2026-07-26; `docs/runbooks/production-server-discovery.md:9-19` | Не оцінювати місткість і не планувати remote контейнерні ліміти за цим snapshot.                             |
 
-## 3. Цільова стратегія: contracts first, activation later
+## 3. Цільова стратегія: спочатку контракти, потім активація
 
 ### 3.1 Архітектурне рішення цього плану
 
@@ -86,7 +86,7 @@ Increment дозволено злити лише коли він:
 
 ## 4. Детальний план розробки
 
-### Wave 0 — Canonical decision gates і documentation drift
+### Хвиля 0 — канонічні decision gates і розбіжності документації
 
 **Ціль:** перетворити всі pending рішення на machine-testable capability boundary і прибрати ризик, що старий ADR або scaffold помилково ввімкне функцію.
 
@@ -99,7 +99,7 @@ Increment дозволено злити лише коли він:
 
 **Acceptance:** одна таблиця покриває COM-1…COM-8, LOG-1…LOG-7, CAT-1…CAT-6, services і affiliate; registry відхиляє `enabled` та provider configuration у production-like fixture; всі заблоковані native mutation endpoints повертають `404` для шести actor types без створення native records або egress; `predecision-verification-matrix.md` задає exact commands/tests без allowed skips; `pnpm run ci`, `pnpm run test:integration`, `pnpm run test:migrations` і named storefront E2E command green.
 
-### Wave 1 — Sandbox order-domain core без customer checkout
+### Хвиля 1 — ядро sandbox order-домену без customer checkout
 
 **Ціль:** завершити і перевірити pure domain contracts, не створюючи payment/shipment execution surface.
 
@@ -113,7 +113,7 @@ Increment дозволено злити лише коли він:
 
 **Acceptance:** property/table-driven unit tests покривають усі дозволені й заборонені transitions; integration tests доводять `404` для всіх native mutation endpoints і шести actor types; 100 повторів одного idempotency input не створюють дублікат child draft; financial tables/amount fields не мутуються; migration test створює schema на порожній disposable DB двічі без помилки.
 
-### Wave 2 — Provider adapter contracts і fake implementations
+### Хвиля 2 — контракти provider adapters і fake implementations
 
 **Ціль:** зробити майбутні інтеграції замінними без створення live connection.
 
@@ -126,12 +126,12 @@ Increment дозволено злити лише коли він:
 
 **Acceptance:** fake adapter contract suite green; failure matrix охоплює timeout, duplicate event, permanent reject і retryable reject; sandbox test harness блокує всі outbound socket/DNS attempts і fail'ить при першій спробі; snapshot/log tests доводять відсутність secrets/PII; config fixture відхиляє provider URL, proxy, account ID, credential і webhook configuration.
 
-### Wave 3 — Vendor verification, documents і claim moderation hardening
+### Хвиля 3 — посилення vendor verification, documents і claim moderation
 
 **Ціль:** довести compliance workflow до стану, в якому можна швидко підключити справжнього вендора після RACI та document matrix, не завантажуючи його дані зараз.
 **Runtime boundary:** до CAT-1…CAT-5 усі runtime write/review/publication routes для `VendorVerification`, `ComplianceDocument` і `ProductClaim` повертають `404` для всіх non-test actors. Дані можуть створюватися лише test factory або deterministic synthetic seed у local/test environment. Claim із `regulated=true` publication-blocked незалежно від reviewer status і не повертається жодним public або vendor API.
 
-1. Перевірити й закрити переходи `VendorVerification`, `ComplianceDocument` і `ProductClaim` відповідно до ADR 0007 (`docs/adr/0007-vendor-verification-and-compliance.md:19-42`).
+1. Перевірити й закрити переходи `VendorVerification`, `ComplianceDocument` і `ProductClaim` відповідно до ADR 0012 (`docs/adr/0012-vendor-verification-and-compliance.md`); попередній номер 0007 був дубльований і виправлений.
 2. Винести policy interface `RequiredEvidencePolicy`: input — category/claim/fulfillment metadata; output — required document types, expiry requirement, reviewer role і publication blocker. Початкова реалізація повертає лише synthetic/local_demo policy, не «правила України за замовчуванням».
 3. Використовувати sealed test fixtures для документів: MIME, extension, size, malformed file, expired record, missing relation, duplicate hash; не додавати реальні сертифікати або будь-які фото документів.
 4. Зробити upload boundary allowlist-based: MIME, розмір, extension, checksum, object-key isolation, download authorization, malware-scan status `pending|clean|rejected`. Для `pending` і `rejected` application не віддає file bytes, preview, signed URL або object-storage redirect жодному actor'у, включно з platform admin/reviewer; доступні лише sanitized metadata. Download/preview можливі лише для `clean` synthetic test objects після object-level authorization. Справжній scanner adapter — окремий future integration.
@@ -140,7 +140,7 @@ Increment дозволено злити лише коли він:
 
 **Acceptance:** HTTP integration suite доводить `404` для write/review/publication routes всіх non-test actors, tenant isolation, reviewer authorization, malformed/oversize/expired refusal, immutable audit trail, відсутність public download і `403`/`404` для pending/rejected bytes; unit suite покриває policy matrix; E2E перевіряє, що unverified badges і regulated claims не видно у public catalog.
 
-### Wave 4 — Catalog, search і storefront quality без комерційних CTA
+### Хвиля 4 — якість catalog, search і storefront без комерційних CTA
 
 **Ціль:** зробити UX і catalog contract готовими до реальних даних, зберігаючи fixture/Medusa seam та нуль транзакційних обіцянок.
 
@@ -153,7 +153,7 @@ Increment дозволено злити лише коли він:
 
 **Acceptance:** public DTO contract tests захищають fixtures і Medusa response; E2E працює для fixtures і mocked Medusa; Lighthouse/axe-equivalent automated accessibility suite не має critical violations на тестованих catalog pages; UI tests підтверджують відсутність checkout/payment/shipment CTA.
 
-### Wave 5 — Security, privacy і auditability
+### Хвиля 5 — security, privacy та auditability
 
 **Ціль:** закрити те, що не залежить від комерційної моделі, перш ніж у систему потраплять справжні дані.
 
@@ -166,7 +166,7 @@ Increment дозволено злити лише коли він:
 
 **Acceptance:** authorization negative suite охоплює горизонтальну та вертикальну ескалацію; PII test corpus не з’являється в captured logs/audit/error payloads; CI fail'иться на high runtime advisory або змінах lockfile без frozen install; all security defaults тестовані у production-like config without real secrets.
 
-### Wave 6 — Observability і operational readiness у коді
+### Хвиля 6 — observability і operational readiness у коді
 
 **Ціль:** підготувати runtime до безпечної діагностики, не підключаючи production monitoring vendor.
 
@@ -178,7 +178,7 @@ Increment дозволено злити лише коли він:
 
 **Acceptance:** health route snapshot не містить secret/host/path/stack trace; failure tests не допускають uncaught promise, PII leakage або false `ready`; structured-log schema tests green; runbook має owner, escalation і evidence collection boundary.
 
-### Wave 7 — Data, migrations і local recovery rehearsal
+### Хвиля 7 — data, migrations і local recovery rehearsal
 
 **Ціль:** зробити schema evolution передбачуваною, не торкаючись remote data.
 
@@ -190,7 +190,7 @@ Increment дозволено злити лише коли він:
 
 **Acceptance:** `pnpm run test:migrations` green on clean and rerun cases; local recovery rehearsal has a documented checksum/data-count assertion and proves no remote endpoint is contacted; migration change PR cannot merge without compatibility note and updated test.
 
-### Wave 8 — Reproducible container artifacts, але не remote deployment
+### Хвиля 8 — відтворювані container artifacts, але не remote deployment
 
 **Ціль:** підготувати codebase до окремих контейнерів без створення/зміни контейнерів на сервері.
 
@@ -203,7 +203,7 @@ Increment дозволено злити лише коли він:
 
 **Acceptance:** local image build and smoke test are reproducible from pre-fetched artifacts with application network disabled; runtime images contain no `.env`, SSH key, backup, test report or source map unless expressly approved; local compose config validation passes; an attempted production-mode start with local sentinel values fails, matching `apps/commerce/medusa-config.ts:16-28`; no remote topology/configuration is created or asserted.
 
-### Wave 9 — CI quality gates and test economics
+### Хвиля 9 — CI quality gates та економіка тестів
 
 **Ціль:** зробити кожен previous wave continuously verifiable before external decisions arrive.
 
@@ -216,7 +216,7 @@ Increment дозволено злити лише коли він:
 
 **Acceptance:** `predecision-verification-matrix.md` names the exact job/command/fixture for every core deliverable; every pre-decision application lane runs with network disabled and pre-fetched artifacts, while the separately documented supply-chain governance lane executes no application/adapter code; failed job artifacts contain no known secret/PII test markers; no quality gate is disabled or skipped to make a PR pass.
 
-### Wave 10 — Authorized server-discovery and isolated hosting gate
+### Хвиля 10 — authorized server-discovery та isolated hosting gate
 
 **Ціль:** зафіксувати зовнішню умову для майбутнього оцінювання сервера. Wave 10 не є development work, не є дозволом на підключення та не створює remote hosting design.
 
@@ -228,7 +228,7 @@ Increment дозволено злити лише коли він:
 
 **Acceptance:** accepted sanitized discovery template за `production-server-discovery.md:85-92` означає лише одне з двох рішень: `host unsuitable` або `further infrastructure design may be proposed`. Remote provisioning, включно з non-production sandbox, не входить до цього плану; воно потребує окремої письмової авторизації та isolated-infrastructure review. Production provisioning додатково заблоковане до прийняття всіх named external evidence gates, CAT-6, post-discovery infrastructure-design і provisioning authorization.
 
-### Wave 11 — Post-decision activation packs (not executable now)
+### Хвиля 11 — activation packs після рішень (зараз не виконуються)
 
 Create a short, reviewable activation PR only after each named external evidence gate is satisfied:
 
@@ -249,7 +249,7 @@ Each pack must contain a decision reference, migration compatibility note, expli
 
 Поки такого документа, окремої авторизації та всіх production evidence gates немає, жоден remote container, registry login, migration, Compose operation, domain/TLS change чи deployment не виконується.
 
-## 6. Execution order and ownership
+## 6. Порядок виконання та власність
 
 | Order | Deliverable                                           | External dependency                                                     | Suggested owner                  | Merge gate                                                                                 |
 | ----- | ----------------------------------------------------- | ----------------------------------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -267,7 +267,7 @@ Each pack must contain a decision reference, migration compatibility note, expli
 
 Work must follow one vertical slice per PR: contract/schema → implementation → focused test → named commands from `predecision-verification-matrix.md` → commit. Remote provisioning is excluded from every pre-decision development slice.
 
-## 7. Verification matrix
+## 7. Матриця перевірок
 
 | Layer        | Mandatory proof before merge                                                                                                                           | Failure condition                                                                                                                      |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
@@ -280,7 +280,7 @@ Work must follow one vertical slice per PR: contract/schema → implementation �
 | CI/artifacts | Exact jobs from `predecision-verification-matrix.md`; app lanes are hermetic and supply-chain governance is isolated                                   | Disabled/skipped gate, app code in governance lane, egress in app lane, uploaded secret/DB/browser storage or mutable/published image. |
 | Hosting      | External evidence gate only: authorized sanitized discovery result                                                                                     | It is not a merge or completion gate; any remote action lacks separate authorization.                                                  |
 
-## 8. Risks and mitigations
+## 8. Ризики та заходи зменшення
 
 | Risk                                                     | Prevention / mitigation                                                                                                          |
 | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
@@ -293,7 +293,7 @@ Work must follow one vertical slice per PR: contract/schema → implementation �
 | Irreversible migration blocks rollback                   | Additive migrations, compatibility notes, test reruns, immutable image rollback, recovery separated from release rollback.       |
 | Scope creep into CMS/affiliate/services                  | Capability matrix and CI tests enforce disabled routes and copy; separate ADR/change pack required.                              |
 
-## 9. Completion definition for this plan
+## 9. Визначення завершення цього плану
 
 Pre-decision code completion is limited to Waves 0–9. Wave 10 is an external-evidence gate, and all remote provisioning is out of scope. Completion requires Waves 0–9 accepted with the exact named checks green, all externally dependent capabilities disabled, and the capability matrix demonstrating a named activation pack for every pending decision. It does **not** mean the marketplace is ready for commercial launch.
 

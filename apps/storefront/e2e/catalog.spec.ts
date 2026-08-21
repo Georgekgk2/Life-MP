@@ -56,6 +56,11 @@ test.describe("Catalog E2E & Visual Artifacts", () => {
       path: path.join(screenshotsDir, `category-${testInfo.project.name}.png`),
       fullPage: true,
     });
+    // 4. Product detail must not make payment, escrow, delivery, or payout claims.
+    await page.goto("/catalog/odiah/futbolka-svitlo");
+    await expect(page.locator("h1")).toContainText("Футболка «Світло»");
+    await expect(page.getByText("Некомерційний sandbox")).toBeVisible();
+    await expect(page.getByText("Кошти зарезервовано")).toHaveCount(0);
   });
 
   test("skip link moves focus to #main-content", async ({ page }) => {

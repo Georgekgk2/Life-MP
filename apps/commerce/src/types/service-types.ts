@@ -1,3 +1,8 @@
+import type {
+  SyntheticOrderCreateInput,
+  SyntheticOrderCreateResult,
+} from "../modules/marketplace/customer-orders.js";
+
 export type AuthenticatedReq = {
   auth_context?: {
     actor_id?: string;
@@ -5,7 +10,35 @@ export type AuthenticatedReq = {
   };
 };
 
+export type ProductReviewModerationInput = {
+  reviewId: string;
+  reviewerId: string;
+  targetStatus: "approved" | "rejected";
+  rationale: string;
+  correlationId?: string | null;
+};
+
+export type ProductReviewModerationResult =
+  | {
+      conflict: true;
+    }
+  | {
+      review: Record<string, unknown>;
+      decision: Record<string, unknown>;
+    };
+
 export type MarketplaceServiceType = {
+  moderateProductReview: (
+    input: ProductReviewModerationInput,
+    sharedContext?: unknown,
+  ) => Promise<ProductReviewModerationResult>;
+  createSyntheticOrder: (
+    input: SyntheticOrderCreateInput,
+    sharedContext?: unknown,
+  ) => Promise<SyntheticOrderCreateResult>;
+  listParentOrders: (
+    query: Record<string, unknown>,
+  ) => Promise<Record<string, unknown>[]>;
   listVendors: (
     query: Record<string, unknown>,
   ) => Promise<Record<string, unknown>[]>;

@@ -10,10 +10,12 @@ WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps/commerce/package.json ./apps/commerce/
+COPY apps/storefront/package.json ./apps/storefront/
+COPY apps/cms/package.json ./apps/cms/
 COPY packages/types/package.json ./packages/types/
 COPY packages/config/package.json ./packages/config/
 
-RUN pnpm install --frozen-lockfile --filter @life/commerce...
+RUN pnpm install --frozen-lockfile
 
 # --- Stage 2: Build ---
 FROM node:22-alpine AS builder
@@ -39,6 +41,8 @@ RUN addgroup --system --gid 1001 nodejs && \
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV TS_NODE_TRANSPILE_ONLY=true
+ENV NODE_PATH=/app/node_modules:/app/apps/commerce/node_modules
 ENV MEDUSA_DISABLE_ADMIN=true
 ENV PORT=9000
 ENV HOSTNAME=0.0.0.0

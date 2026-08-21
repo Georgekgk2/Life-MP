@@ -1,108 +1,179 @@
-# Посібник розробника: Локальне середовище ЛАЙФ (Local Development Runbook)
+# Посібник розробника: локальне середовище «ЛАЙФ»
 
-## 1. Загальний огляд та архітектурні межі
+- **Дата огляду:** 2026-08-21
+- **Власник:** технічний власник Life-MP
+- **Середовище:** лише локальне development/test
+- **Не є:** staging, production, live payment або реальний carrier-контур
 
-Локальне середовище розробки маркетплейсу «ЛАЙФ» побудоване на базі **Node.js 22, pnpm 11.4 та Docker Compose**.
+## 1. Архітектурні межі
 
-Сервіси баз даних (PostgreSQL 16, Redis 7, Meilisearch) запускаються в Docker-контейнерах виключно на локальному loopback-інтерфейсі `127.0.0.1`. Storefront (`apps/storefront`) та Commerce Backend (`apps/commerce`) працюють локально на робочій станції розробника.
+Локальна інфраструктура запускає Docker Compose з PostgreSQL 16, Redis 7 і Meilisearch. Усі порти прив’язані до loopback:
 
----
+| Сервіс        | Адреса            | Призначення                                    |
+| ------------- | ----------------- | ---------------------------------------------- |
+| PostgreSQL 16 | `127.0.0.1:54329` | Локальні Medusa development/test databases     |
+| Redis 7       | `127.0.0.1:56379` | Локальний cache/queue контур                   |
+| Meilisearch   | `127.0.0.1:7700`  | Локальний експериментальний search service     |
+| Commerce      | `127.0.0.1:9000`  | Medusa development server, запускається окремо |
+| Storefront    | `127.0.0.1:3100`  | Next.js development server                     |
 
-## 2. Швидкий старт (Quick Start)
+Compose не запускає прикладні застосунки. Він не є staging або production topology.
 
-### 2.1. Встановлення залежностей
+## 2. Передумови
 
 ```bash
 corepack enable
+pnpm --version
+node --version
 pnpm install
 ```
 
-### 2.2. Запуск інфраструктури (PostgreSQL, Redis, Meilisearch)
+Не створюйте `.env` із production secrets. Для локальних commerce wrapper-ів використовується безсекретний `.env.example`; його sentinel-значення не можна використовувати поза локальним контуром.
+
+## 3. Запуск локальних сервісів
 
 ```bash
 make dev-infra-up
 make dev-infra-wait
-```
-
-- **PostgreSQL 16:** `127.0.0.1:54329`
-- **Redis 7:** `127.0.0.1:56379`
-- **Meilisearch:** `127.0.0.1:7700`
-
-### 2.3. Ініціалізація баз даних та міграцій
-
-```bash
 make db-bootstrap
+```
+
+Якщо canonical порти вже зайняті іншим Compose-проєктом, не видаляйте чужі контейнери або volumes. Спочатку визначте власника порту та використовуйте ізольований профіль лише після окремого погодження.
+
+Перевірка конфігурації без запуску:
+
+```bash
+docker compose --env-file .env.example -f docker-compose.dev.yml config --quiet
+```
+
+Зупинка без видалення даних:
+
+```bash
+make dev-infra-down
+```
+
+Команди `make db-reset`, `make docker-clean`, `make db-restore` і `test-fresh-state` є локальними руйнівними операціями. Виконуйте їх лише з явним погодженням і після перевірки, що target — саме цей репозиторій.
+
+## 4. Міграція та синтетичний seed Commerce
+
+```bash
 scripts/with-local-commerce-env.sh pnpm --filter @life/commerce run db:migrate
-ALLOW_SYNTHETIC_CATALOG=true scripts/with-local-commerce-env.sh pnpm --filter @life/commerce run seed
+ALLOW_SYNTHETIC_CATALOG=true \
+  scripts/with-local-commerce-env.sh pnpm --filter @life/commerce run seed
 ```
 
----
+Правила:
 
-## 3. Запуск застосунків
+- wrapper підставляє `NODE_ENV=development` і локальні database/Redis URLs;
+- seed відхиляється без `ALLOW_SYNTHETIC_CATALOG=true`;
+- `ALLOW_SYNTHETIC_ORDERS` і `ALLOW_SYNTHETIC_REVIEWS` вмикайте лише для відповідного test сценарію;
+- seed не додає реальні товари, документи, payment records або vendor credentials.
 
-### 3.1. Вітрина Storefront (Next.js 16)
+## 5. Запуск застосунків
+
+### 5.1. Commerce (Medusa, бекенд)
+
+У терміналі A:
 
 ```bash
-# Автономний режим зі статичними даними та PWA:
-pnpm --filter @life/storefront dev --port 3100
-
-# Режим з інтеграцією Medusa API:
-CATALOG_SOURCE=medusa MEDUSA_BACKEND_URL=http://127.0.0.1:9000 pnpm --filter @life/storefront dev --port 3100
+scripts/with-local-commerce-env.sh \
+  pnpm --filter @life/commerce run dev
 ```
 
-- **URL Вітрини:** [http://127.0.0.1:3100](http://127.0.0.1:3100)
-- **Web App Manifest:** [http://127.0.0.1:3100/manifest.webmanifest](http://127.0.0.1:3100/manifest.webmanifest)
-- **Кабінет модератора:** [http://127.0.0.1:3100/moderation](http://127.0.0.1:3100/moderation)
-- **Кабінет покупця:** [http://127.0.0.1:3100/profile](http://127.0.0.1:3100/profile)
-- **Подача товару майстром:** [http://127.0.0.1:3100/vendor/products/new](http://127.0.0.1:3100/vendor/products/new)
-- **Оформлення замовлення:** [http://127.0.0.1:3100/checkout](http://127.0.0.1:3100/checkout)
-- **Трекінг та Escrow-симулятор:** [http://127.0.0.1:3100/orders/LF-20260819-1001](http://127.0.0.1:3100/orders/LF-20260819-1001)
-
-### 3.2. Бекенд Commerce (Medusa v2)
+Перевірки:
 
 ```bash
-scripts/with-local-commerce-env.sh pnpm --filter @life/commerce run dev
+curl -i http://127.0.0.1:9000/store/catalog
 ```
 
-- **URL Medusa API:** [http://127.0.0.1:9000](http://127.0.0.1:9000)
-- **Публічний каталог:** `GET http://127.0.0.1:9000/store/catalog`
+`GET /store/catalog` може повернути синтетичний каталог лише у дозволеному development/test контурі. Для production відсутність explicit guard не повинна перетворюватися на fixtures fallback.
 
----
+### 5.2. Storefront за замовчуванням
 
-## 4. Набір перевірок якості та автоматизовані тести
-
-### 4.1. Локальна валідація всього монорепозиторію
+У терміналі B:
 
 ```bash
-pnpm format:check       # Перевірка форматування коду Prettier
-pnpm lint               # Статичний аналіз ESLint
-pnpm typecheck          # Строга перевірка типів TypeScript
-pnpm test               # 48 юніт-тестів Vitest
-pnpm build              # Збірка всіх пакетів та App Router
-node scripts/verify-deployment-containment.mjs # Перевірка політики безпеки
+pnpm --filter @life/storefront dev
 ```
 
-### 4.2. Наскрізні Playwright E2E тести (28 тестів)
+Адреса: [http://127.0.0.1:3100](http://127.0.0.1:3100).
+
+За замовчуванням `CATALOG_SOURCE=fixtures`; це локальна демонстраційна вітрина.
+
+### 5.3. Storefront із локальним Medusa catalog
 
 ```bash
+CATALOG_SOURCE=medusa \
+MEDUSA_BACKEND_URL=http://127.0.0.1:9000 \
+ALLOW_SYNTHETIC_CATALOG=true \
+NODE_ENV=development \
+pnpm --filter @life/storefront dev
+```
+
+У цьому режимі публічна вітрина читає лише дозволений synthetic catalog. Відсутній backend або недійсна відповідь дає безпечний unavailable/empty result, а не непомітний production fallback.
+
+## 6. Важливі локальні маршрути
+
+- `/catalog` — каталог;
+- `/profile` — локальний профіль і sandbox customer view;
+- `/vendor/dashboard` — локальний vendor UI;
+- `/moderation` — локальний moderation UI;
+- `/checkout` — draft-only checkout UX;
+- `/checkout/success` — draft result без реальної оплати;
+- `/orders/[orderNumber]` — sandbox/demo tracking view.
+
+Наявність цих сторінок не доводить створення бойового order, payment, shipment, fiscal receipt або payout.
+
+## 7. Перевірки якості
+
+```bash
+pnpm docs:check
+pnpm format:check
+pnpm lint
+pnpm build:packages
+pnpm typecheck
+pnpm test
+pnpm build
+pnpm run ci
+```
+
+Перевірка containment і Compose:
+
+```bash
+node scripts/verify-deployment-containment.mjs
+docker compose --env-file .env.example -f docker-compose.dev.yml config --quiet
+```
+
+Інтеграційні перевірки Commerce:
+
+```bash
+make test-integration
+make test-migrations
+```
+
+Свіжі результати потрібно фіксувати разом із commit/worktree, датою, командою та exit status. Числа тестів у документах є inventory, а не автоматичною заявою про pass.
+
+Playwright:
+
+```bash
+pnpm --filter @life/storefront exec playwright install chromium
 pnpm --filter @life/storefront run test:e2e
 ```
 
-Покриває:
-
-1. Завантаження каталогу та інваріанти некомерційного режиму (`catalog.spec.ts`).
-2. Мультивендорний кошик, чекаут, спліт замовлень та Escrow-виплати Нової Пошти (`checkout-and-escrow.spec.ts`).
-3. Історії майстрів та динамічні події з розкладом (`community.spec.ts`).
-4. Дворівневий кабінет модератора для анкет та товарів (`moderation.spec.ts`).
-5. Кабінет покупця з 4 розділами та налаштуваннями сповіщень (`profile.spec.ts`).
-6. Progressive Web App: Manifest, Service Worker та бренд-іконки (`pwa.spec.ts`).
-7. Список бажань (Wishlist) та онбординг майстерень (`saved-and-artisan.spec.ts`).
-8. Швидкий пошук (Cmd+K), українська морфологія, синоніми та автокомпліт (`search.spec.ts`).
-9. Подача товарів майстрами з live-прев'ю картки (`vendor-product.spec.ts`).
-
-### 4.3. Інтеграційні тести бекенду Medusa
+## 8. Безпечне завершення
 
 ```bash
-make test-integration   # 7 HTTP тестів авторизації, комплаєнсу та модерації
-make test-migrations    # 2 тести ідемпотентності міграцій PostgreSQL
+make dev-infra-down
 ```
+
+Не використовуйте `docker system prune`, `docker volume rm` або видалення чужих контейнерів без окремого explicit approval. Локальні volumes можуть містити дані іншого проєкту.
+
+## 9. Межа доказу
+
+Успішний локальний запуск доводить лише працездатність конкретного локального сценарію. Він не доводить:
+
+- production readiness або staging readiness;
+- юридичну модель продавця, фіскалізацію чи платіжний договір;
+- роботу бойової Нової Пошти або реальних webhook-ів;
+- ізольованість віддаленого сервера;
+- відсутність вразливостей у неперевіреному commit або зовнішній інфраструктурі.

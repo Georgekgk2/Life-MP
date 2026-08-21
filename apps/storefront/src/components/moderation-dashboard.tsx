@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { categoryOptions } from "../schema/artisan-application";
 import { vendorCategoryOptions } from "../schema/vendor-product";
+import { formatHryvnia } from "@/formatters";
 
 export type ApplicationStatus =
   "pending" | "under_review" | "approved" | "rejected";
@@ -42,12 +43,6 @@ export type SubmittedProductRecord = Readonly<{
   reviewedAt?: string | null;
   createdAt: string;
 }>;
-
-const hryvniaFormatter = new Intl.NumberFormat("uk-UA", {
-  style: "currency",
-  currency: "UAH",
-  maximumFractionDigits: 0,
-});
 
 const initialDemoApplications: readonly ArtisanApplicationRecord[] = [
   {
@@ -1117,7 +1112,7 @@ export function ModerationDashboard() {
                             color: "var(--color-primary-strong)",
                           }}
                         >
-                          {hryvniaFormatter.format(prod.priceUah)}
+                          {formatHryvnia(prod.priceUah)}
                         </span>
                         <button
                           type="button"
@@ -1372,7 +1367,7 @@ export function ModerationDashboard() {
               }}
             >
               Майстерня: {activeModalProd.workshopName} • Ціна:{" "}
-              {hryvniaFormatter.format(activeModalProd.priceUah)}
+              {formatHryvnia(activeModalProd.priceUah)}
             </p>
 
             <div className="form-group" style={{ marginBottom: "1.25rem" }}>

@@ -3,12 +3,7 @@
 import Link from "next/link";
 import { EmptyState, SectionHeading } from "@/components";
 import { useSaved } from "@/context/saved-context";
-
-const hryvniaFormatter = new Intl.NumberFormat("uk-UA", {
-  style: "currency",
-  currency: "UAH",
-  maximumFractionDigits: 0,
-});
+import { formatHryvnia } from "@/formatters";
 
 export default function SavedPage() {
   const { savedItems, removeItem, clearSaved, isHydrated } = useSaved();
@@ -94,7 +89,7 @@ export default function SavedPage() {
                   </h3>
                   <div className="card__meta">
                     <data value={item.priceUah}>
-                      {hryvniaFormatter.format(item.priceUah)}
+                      {formatHryvnia(item.priceUah)}
                     </data>
                     <div
                       className="badge-group"

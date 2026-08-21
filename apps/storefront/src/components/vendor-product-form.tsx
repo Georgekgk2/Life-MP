@@ -7,14 +7,9 @@ import {
   vendorProductSchema,
   type VendorProductInput,
 } from "../schema/vendor-product";
+import { formatHryvnia } from "@/formatters";
 
 type FormErrors = Partial<Record<keyof VendorProductInput, string>>;
-
-const hryvniaFormatter = new Intl.NumberFormat("uk-UA", {
-  style: "currency",
-  currency: "UAH",
-  maximumFractionDigits: 0,
-});
 
 export function VendorProductForm() {
   const [formData, setFormData] = useState<{
@@ -195,7 +190,7 @@ export function VendorProductForm() {
               </p>
               <div className="card__meta">
                 <data value={submittedProduct.priceUah}>
-                  {hryvniaFormatter.format(submittedProduct.priceUah)}
+                  {formatHryvnia(submittedProduct.priceUah)}
                 </data>
                 <div
                   className="badge-group"

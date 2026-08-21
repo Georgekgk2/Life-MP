@@ -10,6 +10,7 @@ type ListingRow = Record<string, unknown> & {
   title?: string;
   description?: string;
   synthetic?: boolean;
+  price_uah?: number | null;
   claims?: Array<{
     claim_type: string;
     review_status: string;
@@ -45,6 +46,7 @@ export function mapPublicCatalog(
 ): StorefrontCatalogSnapshot {
   const categoryMap = new Map<string, StorefrontCatalogCategory>();
   const products: StorefrontCatalogProduct[] = [];
+  const usedCategorySlugs = new Set<string>();
 
   for (const listing of listings) {
     const vendor = vendorMap.get(listing.vendor_id) || {
@@ -76,16 +78,28 @@ export function mapPublicCatalog(
 
     const variants = product["variants"] as
       { prices?: VariantPrice[] }[] | undefined;
-    const variant = variants?.[0];
-    const uahPriceObj = variant?.prices?.find(
-      (p) => p.currency_code?.toLowerCase() === "uah",
-    ) || { amount: 0 };
+    const uahPriceObj = variants
+      ?.flatMap((variant) => variant.prices || [])
+      .find((p) => p.currency_code?.toLowerCase() === "uah");
+    const variantMinorAmount =
+      typeof uahPriceObj?.amount === "number" &&
+      Number.isSafeInteger(uahPriceObj.amount) &&
+      uahPriceObj.amount >= 0
+        ? uahPriceObj.amount
+        : null;
 
-    const rawMinorAmount = uahPriceObj.amount ?? 0;
+    const listingPriceUah =
+      typeof listing.price_uah === "number" &&
+      Number.isSafeInteger(listing.price_uah) &&
+      listing.price_uah >= 0
+        ? listing.price_uah
+        : null;
+    const rawMinorAmount =
+      listingPriceUah === null ? variantMinorAmount : listingPriceUah * 100;
 
-    if (rawMinorAmount % 100 !== 0) {
+    if (rawMinorAmount === null || rawMinorAmount % 100 !== 0) {
       console.warn(
-        `[mapPublicCatalog] Rejected product ${product["id"] || listing.id}: UAH amount ${rawMinorAmount} is not divisible by 100.`,
+        `[mapPublicCatalog] Rejected product ${product["id"] || listing.id}: відсутня валідна ціна UAH.`,
       );
       continue;
     }
@@ -139,11 +153,14 @@ export function mapPublicCatalog(
     };
 
     products.push(productItem);
+    usedCategorySlugs.add(catSlug);
   }
 
   return {
     source: "medusa",
-    categories: Array.from(categoryMap.values()),
+    categories: Array.from(categoryMap.values()).filter((category) =>
+      usedCategorySlugs.has(category.slug),
+    ),
     products,
   };
 }

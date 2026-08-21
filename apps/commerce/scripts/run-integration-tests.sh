@@ -6,6 +6,6 @@ for spec in integration-tests/http/*.spec.ts; do
     echo "=================================================="
     echo "Running integration test file: $spec"
     echo "=================================================="
-    npx jest "$spec"
+    npx jest "$spec" --runInBand
   fi
 done

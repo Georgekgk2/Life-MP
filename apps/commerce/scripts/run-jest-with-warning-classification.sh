@@ -24,8 +24,17 @@ const outputPath = process.argv[2];
 const output = fs.readFileSync(outputPath, "utf8");
 const expected = "Connection Error: Connection ended unexpectedly";
 const lines = output.split(/\r?\n/);
-const connectionErrors = lines.filter((line) => line.includes("Connection Error:"));
-const unexpected = connectionErrors.filter((line) => !line.includes(expected));
+const normalize = (line) =>
+  line.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, "").trim();
+const connectionLogs = lines.filter((line) =>
+  line.includes("Connection Error:"),
+);
+const expectedConnectionLogs = connectionLogs.filter(
+  (line) => normalize(line) === expected,
+);
+const unexpected = connectionLogs.filter(
+  (line) => normalize(line) !== expected,
+);
 
 if (unexpected.length > 0) {
   console.error(
@@ -35,7 +44,7 @@ if (unexpected.length > 0) {
 }
 
 console.log(
-  `[commerce-test] Classified ${connectionErrors.length} expected Medusa database-reset log(s); no unexpected connection logs.`,
+  `[commerce-test] Classified ${expectedConnectionLogs.length} expected Medusa database-reset log(s); no unexpected connection logs.`,
 );
 NODE
 

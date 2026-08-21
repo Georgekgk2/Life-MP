@@ -37,6 +37,22 @@ export default defineMiddlewares({
       ],
     },
     {
+      matcher: "/store/customer/*",
+      middlewares: [
+        authenticate("customer", ["session", "bearer"], {
+          allowUnregistered: false,
+        }),
+        (req, _res, next) => {
+          assertMarketplaceCoreLocalMode();
+          if (req.body && typeof req.body === "object") {
+            (req as unknown as { sanitizedLogBody: unknown }).sanitizedLogBody =
+              sanitizeLogPayload(req.body as Record<string, unknown>);
+          }
+          next();
+        },
+      ],
+    },
+    {
       matcher: "/store/*",
       middlewares: [
         (req, res, next) => {
@@ -68,14 +84,28 @@ export default defineMiddlewares({
               targetPath === "/artisan-applications" ||
               targetPath.endsWith("/artisan-applications"));
 
-          if (isCatalogGet || isArtisanApplicationPost) {
+          const isCustomerOrderOrReviewRoute =
+            targetPath === "/store/customer/orders" ||
+            targetPath.startsWith("/store/customer/orders/") ||
+            targetPath.startsWith("/store/customer/order-lines/");
+
+          const isPublicProductReviewsGet =
+            req.method === "GET" &&
+            /^\/store\/catalog\/products\/[^/]+\/reviews$/.test(targetPath);
+
+          if (
+            isCatalogGet ||
+            isArtisanApplicationPost ||
+            isCustomerOrderOrReviewRoute ||
+            isPublicProductReviewsGet
+          ) {
             return next();
           }
 
           return res.status(404).json({
             type: "not_found",
             message:
-              "Native Store APIs (products, categories, cart, checkout) are disabled per launch scope boundaries.",
+              "Стандартні Store API (товари, категорії, кошик, оформлення) вимкнено відповідно до меж запуску.",
           });
         },
       ],

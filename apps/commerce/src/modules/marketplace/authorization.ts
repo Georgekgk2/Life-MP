@@ -1,7 +1,7 @@
 import { MedusaError } from "@medusajs/framework/utils";
 import { MARKETPLACE_MODULE } from "./constants";
 
-type AuthContextInput = {
+export type AuthContextInput = {
   actor_id?: string;
   auth_identity_id?: string;
 };
@@ -9,6 +9,36 @@ type AuthContextInput = {
 type ContainerScope = {
   resolve: (key: string) => unknown;
 };
+
+function requireActorId(authContext: AuthContextInput | undefined): string {
+  const actorId = authContext?.actor_id;
+  if (!actorId) {
+    throw new MedusaError(
+      MedusaError.Types.UNAUTHORIZED,
+      "Потрібна автентифікація покупця.",
+    );
+  }
+  return actorId;
+}
+
+function requireAuthIdentityId(
+  authContext: AuthContextInput | undefined,
+): string {
+  const authIdentityId = authContext?.auth_identity_id;
+  if (!authIdentityId) {
+    throw new MedusaError(
+      MedusaError.Types.UNAUTHORIZED,
+      "Відсутній контекст auth identity.",
+    );
+  }
+  return authIdentityId;
+}
+
+export function resolveAuthenticatedActorId(
+  authContext: AuthContextInput | undefined,
+): string {
+  return requireActorId(authContext);
+}
 
 type VendorMemberRecord = {
   id: string;
@@ -35,7 +65,7 @@ export function assertMarketplaceCoreLocalMode(): void {
   if (env !== "development" && env !== "test") {
     throw new MedusaError(
       MedusaError.Types.NOT_ALLOWED,
-      "Marketplace private core routes are rejected in production mode.",
+      "Приватні маршрути marketplace core заборонені в production-режимі.",
     );
   }
 }
@@ -44,26 +74,19 @@ export async function resolveVendorMembershipFromAuthContext(
   authContext: AuthContextInput | undefined,
   container: ContainerScope,
 ): Promise<VendorMemberRecord> {
-  const actorId = authContext?.actor_id || authContext?.auth_identity_id;
-  if (!actorId) {
-    throw new MedusaError(
-      MedusaError.Types.UNAUTHORIZED,
-      "Missing authenticated identity context.",
-    );
-  }
-
+  const authIdentityId = requireAuthIdentityId(authContext);
   const marketplaceService = container.resolve(MARKETPLACE_MODULE) as {
     listVendorMembers: (query: Record<string, unknown>) => Promise<unknown[]>;
   };
   const [member] = (await marketplaceService.listVendorMembers({
-    auth_identity_id: actorId,
+    auth_identity_id: authIdentityId,
     active: true,
   })) as VendorMemberRecord[];
 
   if (!member) {
     throw new MedusaError(
       MedusaError.Types.NOT_ALLOWED,
-      "Authenticated identity has no active vendor membership.",
+      "Автентифікована auth identity не має активного членства майстерні.",
     );
   }
 
@@ -85,7 +108,7 @@ export async function assertVendorListingAccess(
   if (!listing || listing.vendor_id !== membership.vendor_id) {
     throw new MedusaError(
       MedusaError.Types.NOT_FOUND,
-      `Listing with id ${listingId} not found for current vendor.`,
+      `Виріб каталогу з ідентифікатором ${listingId} не знайдено для поточної майстерні.`,
     );
   }
 
@@ -97,13 +120,7 @@ export async function assertStaffRole(
   requiredRole: "platform_admin" | "compliance_reviewer",
   container: ContainerScope,
 ): Promise<StaffAssignmentRecord> {
-  const userId = authContext?.actor_id || authContext?.auth_identity_id;
-  if (!userId) {
-    throw new MedusaError(
-      MedusaError.Types.UNAUTHORIZED,
-      "Missing authenticated user context.",
-    );
-  }
+  const userId = requireActorId(authContext);
 
   const marketplaceService = container.resolve(MARKETPLACE_MODULE) as {
     listStaffRoleAssignments: (
@@ -117,7 +134,7 @@ export async function assertStaffRole(
   if (!assignment) {
     throw new MedusaError(
       MedusaError.Types.NOT_ALLOWED,
-      `User ${userId} has no staff role assigned.`,
+      `Для користувача ${userId} не призначено роль staff.`,
     );
   }
 
@@ -127,7 +144,7 @@ export async function assertStaffRole(
   ) {
     throw new MedusaError(
       MedusaError.Types.NOT_ALLOWED,
-      `User requires ${requiredRole} staff role.`,
+      `Для користувача потрібна роль ${requiredRole}.`,
     );
   }
 
@@ -139,19 +156,20 @@ export async function assertReviewerMayDecide(
   listing: ListingRecord,
   container: ContainerScope,
 ): Promise<void> {
-  const reviewerId = authContext?.actor_id || authContext?.auth_identity_id;
-  if (!reviewerId) {
+  if (!listing.vendor_id) {
     throw new MedusaError(
-      MedusaError.Types.UNAUTHORIZED,
-      "Missing authenticated reviewer context.",
+      MedusaError.Types.NOT_ALLOWED,
+      "Неможливо перевірити конфлікт майстерні без vendor context.",
     );
   }
+  requireActorId(authContext);
+  const authIdentityId = requireAuthIdentityId(authContext);
 
   const marketplaceService = container.resolve(MARKETPLACE_MODULE) as {
     listVendorMembers: (query: Record<string, unknown>) => Promise<unknown[]>;
   };
   const [member] = await marketplaceService.listVendorMembers({
-    auth_identity_id: reviewerId,
+    auth_identity_id: authIdentityId,
     vendor_id: listing.vendor_id,
     active: true,
   });
@@ -159,7 +177,7 @@ export async function assertReviewerMayDecide(
   if (member) {
     throw new MedusaError(
       MedusaError.Types.NOT_ALLOWED,
-      "Compliance reviewer cannot review a listing belonging to a vendor where they hold active membership.",
+      "Рецензент відповідності не може перевіряти виріб майстерні, у якій має активне членство.",
     );
   }
 }

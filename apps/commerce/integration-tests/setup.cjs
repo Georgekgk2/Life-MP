@@ -93,7 +93,10 @@ function loadEnvFile(envName) {
 
 loadEnvFile("test");
 
-const dbUrlStr = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
+const dbUrlStr =
+  process.env.TEST_RUNNER_DATABASE_URL ||
+  process.env.TEST_DATABASE_URL ||
+  process.env.DATABASE_URL;
 if (dbUrlStr) {
   try {
     const url = new URL(dbUrlStr);

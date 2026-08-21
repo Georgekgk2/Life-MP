@@ -369,3 +369,112 @@ export type ProductRatingSummary = Readonly<{
     1: number;
   }>;
 }>;
+// --------------------------------------------------------------------------
+// Customer Orders & Verified Reviews (Phase 4D sandbox/read-model contracts)
+// --------------------------------------------------------------------------
+
+export type OrderMode = "synthetic" | "live";
+
+export type OrderLifecycleStatus =
+  "pending" | "processing" | "partially_fulfilled" | "completed" | "cancelled";
+
+export type PaymentStatus =
+  "not_applicable" | "pending" | "authorized" | "captured" | "refunded";
+
+export type FulfillmentStatus =
+  "pending" | "accepted" | "shipped" | "delivered" | "returned" | "cancelled";
+
+export type PayoutStatus =
+  "not_applicable" | "pending" | "settled" | "reversed";
+
+export type TrackingSource = "synthetic" | "provider";
+
+export type CustomerOrderLineDTO = Readonly<{
+  orderLineId: string;
+  productId: string;
+  catalogListingId?: string;
+  vendorId: string;
+  productName: string;
+  quantity: number;
+  unitPriceUah: number;
+  lineTotalUah: number;
+  reviewEligibility:
+    | { eligible: true }
+    | {
+        eligible: false;
+        reason:
+          | "not_delivered"
+          | "review_exists"
+          | "not_authenticated"
+          | "unavailable";
+      };
+}>;
+
+export type TrackingEventDTO = Readonly<{
+  id: string;
+  status: "created" | "in_transit" | "delivered" | "returned" | "cancelled";
+  label: string;
+  occurredAt: string;
+  source: TrackingSource;
+}>;
+
+export type CustomerShipmentDTO = Readonly<{
+  childOrderId: string;
+  vendor: Readonly<{ id: string; name: string }>;
+  fulfillmentStatus: FulfillmentStatus;
+  tracking: Readonly<{
+    carrier: "nova_poshta";
+    ttnNumber: string | null;
+    status: TrackingEventDTO["status"];
+    events: readonly TrackingEventDTO[];
+  }>;
+  lines: readonly CustomerOrderLineDTO[];
+}>;
+
+export type CustomerOrderDTO = Readonly<{
+  id: string;
+  orderNumber: string;
+  mode: OrderMode;
+  lifecycleStatus: OrderLifecycleStatus;
+  paymentStatus: PaymentStatus;
+  payoutStatus: PayoutStatus;
+  createdAt: string;
+  totalUah: number;
+  shipments: readonly CustomerShipmentDTO[];
+}>;
+
+export type CustomerOrderListDTO = Readonly<{
+  orders: readonly CustomerOrderDTO[];
+  nextCursor: string | null;
+}>;
+
+export type ProductReviewStatus = "pending" | "approved" | "rejected";
+
+export type ProductReviewDTO = Readonly<{
+  id: string;
+  productId: string;
+  vendorId: string;
+  displayName: string;
+  rating: number;
+  body: string;
+  verifiedPurchase: true;
+  status: "approved";
+  createdAt: string;
+}>;
+
+export type ProductReviewSummaryDTO = Readonly<{
+  averageRating: number | null;
+  totalReviews: number;
+  ratingBreakdown: Readonly<{
+    5: number;
+    4: number;
+    3: number;
+    2: number;
+    1: number;
+  }>;
+}>;
+
+export type ProductReviewsDTO = Readonly<{
+  reviews: readonly ProductReviewDTO[];
+  summary: ProductReviewSummaryDTO;
+}>;

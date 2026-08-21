@@ -36,6 +36,11 @@ export default defineConfig({
       "DATABASE_URL",
       "postgresql://life_medusa_dev:life_medusa_dev_password@127.0.0.1:54329/life_medusa_dev",
     ),
+    databaseDriverOptions: {
+      connection: {
+        ssl: false,
+      },
+    },
     redisUrl: getRequiredEnv("REDIS_URL", "redis://127.0.0.1:56379"),
     http: {
       jwtSecret: getRequiredEnv(

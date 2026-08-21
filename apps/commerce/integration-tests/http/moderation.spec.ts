@@ -13,7 +13,7 @@ describe("assertMarketplaceCoreLocalMode", () => {
     try {
       process.env["NODE_ENV"] = "production";
       expect(() => assertMarketplaceCoreLocalMode()).toThrow(
-        "Marketplace private core routes are rejected in production mode.",
+        "Приватні маршрути marketplace core заборонені в production-режимі.",
       );
     } finally {
       process.env["NODE_ENV"] = originalEnv;

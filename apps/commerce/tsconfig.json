@@ -15,6 +15,9 @@
     "emitDecoratorMetadata": true,
     "skipLibCheck": true
   },
+  "ts-node": {
+    "transpileOnly": true
+  },
   "include": [
     "medusa-config.ts",
     "src/**/*.ts",

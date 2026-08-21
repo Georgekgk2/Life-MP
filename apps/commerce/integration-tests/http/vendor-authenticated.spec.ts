@@ -162,7 +162,7 @@ medusaIntegrationTestRunner({
         expect(submittedResponse.data.listing).toMatchObject({
           id: created.id,
           vendor_id: vendorA.id,
-          state: "review",
+          state: "submitted",
         });
       });
 

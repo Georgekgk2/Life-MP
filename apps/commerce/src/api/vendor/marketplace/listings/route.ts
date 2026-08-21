@@ -59,7 +59,11 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
     "remoteLink",
   ) as unknown as RemoteLinkType;
 
-  const generatedHandle = `vendor-${membership.vendor_id.slice(-6)}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  const vendorHandleSuffix = membership.vendor_id
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .slice(-8);
+  const generatedHandle = `vendor-${vendorHandleSuffix}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
   const product = await productService.createProducts({
     title: parseResult.data.title,

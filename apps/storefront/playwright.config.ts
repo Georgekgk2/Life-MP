@@ -22,11 +22,13 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "pnpm run build && pnpm run start",
+    command: "pnpm run dev",
     url: "http://127.0.0.1:3100",
     reuseExistingServer: true,
     env: {
+      NODE_ENV: "development",
       CATALOG_SOURCE: "fixtures",
+      ALLOW_SYNTHETIC_CATALOG: "true",
     },
   },
 });

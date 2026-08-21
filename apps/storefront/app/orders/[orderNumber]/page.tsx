@@ -9,7 +9,7 @@ export async function generateMetadata({
   const { orderNumber } = await params;
   return {
     title: `Відстеження замовлення #${orderNumber}`,
-    description: `Деталі та статус доставки замовлення #${orderNumber} на маркетплейсі ЛАЙФ`,
+    description: `Безпечне відстеження замовлення #${orderNumber} буде доступне після підключення серверного API та автентифікації клієнта.`,
   };
 }
 

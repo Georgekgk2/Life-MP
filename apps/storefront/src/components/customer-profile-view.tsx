@@ -4,12 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useProfile } from "@/context/profile-context";
 import { useSaved } from "@/context/saved-context";
-
-const hryvniaFormatter = new Intl.NumberFormat("uk-UA", {
-  style: "currency",
-  currency: "UAH",
-  maximumFractionDigits: 0,
-});
+import { formatHryvnia } from "@/formatters";
+import { CustomerOrdersPanel } from "./customer-orders-panel";
 
 export function CustomerProfileView() {
   const {
@@ -25,7 +21,7 @@ export function CustomerProfileView() {
   const { savedItems, removeItem, count: savedCount } = useSaved();
 
   const [activeTab, setActiveTab] = useState<
-    "saved" | "workshops" | "notifications" | "details"
+    "saved" | "orders" | "workshops" | "notifications" | "details"
   >("saved");
 
   const [editName, setEditName] = useState(profile.name);
@@ -162,6 +158,14 @@ export function CustomerProfileView() {
         </button>
         <button
           type="button"
+          onClick={() => setActiveTab("orders")}
+          className={`button ${activeTab === "orders" ? "button--primary" : "button--secondary"}`}
+          style={{ padding: "0.6rem 1.25rem", fontSize: "0.95rem" }}
+        >
+          📦 Мої замовлення
+        </button>
+        <button
+          type="button"
           onClick={() => setActiveTab("workshops")}
           className={`button ${activeTab === "workshops" ? "button--primary" : "button--secondary"}`}
           style={{ padding: "0.6rem 1.25rem", fontSize: "0.95rem" }}
@@ -254,7 +258,7 @@ export function CustomerProfileView() {
                     </h4>
                     <div className="card__meta">
                       <data value={item.priceUah}>
-                        {hryvniaFormatter.format(item.priceUah)}
+                        {formatHryvnia(item.priceUah)}
                       </data>
                     </div>
                     <div
@@ -289,7 +293,10 @@ export function CustomerProfileView() {
         </div>
       )}
 
-      {/* Tab 2: Favorite Workshops */}
+      {/* Tab 2: Server-backed Customer Orders */}
+      {activeTab === "orders" && <CustomerOrdersPanel />}
+
+      {/* Tab 3: Favorite Workshops */}
       {activeTab === "workshops" && (
         <div
           style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
@@ -392,7 +399,7 @@ export function CustomerProfileView() {
         </div>
       )}
 
-      {/* Tab 3: Notification Settings */}
+      {/* Tab 4: Notification Settings */}
       {activeTab === "notifications" && (
         <div
           className="card"
@@ -552,7 +559,7 @@ export function CustomerProfileView() {
         </div>
       )}
 
-      {/* Tab 4: Profile Details */}
+      {/* Tab 5: Profile Details */}
       {activeTab === "details" && (
         <form
           onSubmit={handleSaveProfile}

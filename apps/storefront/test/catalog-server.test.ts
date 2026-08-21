@@ -28,6 +28,20 @@ describe("storefront src/catalog/server.ts", () => {
       expect(result.snapshot.products.every((p) => p.isSynthetic)).toBe(true);
     }
   });
+  it("fails closed in production even when synthetic catalog mode is explicit", async () => {
+    process.env = {
+      ...process.env,
+      NODE_ENV: "production",
+      CATALOG_SOURCE: "fixtures",
+      ALLOW_SYNTHETIC_CATALOG: "true",
+    };
+
+    const result = await getCatalogSnapshot();
+    expect(result.kind).toBe("unavailable");
+    if (result.kind === "unavailable") {
+      expect(result.reason).toBe("missing_configuration");
+    }
+  });
 
   it("returns unavailable when CATALOG_SOURCE=medusa and MEDUSA_BACKEND_URL is missing", async () => {
     process.env["CATALOG_SOURCE"] = "medusa";
@@ -39,11 +53,30 @@ describe("storefront src/catalog/server.ts", () => {
       expect(result.reason).toBe("missing_configuration");
     }
   });
+  it("does not read Medusa without explicit synthetic catalog mode", async () => {
+    process.env = {
+      ...process.env,
+      NODE_ENV: "test",
+      CATALOG_SOURCE: "medusa",
+      MEDUSA_BACKEND_URL: "http://127.0.0.1:9000",
+    };
+    delete process.env["ALLOW_SYNTHETIC_CATALOG"];
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
 
+    const result = await getCatalogSnapshot();
+
+    expect(result).toEqual({
+      kind: "unavailable",
+      source: "medusa",
+      reason: "missing_configuration",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
   it("returns unavailable when Medusa endpoint responds with non-200 or invalid payload without falling back to fixtures", async () => {
     process.env["CATALOG_SOURCE"] = "medusa";
+    process.env["ALLOW_SYNTHETIC_CATALOG"] = "true";
     process.env["MEDUSA_BACKEND_URL"] = "http://127.0.0.1:9000";
-
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
       status: 500,

@@ -2,12 +2,7 @@ import Link from "next/link";
 import type { StorefrontCatalogProduct } from "@life/types";
 import { SaveButton } from "./save-button";
 import { AddToCartButton } from "./add-to-cart-button";
-
-const hryvniaFormatter = new Intl.NumberFormat("uk-UA", {
-  style: "currency",
-  currency: "UAH",
-  maximumFractionDigits: 0,
-});
+import { formatHryvnia } from "@/formatters";
 
 type ProductCardProps = Readonly<{
   product: StorefrontCatalogProduct;
@@ -68,7 +63,7 @@ export function ProductCard({ product }: ProductCardProps) {
         <p className="card__description">{product.description}</p>
         <div className="card__meta">
           <data value={product.priceUah}>
-            {hryvniaFormatter.format(product.priceUah)}
+            {formatHryvnia(product.priceUah)}
           </data>
           <div
             className="badge-group"

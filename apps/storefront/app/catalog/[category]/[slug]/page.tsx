@@ -9,8 +9,10 @@ import {
   SaveButton,
   SectionHeading,
 } from "@/components";
+import { getProductReviews } from "@/reviews/server";
 import { getCatalogSnapshot } from "@/catalog/server";
 import { products as fixtureProducts } from "@/fixtures";
+import { formatHryvnia } from "@/formatters";
 
 export const dynamic = "force-dynamic";
 
@@ -20,12 +22,6 @@ type ProductDetailPageProps = Readonly<{
     slug: string;
   }>;
 }>;
-
-const hryvniaFormatter = new Intl.NumberFormat("uk-UA", {
-  style: "currency",
-  currency: "UAH",
-  maximumFractionDigits: 0,
-});
 
 export function generateStaticParams() {
   const source = process.env["CATALOG_SOURCE"] || "fixtures";
@@ -105,6 +101,7 @@ export default async function ProductDetailPage({
     .filter((p) => p.categorySlug === categorySlug && p.id !== product.id)
     .slice(0, 3);
 
+  const reviewsResult = await getProductReviews(product.id);
   return (
     <>
       <article className="page-section page-section--spacious">
@@ -252,7 +249,7 @@ export default async function ProductDetailPage({
                     color: "var(--color-pine-900)",
                   }}
                 >
-                  {hryvniaFormatter.format(product.priceUah)}
+                  {formatHryvnia(product.priceUah)}
                 </data>
                 <div style={{ display: "flex", gap: "0.5rem" }}>
                   <AddToCartButton product={product} size="md" />
@@ -289,26 +286,24 @@ export default async function ProductDetailPage({
                   </div>
                 )}
               </dl>
-
-              {/* Escrow Guarantee Notice */}
+              {/* Non-commercial sandbox boundary notice */}
               <aside
                 className="notice"
-                aria-label="Гарантія безпеки"
+                aria-label="Статус комерційних функцій"
                 style={{
                   padding: "1rem",
-                  backgroundColor: "#e6f4ea",
-                  border: "1px solid #ceead6",
+                  backgroundColor: "#fff8e1",
+                  border: "1px solid #f1d48a",
                   borderRadius: "var(--radius-sm)",
-                  color: "#137333",
+                  color: "#6b4f00",
                 }}
               >
                 <h3 style={{ margin: "0 0 0.25rem 0", fontSize: "0.95rem" }}>
-                  🛡️ Захист покупки через Escrow
+                  🧪 Некомерційний sandbox
                 </h3>
                 <p style={{ margin: 0, fontSize: "0.85rem", lineHeight: 1.4 }}>
-                  Кошти зарезервовано. Майстер отримує виплату на IBAN тільки
-                  після того, як ви отримаєте та оглянете посилку у відділенні
-                  Нової Пошти.
+                  Ця сторінка показує демонстраційні дані. Оплата, резерв
+                  коштів, доставка, ТТН та виплата майстерні не активні.
                 </p>
               </aside>
             </div>
@@ -318,6 +313,7 @@ export default async function ProductDetailPage({
           <ProductReviewsSection
             productSlug={product.slug}
             productName={product.name}
+            reviews={reviewsResult}
           />
         </div>
       </article>

@@ -69,8 +69,11 @@ const defaultContextValue: ProfileContextValue = {
 
 const ProfileContext = createContext<ProfileContextValue>(defaultContextValue);
 
+/**
+ * Only non-sensitive UI preferences may be persisted in this browser.
+ * Customer identity/profile data is intentionally not a client-side source of truth.
+ */
 type StoredProfilePayload = {
-  profile?: CustomerProfileData;
   notifications?: NotificationPreferences;
   favoriteWorkshops?: string[];
 };
@@ -108,12 +111,10 @@ export function ProfileProvider({
   );
   const [isHydrated, setIsHydrated] = useState(false);
 
-  // 1. Initial hydration from localStorage
+  // 1. Hydrate only UI preferences from localStorage.
+  // The demo profile remains in memory until a server-backed customer profile exists.
   useEffect(() => {
     const stored = readFromLocalStorage();
-    if (stored.profile) {
-      setProfile(stored.profile);
-    }
     if (stored.notifications) {
       setNotifications(stored.notifications);
     }
@@ -125,7 +126,6 @@ export function ProfileProvider({
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY) {
         const updated = readFromLocalStorage();
-        if (updated.profile) setProfile(updated.profile);
         if (updated.notifications) setNotifications(updated.notifications);
         if (Array.isArray(updated.favoriteWorkshops)) {
           setFavoriteWorkshops(updated.favoriteWorkshops);
@@ -137,16 +137,15 @@ export function ProfileProvider({
     return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
 
-  // 2. Persist to localStorage
+  // 2. Persist only non-sensitive UI preferences. Never write profile identity data.
   useEffect(() => {
     if (isHydrated) {
       writeToLocalStorage({
-        profile,
         notifications,
         favoriteWorkshops: [...favoriteWorkshops],
       });
     }
-  }, [profile, notifications, favoriteWorkshops, isHydrated]);
+  }, [notifications, favoriteWorkshops, isHydrated]);
 
   const isWorkshopFavorite = useCallback(
     (workshopSlug: string): boolean => {

@@ -1,131 +1,129 @@
-# Огляд архітектури маркетплейсу «ЛАЙФ» (Architecture Overview)
+# Фактичний огляд архітектури «ЛАЙФ»
 
-## 1. Статус системи та інженерний базис
+- **Дата огляду:** 2026-08-21
+- **Власник:** технічний власник Life-MP
+- **Статус:** локальна розробка та контрольований sandbox
+- **Канонічні межі:** [межі запуску](../decisions/launch-scope.md), [реєстр відкритих рішень](../decisions/open-questions.md), [production readiness gate](../decisions/production-readiness-gate.md)
 
-Цей документ фіксує **фактичну архітектуру кодової бази маркетплейсу «ЛАЙФ»** станом на поточну версію в гілці `main`.
+> Цей документ описує те, що можна підтвердити поточним деревом репозиторію. Наявність типу, таблиці, адаптера або UI-макета не означає, що відповідний production-процес увімкнений. Бойові платежі, ПРРО, реальна логістика, виплати та production deployment заблоковані.
 
-Система функціонує в режимі **повної функціональної та тестової готовності (Sandbox Ready)** з ізольованим контуром безпеки (Phase P0 Containment) до моменту підписання юридичних погоджень Phase 4B та підключення бойових API-ключів еквайрингу й логістики.
+## 1. Статус системи
 
----
+Поточний контур має три різні рівні:
 
-## 2. Структура монорепозиторію та межі пакетів
+1. **Реалізовано в коді** — модуль, маршрут або контракт існує.
+2. **Локально перевіряється** — є unit/integration/E2E-перевірка для конкретного sandbox-сценарію.
+3. **Дозволено для production** — окремий gate із юридичними, фінансовими, операційними, security та infrastructure доказами. Цей рівень зараз **не досягнуто**.
 
-Монорепозиторій побудований на базі **pnpm workspaces (Node.js 22)** зі строгою типізацією TypeScript, Flat ESLint, Prettier, Vitest та Playwright E2E.
+Декларативний inventory на дату огляду: 101 файл unit-тестів/наборів Vitest у workspace-пакетах, 7 HTTP-наборів інтеграційних тестів, 1 набір міграцій та 16 Playwright spec-файлів у двох проєктах. Це інвентар файлів, а не самостійний доказ успішного проходження; актуальні результати зберігаються у [реєстрі readiness](../decisions/production-readiness-gate.md) з обмеженнями provenance.
+
+## 2. Матриця можливостей
+
+| Можливість                                                                   | Фактичне джерело                                    | Стан                                  | Межа                                                                                                                                           |
+| ---------------------------------------------------------------------------- | --------------------------------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Спільна основа монорепозиторію                                               | `pnpm-workspace.yaml`, `package.json`, `packages/*` | Реалізовано                           | Якість локального коду не є production sign-off.                                                                                               |
+| Вітрина та статичні fixtures                                                 | `apps/storefront`                                   | Реалізовано / fixture-only            | Демонстраційні дані; за замовчуванням `CATALOG_SOURCE=fixtures`.                                                                               |
+| Серверний catalog seam                                                       | `apps/storefront/src/catalog/server.ts`             | Реалізовано                           | `fixtures` або явно дозволений Medusa source; fail-closed при відсутньому backend.                                                             |
+| Marketplace module                                                           | `apps/commerce/src/modules/marketplace`             | Реалізовано для local/test            | Medusa є authority для локальних vendor/listing/moderation записів; це не vendor onboarding для production.                                    |
+| Публічний каталог                                                            | `GET /store/catalog`                                | Локально / синтетично                 | Демо-дані доступні лише в development/test з `ALLOW_SYNTHETIC_CATALOG=true`; production fallback не дозволений.                                |
+| Tenant authorization                                                         | `authorization.ts`, vendor routes, HTTP tests       | Локально перевіряється                | Контекст береться з actor/auth token; membership не передається клієнтом як authority. Потрібна незалежна перевірка перед merge.               |
+| Модерація listings, claims, verification та reviews                          | `src/workflows`, admin/vendor routes                | Локально / synthetic                  | `approved` є передумовою публічності; regulated claims та реальний evidence review не затверджені.                                             |
+| Customer orders і reviews                                                    | `customer-orders.ts`, customer routes, Phase 4D     | Synthetic/test boundary               | Customer-scoped read/write та test seed не є бойовим checkout. `localStorage` не є authoritative source.                                       |
+| Кошик і checkout UI                                                          | `apps/storefront/src/context`, `checkout-view.tsx`  | Draft/fixture-only                    | UI завершується draft-станом; реальна оплата, order write, TTN та payout не створюються.                                                       |
+| Пошук                                                                        | `apps/storefront/src/search`                        | Fixture/in-memory adapter             | Поточний provider працює над переданим набором продуктів. PostgreSQL FTS/Meilisearch — цільовий адаптерний напрям, не доказ активного індексу. |
+| CMS                                                                          | `apps/cms`, ADR 0005                                | Заблоковано                           | Payload runtime не встановлений і не має authority над каталогом.                                                                              |
+| Payment, fiscalization, shipment provider, payout, booking, affiliate payout | `apps/commerce/src/index.ts`, launch scope          | Заблоковано / не реалізовано для live | Будь-які sandbox-моделі лише тестові; бойові ключі й webhook-и не підключаються.                                                               |
+| Production/staging deployment                                                | `deploy/`, containment policy, readiness gate       | Заблоковано                           | Немає дозволу на remote provisioning або promotion. Потрібні окремі infrastructure та external gates.                                          |
+
+## 3. Фактична структура репозиторію
 
 ```text
 Life-MP/
 ├── apps/
-│   ├── storefront/          # Next.js 16 (App Router, Turbopack, PWA, Wishlist, Search, Checkout, Order Tracker)
-│   ├── commerce/            # Medusa v2.18.0 Backend (PostgreSQL 16, MikroORM, Marketplace Module, REST API)
-│   └── cms/                 # Редакційний контур (Skeleton per ADR 0005, Payload заблоковано)
-│
+│   ├── storefront/          # Next.js App Router, fixture/sandbox UI
+│   ├── commerce/            # Medusa v2.18.0 + marketplace module
+│   └── cms/                 # TypeScript boundary без Payload runtime
 ├── packages/
-│   ├── types/               # Спільні TypeScript контракти (@life/types): DTO, Cart, Orders, Escrow, Search
-│   └── config/              # Загальні конфігурації (@life/config) та валідатор Containment Policy
-│
-├── infra/
-│   ├── compose/             # Docker Compose конфігурації (PostgreSQL 16, Redis 7, Meilisearch)
-│   ├── docker/              # Multi-stage production Dockerfiles
-│   └── deployment-policy.json # Політика блокування несанкціонованого деплою (Phase P0)
-│
-├── docs/
-│   ├── architecture/        # Архітектурні огляди, ERD, Sequence Diagrams
-│   ├── adr/                 # Архітектурні рішення (ADR 0001 - 0011)
-│   ├── decisions/           # Реєстри погоджень, опитувальники стейкхолдерів (Phase 4B)
-│   └── runbooks/            # Посібники з розробки, тестування, Sandbox та безпеки
-│
-└── .github/workflows/       # 9 автоматичних перевірок GitHub Actions (Verify, CodeQL, Trivy, E2E, Secret Detection)
+│   ├── types/               # Спільні DTO та sandbox-контракти
+│   └── config/              # Конфігураційні типи й правила інструментів
+├── deploy/                  # Docker/Caddy артефакти; не дозвіл на deployment
+├── infra/compose/           # Локальні допоміжні матеріали Compose
+├── scripts/                 # env wrappers, checks, test runners
+├── docs/                    # ADR, decisions, architecture, runbooks, templates
+├── docker-compose.dev.yml   # Лише локальні PostgreSQL/Redis/Meilisearch
+└── .github/workflows/       # ci.yml, codeql.yml, security.yml
 ```
 
----
+У репозиторії є три workflow-файли. Кількість job або matrix-виконань не слід називати кількістю workflow-файлів.
 
-## 3. Матриця відповідальності компонентів
+## 4. Потоки даних
 
-| Компонент              | Стек / Технологія                                | Реалізований функціонал                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Статус готовності                                          |
-| ---------------------- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| **`@life/storefront`** | Next.js 16.2, React 19, TypeScript, Turbopack    | • Інтерактивний каталог та сторінки категорій<br>• Progressive Web App (PWA, Manifest, Service Worker)<br>• Пошуковий рушій (Postgres FTS + морфологія + Meilisearch)<br>• Список бажань (Wishlist / localStorage)<br>• Онбординг майстрів (`/join-as-artisan`) та подача товарів (`/vendor/products/new`)<br>• Дворівневий кабінет модератора (`/moderation`)<br>• Кабінет покупця (`/profile`)<br>• Мультивендорний кошик (`CartContext`, `CartDrawer`)<br>• Оформлення замовлення (`/checkout`) та трекер замовлень (`/orders/[id]`) | **100% VERIFIED** (28 Playwright E2E + 48 Vitest тестів)   |
-| **`@life/commerce`**   | Medusa v2.18.0, PostgreSQL 16, MikroORM, Redis 7 | • Кастомний модуль `marketplace`<br>• Сутності `Vendor`, `VendorMember`, `CatalogListing`, `ArtisanApplication`, `ParentOrder`, `VendorChildOrder`, `ProductClaim`, `ComplianceDocument`<br>• Авторизаційні гарди тенантів (Vendor Isolation)<br>• PII Masking Middleware (маскування чутливих даних у логах)<br>• Аудит-трейл критичних дій модерації                                                                                                                                                                                  | **100% VERIFIED** (9 інтеграційних тестів HTTP/Migrations) |
-| **`@life/types`**      | TypeScript 5.9                                   | • Спільні контракти сутностей каталогу<br>• DTO комплаєнсу та верифікації<br>• Типи мультивендорного кошика та спліту замовлень<br>• Типи Escrow-холдингу та розблокування виплат `SettlementBatch`                                                                                                                                                                                                                                                                                                                                     | **100% VERIFIED** (Строга сумісність)                      |
-| **`@life/config`**     | TypeScript, ESLint, Prettier                     | • Валідатор політики `verify-deployment-containment.mjs`<br>• Спільні правила лінтингу та форматування                                                                                                                                                                                                                                                                                                                                                                                                                                  | **100% VERIFIED**                                          |
-| **`@life/cms`**        | TypeScript Skeleton                              | • Збережено чисту межу пакету per ADR 0005 (Payload заблоковано до рішень щодо серверної інфраструктури)                                                                                                                                                                                                                                                                                                                                                                                                                                | **CONTAINED**                                              |
-
----
-
-## 4. Архітектура пошукового рушія (Search Adapter Pattern per ADR 0005)
-
-Пошукова система реалізована за патерном **Search Adapter** (`apps/storefront/src/search/`):
-
-- **`PostgresFtsSearchProvider` (Дефолтний адаптер):** повнотекстовий пошук засобами PostgreSQL FTS + клієнтська українська морфологія (`ukrainian-morphology.ts`):
-  - Токенізація, стемінг, видалення стоп-слів.
-  - Словник крафтових синонімів (наприклад, `горнятко` ➔ `чашка`, `ткацтво` ➔ `льон`, `рушник`).
-  - Толерантність до друкарських помилок за алгоритмом Левенштейна (відстань Дамерау-Левенштейна).
-- **`MeilisearchProvider` (Опціональний адаптер для масштабування):** підключення до локального контейнера Meilisearch (`127.0.0.1:7700`) з автоматичним прозорим fallback на Postgres FTS.
-
----
-
-## 5. Транзакційне ядро (Phase 4C Sandbox Transactional Architecture)
-
-Маркетплейс реалізує повний життєвий цикл мультивендорного замовлення відповідно до юридичної моделі Phase 4B:
+### 4.1. Каталог
 
 ```text
-                            ПОКУПЕЦЬ
-                               │
-               Додає товари від різних майстерень
-                               ▼
-                    [ CartContext & CartDrawer ]
-                               │
-                       Натискає Оформити
-                               ▼
-                     [ Форма /checkout ]
-               (Контакти, Місто, Нова Пошта, Оплата)
-                               │
-                               ▼
-                  [ SandboxOrderEngine.createOrder ]
-                               │
-                 ┌─────────────┴─────────────┐
-                 ▼                           ▼
-          [ ParentOrder ]             [ EscrowHoldRecord ]
-       Сума замовлення покупця         Статус: "held"
-                 │                     (Кошти заблоковано)
-                 │
-       Автоматичний спліт
-                 │
-       ┌─────────┴─────────┐
-       ▼                   ▼
-[ VendorChildOrder 1 ] [ VendorChildOrder 2 ]
-  Майстерня «Глина»      Ткацтво «Берегиня»
-  Сума: 800 ₴            Сума: 600 ₴
-  Комісія: 80 ₴ (10%)    Комісія: 60 ₴ (10%)
-  Виплата: 720 ₴ (90%)   Виплата: 540 ₴ (90%)
-  ТТН: 20450000001001    ТТН: 20450000001002
-       │                   │
-       │                   │
-       ▼                   ▼
- [ Статус 4/7 ]      [ Статус 4/7 ]
-  (Прямує)            (Прибуло)
-       │                   │
-       ▼                   ▼
- [ СТАТУС 9 НОВОЇ ПОШТИ: ВРУЧЕНО ПОКУПЦЮ ]
-       │
-       ├─────────────────────────────────────┐
-       ▼                                     ▼
-[ SettlementBatch 1 ]                 [ SettlementBatch 2 ]
-Статус: "settled"                     Статус: "settled"
-Виплата на IBAN майстра: 720 ₴        Виплата на IBAN майстра: 540 ₴
-       │                                     │
-       └──────────────────┬──────────────────┘
-                          ▼
-             [ ParentOrder: "completed" ]
-             [ EscrowHoldRecord: "captured" ]
+Medusa marketplace module
+  ├─ Vendor / VendorMember / VendorProfile
+  ├─ CatalogListing + moderation decisions
+  └─ link до native Medusa Product
+             │
+             ▼
+GET /store/catalog  ── public DTO mapper ──► storefront catalog server reader
+             │                                  │
+             └─ fail-closed synthetic guard  ◄──┘
 ```
 
----
+Публічний mapper віддає лише записи, які відповідають стану публікації, visibility та synthetic policy. Native store endpoints не є публічним каталогом цього проєкту без відповідного middleware/route policy.
 
-## 6. Політика безпеки та захисту від витоків (Phase P0 Containment)
+### 4.2. Вендорський контур
 
-Згідно з [ADR 0004](../adr/0004-production-isolation.md) та політикою стримування:
+```text
+actor/auth context
+        │
+        ▼
+resolveVendorMembershipFromAuthContext
+        │
+        ▼
+vendor_id з membership ──► listing/document/verification route
+        │
+        └─► audit event із tenant_id та correlation_id
+```
 
-1. **Жодних бойових грошей та секретів:** платіжні шлюзи та API перевізників працюють в автономному Sandbox-режимі.
-2. **Containment Validator:** скрипт `scripts/verify-deployment-containment.mjs` блокує будь-які спроби несанкціонованого деплою в CI.
-3. **PII Masking:** персональні дані покупців та майстрів маскуються в логах бекенду.
-4. **CodeQL AST + Trivy:** 0 відкритих вразливостей, регулярний сканінг контейнерів та залежностей.
+`vendor_id`, `customer_id`, moderation status і фінансові поля не повинні прийматися від клієнта як довірені значення. Адміністративні маршрути мають окремі ролі та audit trail.
+
+### 4.3. Sandbox довіри покупця
+
+Серверний customer-order/review контур існує для ізольованого development/test сценарію. Synthetic records створюються лише за явними прапорцями та у дозволених `NODE_ENV`; UI не може видавати їх за оплату, реальну ТТН або виплату. Деталі — у [ADR 0007](../adr/0007-customer-order-and-review-source-of-truth.md) і [Phase 4D](../decisions/phase4d-customer-trust-decision-pack.md).
+
+## 5. Пошук: фактичний стан і ціль
+
+Назва `PostgresFtsSearchProvider` не доводить наявності PostgreSQL-індексу. Поточна реалізація нормалізує український запит і працює над переданими fixture-продуктами; Meilisearch не є обов’язковим runtime dependency цього контуру. PostgreSQL FTS, `pg_trgm`, окремий індекс і benchmark залишаються окремою роботою з власними доказами.
+
+## 6. Дані та міграції
+
+- PostgreSQL 16 і MikroORM/Medusa migrations використовуються в локальному commerce-контурі.
+- Ролі `life_medusa_dev`, `life_medusa_test` і `life_medusa_migration_test` призначені для окремих локальних перевірок.
+- Міграції marketplace є additive test/development schema; наявність таблиці `parent_order`, `shipment` або `settlement_batch` не означає підключення payment/carrier/payout provider.
+- Перед будь-якою зміною схеми потрібні backup policy, міграційна сумісність і окремий staging/production gate; цього документа недостатньо для міграції production.
+
+Детальний перелік таблиць і зв’язків — у [ERD v1](erd-v1.md).
+
+## 7. Безпека та приватність
+
+1. Секрети мають надходити через environment/secret manager; `.env.example` містить лише локальні sentinel-значення.
+2. Синтетичні дані вмикаються явними `ALLOW_SYNTHETIC_*` прапорцями та не повинні мати production fallback.
+3. Vendor і customer isolation перевіряються на server boundary, а не лише в UI.
+4. Логи не повинні містити PII, токени, платіжні реквізити або вміст документів.
+5. Containment policy блокує непогоджені deployment capability; її перевірка не доводить наявність production-сервера.
+6. CodeQL, Trivy, Gitleaks, GitHub CI та зовнішні договори мають окрему provenance; локальний тест не замінює жоден із цих доказів.
+
+## 8. Заборонені висновки
+
+Не робіть із цього документа висновків, що:
+
+- production або staging існує чи готовий;
+- checkout приймає реальні гроші;
+- ПРРО видало чек;
+- Нова Пошта створила реальну ЕН/ТТН;
+- вендор отримав payout;
+- продукт, вендор або claim пройшов юридичну/медичну сертифікацію;
+- локальний test pass покриває поточний непушений diff без незалежної перевірки.

@@ -1,49 +1,106 @@
-# Посібник з безпеки та політики стримування (Security & Containment Runbook)
+# Посібник з безпеки та політики стримування
 
-## 1. Архітектурні принципи безпеки (Security Principles)
+- **Дата огляду:** 2026-08-21
+- **Власник:** security-власник + технічний власник
+- **Середовище:** локальні перевірки та GitHub CI
+- **Принцип:** fail-closed — відсутній або суперечливий доказ блокує promotion.
 
-Безпека маркетплейсу «ЛАЙФ» базується на наступних фундаментальних принципах:
+## 1. Базові принципи
 
-1. **Fail-Closed Gatekeeper Model:** Будь-яка непевність або збій у системі перевірок блокує подальші дії (злиття коду, деплой, виплати).
-2. **Phase P0 Containment:** Повна ізоляція тестового середовища від бойових фінансових потоків до моменту підписання юридичних погоджень Phase 4B.
-3. **Defense-in-Depth:** Багаторівневий захист на рівні коду, залежностей, контейнерів, статичного аналізу та інфраструктури.
+1. **Fail-closed:** невизначеність не перетворюється на дозвіл.
+2. **P0 Containment:** payment, fiscal, carrier, payout і remote deployment capability залишаються вимкненими до зовнішніх gate.
+3. **Найменші привілеї:** локальні application roles не є superuser; test runner має окремий control connection.
+4. **Tenant isolation:** доступ vendor визначається actor/auth context і membership, а не client-provided tenant id.
+5. **Мінімізація даних:** PII, secrets, платіжні реквізити й реальні документи не потрапляють у Git, fixtures або журнали.
+6. **Provenance:** назва security job або наявність workflow не є доказом її успішного запуску для поточного commit.
 
----
+## 2. Фактична CI-структура
 
-## 2. Комплекс перевірок GitHub Actions CI (9 Джоба)
+У репозиторії є три workflow-файли:
 
-Перед кожним злиттям коду в захищену гілку `main` виконується обов'язковий набір із 9 перевірок:
+| Workflow                         | Job/контур                                    | Призначення                                                                                                                                 |
+| -------------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.github/workflows/ci.yml`       | `Verify`                                      | lint, build, containment, typecheck, unit test; форматування має запускатися окремо в локальному `pnpm run ci`, якщо не додана до workflow. |
+| `.github/workflows/ci.yml`       | catalog integration/migrations/storefront E2E | Локальні contract checks з ephemeral services або Playwright.                                                                               |
+| `.github/workflows/codeql.yml`   | `CodeQL Analysis`                             | JavaScript/TypeScript security-extended analysis; SARIF зберігається як artifact, upload вимкнений.                                         |
+| `.github/workflows/security.yml` | `Secret Detection`                            | Gitleaks без upload artifact.                                                                                                               |
+| `.github/workflows/security.yml` | `Dependency Audit`                            | `pnpm audit --prod --audit-level=high`.                                                                                                     |
+| `.github/workflows/security.yml` | `Container Scan` matrix                       | Trivy для commerce і storefront images; також перевірка layer history на secret-like strings.                                               |
 
-| Джоба CI                           | Інструмент                                       | Мета перевірки                                                            | Поточний стан         |
-| ---------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------- | --------------------- |
-| **`Verify`**                       | TypeScript, ESLint, Prettier, Containment Script | Перевірка стилю, типів, збірки App Router та політики блокування деплою   | ✅ PASS (100%)        |
-| **`Storefront E2E`**               | Playwright (Chromium Mobile + Desktop)           | 28 наскрізних тестів (PWA, Checkout, Escrow, Search, Moderation, Profile) | ✅ PASS (100%)        |
-| **`Container Scan (storefront)`**  | Trivy Container Scanner                          | Пошук вразливостей в образі `life-storefront`                             | ✅ PASS (0 findings)  |
-| **`Container Scan (commerce)`**    | Trivy Container Scanner                          | Пошук вразливостей в образі `life-commerce`                               | ✅ PASS (0 findings)  |
-| **`Dependency Audit`**             | `pnpm audit --audit-level=high`                  | Виявлення вразливостей у дереві npm-пакетів (Fail-Closed)                 | ✅ PASS (0 High/Crit) |
-| **`Secret Detection`**             | Gitleaks Scanner                                 | Пошук захардкодних API-ключів, паролів чи приватних сертифікатів          | ✅ PASS (0 secrets)   |
-| **`CodeQL Analysis`**              | GitHub CodeQL AST Engine (ADR 0011)              | Глибокий семантичний аналіз коду на вразливості (XSS, Injection)          | ✅ PASS (SARIF Clean) |
-| **`Catalog Provider Migrations`**  | MikroORM Migration Engine                        | Перевірка ідемпотентності та чистоти міграцій PostgreSQL 16               | ✅ PASS (100%)        |
-| **`Catalog Provider Integration`** | Medusa REST API HTTP Tests                       | Перевірка ізоляції тенантів, модерації та сервісних шарів                 | ✅ PASS (100%)        |
+Workflow-файли, job-и та matrix executions — різні поняття. Не називайте три workflow «дев’ятьма workflow».
 
----
+## 3. Локальні перевірки
 
-## 3. Механізми захисту персональних даних (PII Protection)
+```bash
+pnpm docs:check
+pnpm format:check
+pnpm lint
+pnpm build:packages
+pnpm typecheck
+pnpm test
+pnpm build
+node scripts/verify-deployment-containment.mjs
+pnpm audit --prod --audit-level=high
+```
 
-- **PII Masking Middleware (`apps/commerce/src/utils/pii-masking.ts`):**
-  - Автоматично маскує адреси електронної пошти (`o***@example.ua`), номери телефонів (`+380 67 *** ** 67`), номери платіжних карток та паролі в усіх системних логах бекенду.
-- **Tenant Isolation (`VendorMember` & Authorization Guards):**
-  - Користувачі майстерень мають доступ виключно до власних товарів, замовлень та налаштувань. Спроби доступу до чужих лістингів повертають `403 Forbidden`.
+Для окремого CodeQL/Trivy/Gitleaks доказу використовуйте відповідний GitHub run або локальну команду збережену з датою, commit і exit status. Не переносіть PASS зі старого SHA на незакомічений worktree.
 
----
+## 4. Персональні дані та журнали
 
-## 4. Інструкція реагування на інциденти безпеки
+- `apps/commerce/src/utils/pii-masking.ts` і пов’язані middleware повинні маскувати PII у структурованих логах.
+- Не записуйте в лог body з customer phone/email, auth token, cookie, payment transaction, IBAN або document bytes.
+- DTO для customer orders віддає лише записи поточного customer і не розкриває чужі shipment чи vendor payout fields.
+- `localStorage` storefront дозволений для draft/fixture/UI state, але не є authoritative source для identity, order або review.
+- Після зміни PII policy потрібні unit/integration tests і оновлення decision/register документів.
 
-1. **При виявленні вразливості в залежностях:**
-   - Запустити локально `pnpm audit`.
-   - Оновити вразливий пакет або зафіксувати безпечну версію в `pnpm.overrides`.
-2. **При виявленні секрету:**
-   - Негайно відкликати скомпрометований ключ на стороні провайдера.
-   - Видалити ключ з історії git за допомогою `git-filter-repo` (якщо необхідно).
-3. **Порушення політики стримування:**
-   - Перевірити `infra/deployment-policy.json` та переконатися, що `deploy_enabled: false`.
+## 5. Tenant і role controls
+
+- Vendor route спочатку викликає `resolveVendorMembershipFromAuthContext`.
+- Listing/document/verification доступні лише membership поточного actor.
+- Admin moderation потребує staff role; conflict-of-interest policy і audit event є обов’язковими.
+- Відсутність membership, auth або ролі повинна завершуватися безпечним error, а не fallback до іншого tenant.
+- UI-приховування кнопки не є authorization.
+
+## 6. Ворота стримування
+
+Перевірка:
+
+```bash
+node scripts/verify-deployment-containment.mjs
+```
+
+Очікування: policy зберігає deployment capabilities вимкненими. Успіх цієї команди доводить лише стан локального policy-файлу; він не доводить наявність production-сервера, registry, DNS, TLS, backup або дозволу на remote action.
+
+## 7. Реагування на інцидент
+
+### Витік секрету
+
+1. Не публікуйте секрет у issue, логу або чаті.
+2. Негайно відкличте/замініть ключ у відповідного власника поза репозиторієм.
+3. Зафіксуйте sanitized incident record без самого секрету.
+4. Перевірте Git history, images, CI logs і artifacts дозволеним security owner способом.
+5. Оновіть `.gitignore`, secret scanning rule або boundary лише після review.
+
+### Вразливість залежності або образу
+
+1. Збережіть package/image digest, commit і scanner output.
+2. Визначте, чи affected dependency потрапляє в runtime image.
+3. Оновіть залежність або зафіксуйте безпечний override через PR.
+4. Повторіть dependency/container scan; не ігноруйте finding без письмової risk acceptance.
+
+### Порушення containment
+
+1. Зупиніть виконання та не повторюйте небезпечну команду.
+2. Перевірте `infra/deployment-policy.json` і актуальний workflow.
+3. Повідомте технічного та security-власника.
+4. Відкрийте remediation task із доказом, scope та rollback.
+
+## 8. Межа тверджень
+
+Цей runbook не підтверджує:
+
+- відсутність вразливостей у поточному непушеному diff;
+- юридичну відповідність або certification;
+- production readiness;
+- ізоляцію віддаленого сервера;
+- безпеку реальних payment/shipping credentials.

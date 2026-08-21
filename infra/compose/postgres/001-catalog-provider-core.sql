@@ -19,7 +19,7 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'life_medusa_dev')\gex
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'life_medusa_test') THEN
-        CREATE ROLE life_medusa_test WITH LOGIN PASSWORD 'life_medusa_test_password' SUPERUSER CREATEDB;
+        CREATE ROLE life_medusa_test WITH LOGIN PASSWORD 'life_medusa_test_password' NOSUPERUSER NOCREATEDB NOCREATEROLE;
     END IF;
 END
 $$;
@@ -31,7 +31,7 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'life_medusa_test')\ge
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'life_medusa_migration_test') THEN
-        CREATE ROLE life_medusa_migration_test WITH LOGIN PASSWORD 'life_medusa_migration_test_password' SUPERUSER CREATEDB;
+        CREATE ROLE life_medusa_migration_test WITH LOGIN PASSWORD 'life_medusa_migration_test_password' NOSUPERUSER NOCREATEDB NOCREATEROLE;
     END IF;
 END
 $$;
@@ -42,10 +42,8 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'life_medusa_migration
 -- Development role security invariant: strict non-superuser, no CREATEDB, no CREATEROLE, no pg_signal_backend
 ALTER ROLE life_medusa_dev NOSUPERUSER NOCREATEDB NOCREATEROLE;
 
--- Integration test roles: SUPERUSER CREATEDB required for Medusa test runner template database creation & connection termination
-ALTER ROLE life_medusa_test SUPERUSER CREATEDB NOCREATEROLE;
-ALTER ROLE life_medusa_migration_test SUPERUSER CREATEDB NOCREATEROLE;
-
--- Grant connect on default postgres database for test-runner database management
-GRANT CONNECT ON DATABASE postgres TO life_medusa_test, life_medusa_migration_test;
-GRANT pg_signal_backend TO life_medusa_test, life_medusa_migration_test;
+-- Integration test roles stay least-privilege application roles. The Medusa
+-- test runner uses the separate local bootstrap connection from TEST_RUNNER_DATABASE_URL.
+ALTER ROLE life_medusa_test NOSUPERUSER NOCREATEDB NOCREATEROLE;
+ALTER ROLE life_medusa_migration_test NOSUPERUSER NOCREATEDB NOCREATEROLE;
+REVOKE pg_signal_backend FROM life_medusa_test, life_medusa_migration_test;

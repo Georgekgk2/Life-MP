@@ -1,153 +1,132 @@
-# Діаграми послідовностей маркетплейсу «ЛАЙФ» (Sequence Diagrams)
+# Діаграми послідовностей «ЛАЙФ»
 
-Цей документ містить детальні діаграми послідовностей (Mermaid Sequence Diagrams) для всіх ключових процесів маркетплейсу.
+- **Статус:** концептуальні sandbox/test сценарії
+- **Дата огляду:** 2026-08-21
+- **Межа:** діаграми пояснюють дозволені server-side контракти; вони не є доказом runtime або production readiness.
 
----
-
-## 1. Мультивендорний кошик, Чекаут та Escrow-холдинг
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Customer as Покупець
-    participant Cart as CartContext & CartDrawer
-    participant Checkout as Сторінка /checkout
-    participant OrderEngine as Sandbox Order Engine
-    participant Escrow as Escrow System (Sandbox)
-    participant NP as Нова Пошта (Емуляція)
-
-    Customer->>Cart: Додає товар Майстерні А (800 ₴)
-    Customer->>Cart: Додає товар Майстерні Б (600 ₴)
-    Cart-->>Customer: Групує товари за майстернями (Разом: 1400 ₴)
-
-    Customer->>Checkout: Переходить до оформлення замовлення
-    Customer->>Checkout: Вказує контактні дані, місто та відділення НП
-    Customer->>Checkout: Обирає спосіб оплати "sandbox_escrow"
-    Customer->>Checkout: Натискає "Підтвердити замовлення"
-
-    Checkout->>OrderEngine: createOrder({ customer, items })
-
-    Note over OrderEngine: Створення ParentOrder #LF-20260819-1001 (1400 ₴)
-    OrderEngine->>Escrow: Створити EscrowHoldRecord (status: "held", 1400 ₴)
-
-    Note over OrderEngine: Автоматичний спліт замовлення за майстернями
-    OrderEngine->>NP: Згенерувати ТТН для Майстерні А
-    NP-->>OrderEngine: ЕН 20450000001001 (Статус 1: Створено)
-    OrderEngine->>OrderEngine: Створити VendorChildOrder 1 (800 ₴, комісія 80 ₴, виплата 720 ₴)
-
-    OrderEngine->>NP: Згенерувати ТТН для Майстерні Б
-    NP-->>OrderEngine: ЕН 20450000001002 (Статус 1: Створено)
-    OrderEngine->>OrderEngine: Створити VendorChildOrder 2 (600 ₴, комісія 60 ₴, виплата 540 ₴)
-
-    OrderEngine-->>Checkout: Успіх (parentOrder, childOrders, escrowHold)
-    Checkout->>Cart: clearCart()
-    Checkout-->>Customer: Перенаправлення на /checkout/success
-```
-
----
-
-## 2. Відстеження доставки Нової Пошти та автоматична виплата (Settlement)
+## 1. Публічний каталог
 
 ```mermaid
 sequenceDiagram
-    autonumber
-    actor Customer as Покупець
-    actor Courier as Відділення Нової Пошти
-    participant Tracker as Сторінка /orders/[id]
-    participant OrderEngine as Sandbox Order Engine
-    participant Ledger as SettlementBatch (Ledger)
-    participant Escrow as Escrow System
+    participant Customer as Покупець
+    participant Storefront as Storefront
+    participant CatalogAPI as GET /store/catalog
+    participant Medusa as Medusa marketplace module
+    participant Mapper as Public DTO mapper
 
-    Customer->>Tracker: Відкриває трекінг замовлення #LF-20260819-1001
-    Tracker-->>Customer: Відображає 2 окремі посилки (ТТН 20450001 та 20450002)
-
-    Note over Courier,OrderEngine: Майстерня А передає посилку перевізнику
-    Courier->>OrderEngine: Оновлення статусу ЕН (Статус 4: Прямує до отримувача)
-    OrderEngine->>Tracker: VendorChildOrder 1 -> status: "shipped"
-
-    Courier->>OrderEngine: Оновлення статусу ЕН (Статус 7: Прибуло у відділення)
-    OrderEngine->>Tracker: Сповіщення покупцю: посилка прибула
-
-    Note over Customer,Courier: Покупець оглядає та забирає посилку
-    Courier->>OrderEngine: Оновлення статусу ЕН (Статус 9: Вручено покупцю)
-
-    critical Тригер розблокування виплати (Settlement Trigger)
-        OrderEngine->>OrderEngine: VendorChildOrder 1 -> status: "delivered"
-        OrderEngine->>Ledger: Створити SettlementBatch (+720 ₴ на IBAN Майстерні А)
-        Ledger-->>OrderEngine: Settlement підтверджено (status: "settled")
-    end
-
-    Note over Courier,OrderEngine: Доставка другої посилки (Майстерня Б)
-    Courier->>OrderEngine: Статус 9 (Вручено покупцю)
-    OrderEngine->>Ledger: Створити SettlementBatch (+540 ₴ на IBAN Майстерні Б)
-
-    critical Завершення замовлення
-        Note over OrderEngine: Всі посилки замовлення вручено!
-        OrderEngine->>Escrow: EscrowHoldRecord -> status: "captured"
-        OrderEngine->>OrderEngine: ParentOrder -> status: "completed"
-    end
-
-    OrderEngine-->>Tracker: Оновлено статус: "✓ Замовлення виконано, виплати проведено"
+    Customer->>Storefront: Відкриває /catalog
+    Storefront->>CatalogAPI: Запит каталогу
+    CatalogAPI->>Medusa: Читає public listings
+    Medusa->>Mapper: Передає лише дозволені записи
+    Mapper-->>CatalogAPI: CatalogSnapshot без приватних полів
+    CatalogAPI-->>Storefront: DTO або безпечний unavailable/empty result
+    Storefront-->>Customer: Відображає каталог з provenance/status boundary
 ```
 
----
+Native `/store/products` і mutation/cart endpoints не є публічним authority цього контуру. Відсутність доступного synthetic Medusa режиму не повинна створювати непомітний fixture fallback.
 
-## 3. Пошуковий рушій з автокомплітом та українською морфологією
+## 2. Створення listing вендором
 
 ```mermaid
 sequenceDiagram
-    autonumber
-    actor User as Користувач (Покупець)
-    participant Header as SiteHeader (Cmd+K)
-    participant Modal as SearchAutocompleteModal
-    participant Morphology as Ukrainian Morphology Engine
-    participant Adapter as SearchProvider (Postgres FTS / Meilisearch)
+    participant Vendor as Вендор
+    participant API as POST /vendor/marketplace/listings
+    participant Auth as Auth context
+    participant Module as Marketplace module
+    participant Product as Medusa Product module
+    participant Audit as AuditEvent
 
-    User->>Header: Натискає Cmd+K або кнопку 🔍 Пошук
-    Header->>Modal: Відкрити модальне вікно пошуку
-
-    User->>Modal: Вводить пошуковий запит "горнятко"
-    Modal->>Morphology: tokenizeAndNormalize("горнятко")
-    Morphology->>Morphology: Очищення від пунктуації, нормалізація регістру
-    Morphology->>Morphology: Пошук у словнику крафтових синонімів ("горнятко" -> "чашка", "кераміка")
-    Morphology-->>Modal: Розширені токени пошуку
-
-    Modal->>Adapter: searchProducts({ query: "горнятко", synonyms: ["чашка", "кераміка"] })
-    Adapter-->>Modal: 2 товари: "Чашка «Ранок»", "Керамічна піала" (12 мс)
-
-    Modal->>Adapter: searchUnified("горнятко")
-    Adapter-->>Modal: Знайдено майстерню: "Майстерня Олени" (Гончарство)
-
-    Modal-->>User: Миттєве відображення згрупованих результатів (Товари, Майстерні, Події)
+    Vendor->>API: Надсилає title/description
+    API->>Auth: Визначає actor і active membership
+    Auth-->>API: vendor_id або відмова
+    API->>Module: Валідує Zod input і створює listing
+    Module->>Product: Створює/зв’язує native product у транзакції
+    Module->>Audit: Записує actor/action/target
+    Module-->>API: Listing у moderation state
+    API-->>Vendor: Private response без public eligibility claim
 ```
 
----
+Tenant id з body не замінює actor-derived context. Помилка транзакції не повинна залишати частково створений public listing.
 
-## 4. Онбординг майстерень та дворівнева модерація
+## 3. Модерація listing
 
 ```mermaid
 sequenceDiagram
-    autonumber
-    actor Artisan as Майстерня / Виробник
-    participant Form as Форма /join-as-artisan
-    actor Moderator as Комплаєнс-Модератор
-    participant Dashboard as Кабінет /moderation
-    participant Backend as Medusa Marketplace Module
+    participant Reviewer as Модератор
+    participant Dashboard as Moderation UI
+    participant API as POST /admin/marketplace/reviews/:id
+    participant Guard as Role guard
+    participant Module as Marketplace module
+    participant Audit as AuditEvent
 
-    Artisan->>Form: Заповнює анкету (Назва, Категорія, Опис ремесла, Склад, Instagram)
-    Artisan->>Form: Погоджується з правилами локальності та якості
-    Form->>Backend: POST /store/artisan-applications (ArtisanApplication: "pending")
-    Backend-->>Artisan: Заявку прийнято на модерацію
-
-    Moderator->>Dashboard: Відкриває /moderation
-    Dashboard->>Backend: GET /admin/marketplace/artisan-applications?status=pending
-    Backend-->>Dashboard: Список анкет, що очікують перевірки
-
-    Moderator->>Dashboard: Відкриває детальну картку майстерні
-    Moderator->>Dashboard: Додає коментар модератора та натискає "✅ Схвалити"
-
-    Dashboard->>Backend: POST /admin/marketplace/artisan-applications/:id/review { decision: "approved" }
-    Note over Backend: Створення Vendor record та генерація токена доступу
-    Backend-->>Dashboard: Статус оновлено: "approved"
-    Dashboard-->>Moderator: Візуальне підтвердження схвалення
+    Reviewer->>Dashboard: Відкриває pending listing
+    Dashboard->>API: Надсилає decision і rationale
+    API->>Guard: Перевіряє staff role та actor
+    Guard-->>API: Дозвіл або відмова
+    API->>Module: Застосовує state transition
+    Module->>Audit: Записує decision/rationale/actor
+    Module-->>API: Оновлений moderation state
+    API-->>Dashboard: Sanitized result
 ```
+
+`approved` — технічний workflow state; він не є юридичною сертифікацією vendor, product або claim.
+
+## 4. Synthetic customer order у development/test
+
+```mermaid
+sequenceDiagram
+    participant Customer as Authenticated customer
+    participant Storefront as Storefront
+    participant API as POST /store/customer/orders
+    participant Guard as Environment + auth guards
+    participant Catalog as Marketplace catalog
+    participant Orders as Synthetic order service
+    participant Audit as AuditEvent
+
+    Customer->>Storefront: Підтверджує draft input
+    Storefront->>API: Передає items без довірених ownership/status полів
+    API->>Guard: Перевіряє NODE_ENV і ALLOW_SYNTHETIC_ORDERS
+    Guard-->>API: Дозвіл або безпечна відмова
+    API->>Catalog: Перевіряє listing, vendor і server price
+    API->>Orders: Створює synthetic parent/child records
+    Orders->>Audit: Записує synthetic action
+    Orders-->>API: Sandbox order DTO
+    API-->>Storefront: Нефінансовий synthetic status
+```
+
+Цей flow не викликає payment, fiscal, shipment, carrier, settlement або payout adapter. У production guard synthetic route має бути закритий.
+
+## 5. Review eligibility та moderation
+
+```mermaid
+sequenceDiagram
+    participant Customer as Покупець
+    participant API as POST /store/customer/order-lines/:id/review
+    participant Auth as Auth context
+    participant Orders as Customer order reader
+    participant Reviews as Review service
+    participant Moderator as Compliance reviewer
+
+    Customer->>API: Надсилає rating/body
+    API->>Auth: Перевіряє current customer
+    API->>Orders: Перевіряє ownership і verified-purchase rule
+    Orders-->>API: Eligibility або відмова
+    API->>Reviews: Створює review зі статусом pending
+    Reviews-->>API: Sanitized pending response
+    Moderator->>Reviews: Виносить approve/reject decision
+    Reviews-->>Moderator: Audit-bound result
+```
+
+Public mapper показує лише записи з дозволеною provenance і moderation status. Client не може самостійно встановити `verifiedPurchase` або `approved`.
+
+## 6. Заборонені потоки
+
+У поточному scope немає діаграми або runtime flow для:
+
+- live acquiring, escrow, payment webhook чи refund;
+- ПРРО/фіскального чека;
+- реальної Нової Пошти, ЕН/ТТН або carrier webhook;
+- vendor settlement/payout;
+- production provisioning/deployment.
+
+Такі потоки потребують окремих прийнятих рішень, контрактів, security review та production gate.

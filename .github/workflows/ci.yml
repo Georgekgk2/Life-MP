@@ -34,6 +34,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check documentation
+        run: pnpm docs:check
       - name: Lint
         run: pnpm lint
 
@@ -108,12 +110,7 @@ jobs:
         env:
           DATABASE_URL: postgresql://life_medusa_test:ci_test_password@127.0.0.1:${{ job.services.postgres.ports[5432] }}/life_medusa_test
           TEST_DATABASE_URL: postgresql://life_medusa_test:ci_test_password@127.0.0.1:${{ job.services.postgres.ports[5432] }}/life_medusa_test
-          DB_HOST: "127.0.0.1"
-          DB_PORT: "${{ job.services.postgres.ports[5432] }}"
-          DB_USERNAME: "life_medusa_test"
-          DB_PASSWORD: "ci_test_password"
-          DB_NAME: "life_medusa_test"
-          DB_WAITINGROOM_DATABASE: "postgres"
+          TEST_RUNNER_DATABASE_URL: postgresql://ci_bootstrap:ci_bootstrap_password@127.0.0.1:${{ job.services.postgres.ports[5432] }}/postgres
           REDIS_URL: redis://127.0.0.1:${{ job.services.redis.ports[6379] }}
           NODE_ENV: test
           ALLOW_SYNTHETIC_CATALOG: "true"
@@ -180,12 +177,7 @@ jobs:
         env:
           DATABASE_URL: postgresql://life_medusa_migration_test:ci_migration_password@127.0.0.1:${{ job.services.postgres.ports[5432] }}/life_medusa_migration_test
           MIGRATION_TEST_DATABASE_URL: postgresql://life_medusa_migration_test:ci_migration_password@127.0.0.1:${{ job.services.postgres.ports[5432] }}/life_medusa_migration_test
-          DB_HOST: "127.0.0.1"
-          DB_PORT: "${{ job.services.postgres.ports[5432] }}"
-          DB_USERNAME: "life_medusa_migration_test"
-          DB_PASSWORD: "ci_migration_password"
-          DB_NAME: "life_medusa_migration_test"
-          DB_WAITINGROOM_DATABASE: "postgres"
+          TEST_RUNNER_DATABASE_URL: postgresql://ci_bootstrap:ci_bootstrap_password@127.0.0.1:${{ job.services.postgres.ports[5432] }}/postgres
           REDIS_URL: redis://127.0.0.1:${{ job.services.redis.ports[6379] }}
           NODE_ENV: test
           ALLOW_SYNTHETIC_CATALOG: "true"

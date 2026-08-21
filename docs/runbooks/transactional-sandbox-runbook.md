@@ -1,67 +1,96 @@
-# Інструкція з тестування транзакційного ядра (Phase 4C Sandbox Runbook)
+# Посібник sandbox: кошик, замовлення та відгуки
 
-## 1. Мета та архітектурні рамки
+- **Статус:** лише локальний development/test; не live commerce
+- **Дата огляду:** 2026-08-21
+- **Власник:** технічний власник Life-MP
 
-Цей посібник призначений для тестування **повного транзакційного циклу маркетплейсу «ЛАЙФ»** у безпечному автономному Sandbox-середовищі.
+## 1. Мета і межа
 
-Усі операції (кошик, розщеплення замовлень, генерація ЕН Нової Пошти, Escrow-холдування та формування виплат `SettlementBatch`) виконуються без участі реальних грошей або зовнішніх банківських API, що забезпечує 100% відповідність обмеженням [Phase P0 Containment](../adr/0004-production-isolation.md).
+Цей посібник описує безпечні contract/UI сценарії для customer cart і synthetic order/review boundary. Він не запускає реальні транзакції.
 
----
+У цьому контурі не можна створювати або стверджувати:
 
-## 2. Крок-за-кроком: Повний тестовий сценарій
+- оплату, escrow hold/capture, refund чи chargeback;
+- фіскальний чек;
+- реальну ЕН/ТТН або carrier tracking;
+- vendor settlement, IBAN або payout;
+- production customer/vendor onboarding.
 
-### Крок 1: Додавання товарів від різних майстерень до кошика
+Успішний sandbox test доводить лише поведінку конкретного локального сценарію з explicit guard.
 
-1. Відкрийте сторінку каталогу: [http://127.0.0.1:3100/catalog](http://127.0.0.1:3100/catalog).
-2. Знайдіть виріб майстерні «Глина та Світло» (наприклад, **Чашка «Ранок»**) та натисніть кнопку **`🧺 В кошик`**.
-3. Знайдіть виріб майстерні «Ткацтво Берегиня» (наприклад, **Шопер «Разом»**) та натисніть **`🧺 В кошик`**.
-4. У шапці сайту лічильник кошика збільшиться: `🧺 Кошик (2)`.
-5. Автоматично відкриється шторка **`CartDrawer`**:
-   - Перевірте, що товари автоматично згруповані у два блоки: _«Майстерня: Олена»_ та _«Майстерня: Ткацтво Берегиня»_.
-   - Перевірте відображення підсумку для кожної майстерні окремо та загальної суми до сплати.
+## 2. Draft-only storefront сценарій
 
-### Крок 2: Оформлення мультивендорного замовлення (/checkout)
+1. Запустіть інфраструктуру за [локальним runbook](local-development.md).
+2. Запустіть storefront з `CATALOG_SOURCE=fixtures` або дозволеним development Medusa catalog.
+3. Відкрийте [http://127.0.0.1:3100/catalog](http://127.0.0.1:3100/catalog).
+4. Додайте synthetic items до draft cart.
+5. Перевірте групування за workshop/vendor у UI.
+6. Перейдіть до `/checkout`.
+7. Перевірте, що копірайт і статуси явно позначають draft/sandbox, а payment/shipment actions не імітують факт виконання.
+8. Не вводьте реальні PII, payment credentials, IBAN або carrier identifiers.
 
-1. У шторці кошика натисніть **`Оформити замовлення →`** (або перейдіть за адресою [http://127.0.0.1:3100/checkout](http://127.0.0.1:3100/checkout)).
-2. Заповніть форму:
-   - **ПІБ:** Олена Мельник
-   - **Телефон:** +380 67 123 45 67
-   - **Email:** olena@example.ua
-   - **Місто:** Київ
-   - **Відділення Нової Пошти:** Відділення №42 (вул. Саксаганського, 102)
-   - **Спосіб оплати:** `Онлайн-оплата з Escrow-захистом`
-3. У правій колонці перегляньте деталізований розрахунок: замовлення буде розщеплено на 2 окремі посилки.
-4. Натисніть **`Підтвердити замовлення`**.
+`localStorage` може містити draft cart і fixture UI state; це не authoritative order або identity storage.
 
-### Крок 3: Підтвердження замовлення (/checkout/success)
+## 3. Контракт синтетичного замовлення
 
-1. Відкриється сторінка успіху з унікальним номером замовлення (наприклад, `#LF-20260819-1001`).
-2. Зелений банер підтверджує, що кошти зарезервовано в Escrow (статус `held`) і будуть виплачені майстрам лише після успішної доставки.
-3. Натисніть кнопку **`🚚 Відстежувати посилки в реальному часі →`**.
+Synthetic order endpoint дозволений тільки за узгодженими `NODE_ENV=development|test` та `ALLOW_SYNTHETIC_ORDERS=true` guards. Він має:
 
-### Крок 4: Трекінг Нової Пошти та симуляція виплати (/orders/[orderNumber])
+- перевіряти schema та authenticated customer context;
+- створювати parent/child records лише в local/test database;
+- зберігати immutable order lines;
+- не створювати payment, fiscal, shipment або payout record;
+- повертати status, який не можна трактувати як `paid`, `captured`, `fulfilled` або `settled`.
 
-1. На сторінці відстеження відображено:
-   - Статус замовлення: **`🔒 Escrow Захолдовано`**.
-   - Посилка #1 (Майстерня Олени): сума 800 ₴, комісія 80 ₴ (10%), виплата майстру 720 ₴ (90%), ТТН `2045...`.
-   - Посилка #2 (Ткацтво Берегиня): сума 390 ₴, комісія 39 ₴ (10%), виплата майстру 351 ₴ (90%), ТТН `2045...`.
-2. У блоці першої посилки натисніть кнопку симулятора **`✓ Вручено (9) ➔ Виплата`**:
-   - Статус посилки зміниться на _«✓ Вручено отримувачу»_.
-   - З'явиться зелений блок підтвердження: **`✓ Виплату проведено (SettlementBatch #settle_...)`** із зазначенням IBAN майстра та суми виплати.
-3. Натисніть кнопку **`✓ Вручено (9) ➔ Виплата`** на другій посилці:
-   - Обидві посилки перейдуть у статус вручених.
-   - Головне замовлення автоматично перейде у статус **`✓ Замовлення виконано`**, а Escrow-холд перейде у статус **`captured`** (кошти повністю перераховані майстрам).
+При відсутності guard endpoint має бути недоступним або повертати безпечну помилку. Production mode не має fallback до synthetic behavior.
 
----
+## 4. Synthetic tracking і review
 
-## 3. Автоматичні тести (E2E & Unit)
+- Tracking timeline — тестовий локальний запис без carrier API.
+- Customer бачить лише власний order scope.
+- Vendor бачить лише дозволений tenant scope.
+- Review створюється як `pending` і не стає public без moderation decision.
+- `verifiedPurchase` визначається server-side; client body не може його встановити.
+- Reject/approve дії staff потребують role guard, rationale і audit event.
 
-Для швидкої автоматичної верифікації всього ланцюжка запустіть:
+## 5. Дозволені автоматичні перевірки
+
+Для поточного репозиторію використовуйте фактичні package scripts:
 
 ```bash
-# Юніт-тести двигуна розщеплення:
-pnpm --filter @life/storefront test test/cart-and-order-engine.test.ts
+# Усі unit/component тести workspace
+pnpm test
 
-# Наскрізний Playwright E2E тест:
-pnpm --filter @life/storefront exec playwright test e2e/checkout-and-escrow.spec.ts
+# HTTP integration contract-и commerce
+pnpm run test:integration
+
+# Migration idempotency/contract tests
+pnpm run test:migrations
+
+# Storefront Playwright suite
+pnpm --filter @life/storefront run test:e2e
 ```
+
+Для свіжого evidence зберігайте commit/worktree, дату, команду та exit status. Назва тесту або старий звіт не є доказом для поточного diff.
+
+## 6. Очікування failure paths
+
+Перевіряйте негативні сценарії:
+
+- production mode без synthetic flag — відмова;
+- неавторизований customer — відмова;
+- customer читає чужий order — відмова;
+- vendor читає чужий tenant — відмова;
+- client підміняє `customer_id`, `vendor_id`, price або review eligibility — відмова або server-side ігнорування;
+- review без verified purchase — `403`/validation error;
+- unapproved review у public catalog — відсутній;
+- payment/shipment/payout route — disabled/not implemented.
+
+## 7. Очищення
+
+Після test заверште локальний процес і за потреби зупиніть infra без видалення volumes:
+
+```bash
+make dev-infra-down
+```
+
+Для destructive reset користуйтеся лише командами з [local-development.md](local-development.md) і explicit local approval.

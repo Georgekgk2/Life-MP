@@ -4,7 +4,7 @@
 
 COMPOSE := docker compose --env-file .env.example -f docker-compose.dev.yml
 
-.PHONY: help dev build test lint typecheck format-check ci \
+.PHONY: help dev build test lint typecheck format-check docs-check ci \
 	dev-infra-up dev-infra-wait dev-infra-down dev-infra-logs \
 	db-bootstrap commerce-migrate commerce-seed test-integration test-migrations test-fresh-state \
 	db-backup db-restore db-reset docker-clean \
@@ -69,6 +69,9 @@ typecheck: ## Перевірити типи
 
 format-check: ## Перевірити форматування без змін
 	pnpm format:check
+
+docs-check: ## Перевірити індекс, локальні посилання та ADR документації
+	pnpm docs:check
 
 ci: ## Запустити локальний CI через кореневий pnpm-скрипт
 	pnpm run ci

@@ -42,11 +42,11 @@ importers:
         specifier: 3.9.6
         version: 3.9.6
       typescript:
-        specifier: 5.9.3
-        version: 5.9.3
+        specifier: 6.0.3
+        version: 6.0.3
       typescript-eslint:
         specifier: 8.65.0
-        version: 8.65.0(eslint@10.8.0(jiti@1.21.7))(typescript@5.9.3)
+        version: 8.65.0(eslint@10.8.0(jiti@1.21.7))(typescript@6.0.3)
       vitest:
         specifier: 4.1.10
         version: 4.1.10(@opentelemetry/api@1.9.1)(@types/node@22.19.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))
@@ -69,7 +69,7 @@ importers:
         version: 2.18.0(@medusajs/framework@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76))
       '@medusajs/draft-order':
         specifier: 2.18.0
-        version: 2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@medusajs/dashboard@2.18.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(typescript@5.9.3))(@medusajs/framework@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76))(@medusajs/icons@2.18.0(react@19.2.8))(@medusajs/test-utils@2.18.0)(@medusajs/ui@4.2.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3))(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react-router-dom@7.18.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
+        version: 2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@medusajs/dashboard@2.18.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(typescript@6.0.3))(@medusajs/framework@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76))(@medusajs/icons@2.18.0(react@19.2.8))(@medusajs/test-utils@2.18.0)(@medusajs/ui@4.2.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3))(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react-router-dom@7.18.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
       '@medusajs/event-bus-redis':
         specifier: 2.18.0
         version: 2.18.0(@medusajs/framework@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76))
@@ -78,7 +78,7 @@ importers:
         version: 2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76)
       '@medusajs/medusa':
         specifier: 2.18.0
-        version: 2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@medusajs/dashboard@2.18.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(typescript@5.9.3))(@medusajs/framework@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76))(@medusajs/icons@2.18.0(react@19.2.8))(@medusajs/test-utils@2.18.0)(@medusajs/ui@4.2.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3))(@swc/core@1.15.46)(@types/node@22.19.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(awilix@8.0.1)(jiti@1.21.7)(picomatch@4.0.5)(posthog-node@5.46.1(rxjs@7.8.2))(react-dom@19.2.8(react@19.2.8))(react-router-dom@7.18.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(tsx@4.23.1)(typescript@5.9.3)(yaml@2.9.0)
+        version: 2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@medusajs/dashboard@2.18.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(typescript@6.0.3))(@medusajs/framework@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76))(@medusajs/icons@2.18.0(react@19.2.8))(@medusajs/test-utils@2.18.0)(@medusajs/ui@4.2.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3))(@swc/core@1.15.46)(@types/node@22.19.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(awilix@8.0.1)(jiti@1.21.7)(picomatch@4.0.5)(posthog-node@5.46.1(rxjs@7.8.2))(react-dom@19.2.8(react@19.2.8))(react-router-dom@7.18.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(tsx@4.23.1)(typescript@6.0.3)(yaml@2.9.0)
       '@medusajs/workflow-engine-redis':
         specifier: 2.18.0
         version: 2.18.0(@medusajs/framework@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76))
@@ -124,13 +124,13 @@ importers:
         version: 8.20.0
       jest:
         specifier: 30.4.2
-        version: 30.4.2(@types/node@22.19.1)(ts-node@10.9.2(@swc/core@1.15.46)(@types/node@22.19.1)(typescript@5.9.3))
+        version: 30.4.2(@types/node@22.19.1)(ts-node@10.9.2(@swc/core@1.15.46)(@types/node@22.19.1)(typescript@6.0.3))
       jsonwebtoken:
         specifier: 9.0.3
         version: 9.0.3
       ts-node:
         specifier: ^10.9.2
-        version: 10.9.2(@swc/core@1.15.46)(@types/node@22.19.1)(typescript@5.9.3)
+        version: 10.9.2(@swc/core@1.15.46)(@types/node@22.19.1)(typescript@6.0.3)
 
   apps/storefront:
     dependencies:
@@ -2086,11 +2086,11 @@ packages:
     engines: {node: '>=20'}
     hasBin: true
 
-  '@posthog/core@1.45.1':
-    resolution: {integrity: sha512-tLtvzomavb2PPWdGYKsusyIzIeL2Px47v348Smibkay7sMy/83TyPk+Ptsp2NdeOgJsbuwSxWkR2+XA0aSCAaA==}
+  '@posthog/core@1.48.3':
+    resolution: {integrity: sha512-kwVDVvwtCTXctApA2tpnwDjDDan8LrkwCW1Wv6PABaVs/s5ahbQ9W3pvdXcqr71HCuqukSA1jp7MySczebubGg==}
 
-  '@posthog/types@1.398.0':
-    resolution: {integrity: sha512-sJMkl4k+u8yS/0fjHsKqE9xTdsAh30a2WvgChiptellnVoE0e8QJKFgqOMD2sk8FaEArPdeFklAhXvmENAt3Sg==}
+  '@posthog/types@1.405.0':
+    resolution: {integrity: sha512-4rZ/taVXKQxs9Jrf7ZjlCRgrOSL69oKAgIWJQa5kRNJ6wll1UANbrJTSY+Su1e88LIG4zZVjKKKjyQHCkHdHcw==}
 
   '@protobufjs/aspromise@1.1.2':
     resolution: {integrity: sha512-j+gKExEuLmKwvz3OgROXtrJ2UG2x8Ch2YZUxahh+s1F2HZ+wAceUNLkvy6zKCPVRkU++ZWQrdxsUeQXmcg4uoQ==}
@@ -6612,8 +6612,8 @@ packages:
       eslint: ^8.57.0 || ^9.0.0 || ^10.0.0
       typescript: '>=4.8.4 <6.1.0'
 
-  typescript@5.9.3:
-    resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
+  typescript@6.0.3:
+    resolution: {integrity: sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==}
     engines: {node: '>=14.17'}
     hasBin: true
 
@@ -8028,7 +8028,7 @@ snapshots:
       jest-util: 30.4.1
       slash: 3.0.0
 
-  '@jest/core@30.4.2(ts-node@10.9.2(@swc/core@1.15.46)(@types/node@22.19.1)(typescript@5.9.3))':
+  '@jest/core@30.4.2(ts-node@10.9.2(@swc/core@1.15.46)(@types/node@22.19.1)(typescript@6.0.3))':
     dependencies:
       '@jest/console': 30.4.1
       '@jest/pattern': 30.4.0
@@ -8044,7 +8044,7 @@ snapshots:
       fast-json-stable-stringify: 2.1.0
       graceful-fs: 4.2.11
       jest-changed-files: 30.4.1
-      jest-config: 30.4.2(@types/node@22.19.1)(ts-node@10.9.2(@swc/core@1.15.46)(@types/node@22.19.1)(typescript@5.9.3))
+      jest-config: 30.4.2(@types/node@22.19.1)(ts-node@10.9.2(@swc/core@1.15.46)(@types/node@22.19.1)(typescript@6.0.3))
       jest-haste-map: 30.4.1
       jest-message-util: 30.4.1
       jest-regex-util: 30.4.0
@@ -8296,11 +8296,11 @@ snapshots:
 
   '@js-sdsl/ordered-map@4.4.2': {}
 
-  '@medusajs/admin-bundler@2.18.0(@types/node@22.19.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(jiti@1.21.7)(picomatch@4.0.5)(tsx@4.23.1)(typescript@5.9.3)(yaml@2.9.0)':
+  '@medusajs/admin-bundler@2.18.0(@types/node@22.19.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(jiti@1.21.7)(picomatch@4.0.5)(tsx@4.23.1)(typescript@6.0.3)(yaml@2.9.0)':
     dependencies:
       '@medusajs/admin-shared': 2.18.0
       '@medusajs/admin-vite-plugin': 2.18.0(picomatch@4.0.5)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))
-      '@medusajs/dashboard': 2.18.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(typescript@5.9.3)
+      '@medusajs/dashboard': 2.18.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(typescript@6.0.3)
       '@vitejs/plugin-react': 4.7.0(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))
       autoprefixer: 10.5.4(postcss@8.5.23)
       compression: 1.8.1
@@ -8480,7 +8480,7 @@ snapshots:
     dependencies:
       '@medusajs/framework': 2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76)
 
-  '@medusajs/dashboard@2.18.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(typescript@5.9.3)':
+  '@medusajs/dashboard@2.18.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(typescript@6.0.3)':
     dependencies:
       '@ariakit/react': 0.4.35(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@babel/runtime': 7.29.7
@@ -8492,7 +8492,7 @@ snapshots:
       '@medusajs/admin-shared': 2.18.0
       '@medusajs/icons': 2.18.0(react@18.3.1)
       '@medusajs/js-sdk': 2.18.0
-      '@medusajs/ui': 4.2.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3)
+      '@medusajs/ui': 4.2.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@6.0.3)
       '@radix-ui/react-dialog': 1.1.4(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@radix-ui/react-dismissable-layer': 1.1.4(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@tanstack/react-query': 5.64.2(react@18.3.1)
@@ -8556,7 +8556,7 @@ snapshots:
       - supports-color
       - tedious
 
-  '@medusajs/draft-order@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@medusajs/dashboard@2.18.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(typescript@5.9.3))(@medusajs/framework@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76))(@medusajs/icons@2.18.0(react@19.2.8))(@medusajs/test-utils@2.18.0)(@medusajs/ui@4.2.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3))(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react-router-dom@7.18.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)':
+  '@medusajs/draft-order@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@medusajs/dashboard@2.18.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(typescript@6.0.3))(@medusajs/framework@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76))(@medusajs/icons@2.18.0(react@19.2.8))(@medusajs/test-utils@2.18.0)(@medusajs/ui@4.2.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3))(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react-router-dom@7.18.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)':
     dependencies:
       '@ariakit/react': 0.4.35(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@babel/runtime': 7.29.7
@@ -8573,10 +8573,10 @@ snapshots:
       react-hook-form: 7.49.1(react@19.2.8)
     optionalDependencies:
       '@medusajs/cli': 2.18.0(@types/node@22.19.1)
-      '@medusajs/dashboard': 2.18.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(typescript@5.9.3)
+      '@medusajs/dashboard': 2.18.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(typescript@6.0.3)
       '@medusajs/icons': 2.18.0(react@19.2.8)
       '@medusajs/test-utils': 2.18.0(@medusajs/core-flows@2.18.0(@medusajs/framework@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76)))(@medusajs/framework@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76))(@medusajs/medusa@2.18.0)
-      '@medusajs/ui': 4.2.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3)
+      '@medusajs/ui': 4.2.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3)
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
       react-router-dom: 7.18.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -8708,12 +8708,12 @@ snapshots:
     dependencies:
       '@medusajs/framework': 2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76)
 
-  '@medusajs/medusa@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@medusajs/dashboard@2.18.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(typescript@5.9.3))(@medusajs/framework@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76))(@medusajs/icons@2.18.0(react@19.2.8))(@medusajs/test-utils@2.18.0)(@medusajs/ui@4.2.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3))(@swc/core@1.15.46)(@types/node@22.19.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(awilix@8.0.1)(jiti@1.21.7)(picomatch@4.0.5)(posthog-node@5.46.1(rxjs@7.8.2))(react-dom@19.2.8(react@19.2.8))(react-router-dom@7.18.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(tsx@4.23.1)(typescript@5.9.3)(yaml@2.9.0)':
+  '@medusajs/medusa@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@medusajs/dashboard@2.18.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(typescript@6.0.3))(@medusajs/framework@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76))(@medusajs/icons@2.18.0(react@19.2.8))(@medusajs/test-utils@2.18.0)(@medusajs/ui@4.2.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3))(@swc/core@1.15.46)(@types/node@22.19.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(awilix@8.0.1)(jiti@1.21.7)(picomatch@4.0.5)(posthog-node@5.46.1(rxjs@7.8.2))(react-dom@19.2.8(react@19.2.8))(react-router-dom@7.18.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(tsx@4.23.1)(typescript@6.0.3)(yaml@2.9.0)':
     dependencies:
       '@inquirer/checkbox': 2.5.0
       '@inquirer/confirm': 2.0.17
       '@inquirer/input': 2.3.0
-      '@medusajs/admin-bundler': 2.18.0(@types/node@22.19.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(jiti@1.21.7)(picomatch@4.0.5)(tsx@4.23.1)(typescript@5.9.3)(yaml@2.9.0)
+      '@medusajs/admin-bundler': 2.18.0(@types/node@22.19.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(jiti@1.21.7)(picomatch@4.0.5)(tsx@4.23.1)(typescript@6.0.3)(yaml@2.9.0)
       '@medusajs/analytics': 2.18.0(@medusajs/framework@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76))
       '@medusajs/analytics-local': 2.18.0(@medusajs/framework@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76))
       '@medusajs/analytics-posthog': 2.18.0(@medusajs/framework@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76))(posthog-node@5.46.1(rxjs@7.8.2))
@@ -8730,7 +8730,7 @@ snapshots:
       '@medusajs/core-flows': 2.18.0(@medusajs/framework@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76))
       '@medusajs/currency': 2.18.0(@medusajs/framework@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76))
       '@medusajs/customer': 2.18.0(@medusajs/framework@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76))
-      '@medusajs/draft-order': 2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@medusajs/dashboard@2.18.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(typescript@5.9.3))(@medusajs/framework@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76))(@medusajs/icons@2.18.0(react@19.2.8))(@medusajs/test-utils@2.18.0)(@medusajs/ui@4.2.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3))(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react-router-dom@7.18.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
+      '@medusajs/draft-order': 2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@medusajs/dashboard@2.18.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(typescript@6.0.3))(@medusajs/framework@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76))(@medusajs/icons@2.18.0(react@19.2.8))(@medusajs/test-utils@2.18.0)(@medusajs/ui@4.2.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3))(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react-router-dom@7.18.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
       '@medusajs/event-bus-local': 2.18.0(@medusajs/framework@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76))
       '@medusajs/event-bus-redis': 2.18.0(@medusajs/framework@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76))
       '@medusajs/file': 2.18.0(@medusajs/framework@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76))
@@ -8966,7 +8966,7 @@ snapshots:
       ulid: 2.4.0
     optionalDependencies:
       '@medusajs/core-flows': 2.18.0(@medusajs/framework@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76))
-      '@medusajs/medusa': 2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@medusajs/dashboard@2.18.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(typescript@5.9.3))(@medusajs/framework@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76))(@medusajs/icons@2.18.0(react@19.2.8))(@medusajs/test-utils@2.18.0)(@medusajs/ui@4.2.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3))(@swc/core@1.15.46)(@types/node@22.19.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(awilix@8.0.1)(jiti@1.21.7)(picomatch@4.0.5)(posthog-node@5.46.1(rxjs@7.8.2))(react-dom@19.2.8(react@19.2.8))(react-router-dom@7.18.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(tsx@4.23.1)(typescript@5.9.3)(yaml@2.9.0)
+      '@medusajs/medusa': 2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@medusajs/dashboard@2.18.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(typescript@6.0.3))(@medusajs/framework@2.18.0(@medusajs/cli@2.18.0(@types/node@22.19.1))(@types/node@22.19.1)(ioredis@5.11.1)(vite@6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0))(zod@3.25.76))(@medusajs/icons@2.18.0(react@19.2.8))(@medusajs/test-utils@2.18.0)(@medusajs/ui@4.2.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3))(@swc/core@1.15.46)(@types/node@22.19.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(awilix@8.0.1)(jiti@1.21.7)(picomatch@4.0.5)(posthog-node@5.46.1(rxjs@7.8.2))(react-dom@19.2.8(react@19.2.8))(react-router-dom@7.18.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)(tsx@4.23.1)(typescript@6.0.3)(yaml@2.9.0)
     transitivePeerDependencies:
       - debug
       - supports-color
@@ -8982,7 +8982,7 @@ snapshots:
       ioredis: 5.11.1
       vite: 6.4.3(@types/node@22.19.1)(jiti@1.21.7)(tsx@4.23.1)(yaml@2.9.0)
 
-  '@medusajs/ui@4.2.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.9.3)':
+  '@medusajs/ui@4.2.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@6.0.3)':
     dependencies:
       '@dnd-kit/core': 6.3.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@dnd-kit/sortable': 8.0.0(@dnd-kit/core@6.3.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
@@ -8993,7 +8993,7 @@ snapshots:
       '@tanstack/react-table': 8.20.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       clsx: 1.2.1
       copy-to-clipboard: 3.3.3
-      cva: 1.0.0-beta.1(typescript@5.9.3)
+      cva: 1.0.0-beta.1(typescript@6.0.3)
       lodash.isequal: 4.5.0
       prism-react-renderer: 2.4.1(react@18.3.1)
       prismjs: 1.30.0
@@ -9010,7 +9010,7 @@ snapshots:
       - '@types/react-dom'
       - typescript
 
-  '@medusajs/ui@4.2.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3)':
+  '@medusajs/ui@4.2.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3)':
     dependencies:
       '@dnd-kit/core': 6.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@dnd-kit/sortable': 8.0.0(@dnd-kit/core@6.3.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@19.2.8)
@@ -9021,7 +9021,7 @@ snapshots:
       '@tanstack/react-table': 8.20.5(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       clsx: 1.2.1
       copy-to-clipboard: 3.3.3
-      cva: 1.0.0-beta.1(typescript@5.9.3)
+      cva: 1.0.0-beta.1(typescript@6.0.3)
       lodash.isequal: 4.5.0
       prism-react-renderer: 2.4.1(react@19.2.8)
       prismjs: 1.30.0
@@ -9616,11 +9616,11 @@ snapshots:
     dependencies:
       playwright: 1.62.0
 
-  '@posthog/core@1.45.1':
+  '@posthog/core@1.48.3':
     dependencies:
-      '@posthog/types': 1.398.0
+      '@posthog/types': 1.405.0
 
-  '@posthog/types@1.398.0': {}
+  '@posthog/types@1.405.0': {}
 
   '@protobufjs/aspromise@1.1.2': {}
 
@@ -11687,40 +11687,40 @@ snapshots:
     dependencies:
       '@types/yargs-parser': 21.0.3
 
-  '@typescript-eslint/eslint-plugin@8.65.0(@typescript-eslint/parser@8.65.0(eslint@10.8.0(jiti@1.21.7))(typescript@5.9.3))(eslint@10.8.0(jiti@1.21.7))(typescript@5.9.3)':
+  '@typescript-eslint/eslint-plugin@8.65.0(@typescript-eslint/parser@8.65.0(eslint@10.8.0(jiti@1.21.7))(typescript@6.0.3))(eslint@10.8.0(jiti@1.21.7))(typescript@6.0.3)':
     dependencies:
       '@eslint-community/regexpp': 4.12.2
-      '@typescript-eslint/parser': 8.65.0(eslint@10.8.0(jiti@1.21.7))(typescript@5.9.3)
+      '@typescript-eslint/parser': 8.65.0(eslint@10.8.0(jiti@1.21.7))(typescript@6.0.3)
       '@typescript-eslint/scope-manager': 8.65.0
-      '@typescript-eslint/type-utils': 8.65.0(eslint@10.8.0(jiti@1.21.7))(typescript@5.9.3)
-      '@typescript-eslint/utils': 8.65.0(eslint@10.8.0(jiti@1.21.7))(typescript@5.9.3)
+      '@typescript-eslint/type-utils': 8.65.0(eslint@10.8.0(jiti@1.21.7))(typescript@6.0.3)
+      '@typescript-eslint/utils': 8.65.0(eslint@10.8.0(jiti@1.21.7))(typescript@6.0.3)
       '@typescript-eslint/visitor-keys': 8.65.0
       eslint: 10.8.0(jiti@1.21.7)
       ignore: 7.0.6
       natural-compare: 1.4.0
-      ts-api-utils: 2.5.0(typescript@5.9.3)
-      typescript: 5.9.3
+      ts-api-utils: 2.5.0(typescript@6.0.3)
+      typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/parser@8.65.0(eslint@10.8.0(jiti@1.21.7))(typescript@5.9.3)':
+  '@typescript-eslint/parser@8.65.0(eslint@10.8.0(jiti@1.21.7))(typescript@6.0.3)':
     dependencies:
       '@typescript-eslint/scope-manager': 8.65.0
       '@typescript-eslint/types': 8.65.0
-      '@typescript-eslint/typescript-estree': 8.65.0(typescript@5.9.3)
+      '@typescript-eslint/typescript-estree': 8.65.0(typescript@6.0.3)
       '@typescript-eslint/visitor-keys': 8.65.0
       debug: 4.4.3
       eslint: 10.8.0(jiti@1.21.7)
-      typescript: 5.9.3
+      typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/project-service@8.65.0(typescript@5.9.3)':
+  '@typescript-eslint/project-service@8.65.0(typescript@6.0.3)':
     dependencies:
-      '@typescript-eslint/tsconfig-utils': 8.65.0(typescript@5.9.3)
+      '@typescript-eslint/tsconfig-utils': 8.65.0(typescript@6.0.3)
       '@typescript-eslint/types': 8.65.0
       debug: 4.4.3
-      typescript: 5.9.3
+      typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
 
@@ -11729,47 +11729,47 @@ snapshots:
       '@typescript-eslint/types': 8.65.0
       '@typescript-eslint/visitor-keys': 8.65.0
 
-  '@typescript-eslint/tsconfig-utils@8.65.0(typescript@5.9.3)':
+  '@typescript-eslint/tsconfig-utils@8.65.0(typescript@6.0.3)':
     dependencies:
-      typescript: 5.9.3
+      typescript: 6.0.3
 
-  '@typescript-eslint/type-utils@8.65.0(eslint@10.8.0(jiti@1.21.7))(typescript@5.9.3)':
+  '@typescript-eslint/type-utils@8.65.0(eslint@10.8.0(jiti@1.21.7))(typescript@6.0.3)':
     dependencies:
       '@typescript-eslint/types': 8.65.0
-      '@typescript-eslint/typescript-estree': 8.65.0(typescript@5.9.3)
-      '@typescript-eslint/utils': 8.65.0(eslint@10.8.0(jiti@1.21.7))(typescript@5.9.3)
+      '@typescript-eslint/typescript-estree': 8.65.0(typescript@6.0.3)
+      '@typescript-eslint/utils': 8.65.0(eslint@10.8.0(jiti@1.21.7))(typescript@6.0.3)
       debug: 4.4.3
       eslint: 10.8.0(jiti@1.21.7)
-      ts-api-utils: 2.5.0(typescript@5.9.3)
-      typescript: 5.9.3
+      ts-api-utils: 2.5.0(typescript@6.0.3)
+      typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
 
   '@typescript-eslint/types@8.65.0': {}
 
-  '@typescript-eslint/typescript-estree@8.65.0(typescript@5.9.3)':
+  '@typescript-eslint/typescript-estree@8.65.0(typescript@6.0.3)':
     dependencies:
-      '@typescript-eslint/project-service': 8.65.0(typescript@5.9.3)
-      '@typescript-eslint/tsconfig-utils': 8.65.0(typescript@5.9.3)
+      '@typescript-eslint/project-service': 8.65.0(typescript@6.0.3)
+      '@typescript-eslint/tsconfig-utils': 8.65.0(typescript@6.0.3)
       '@typescript-eslint/types': 8.65.0
       '@typescript-eslint/visitor-keys': 8.65.0
       debug: 4.4.3
       minimatch: 10.2.5
       semver: 7.8.5
       tinyglobby: 0.2.17
-      ts-api-utils: 2.5.0(typescript@5.9.3)
-      typescript: 5.9.3
+      ts-api-utils: 2.5.0(typescript@6.0.3)
+      typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/utils@8.65.0(eslint@10.8.0(jiti@1.21.7))(typescript@5.9.3)':
+  '@typescript-eslint/utils@8.65.0(eslint@10.8.0(jiti@1.21.7))(typescript@6.0.3)':
     dependencies:
       '@eslint-community/eslint-utils': 4.10.1(eslint@10.8.0(jiti@1.21.7))
       '@typescript-eslint/scope-manager': 8.65.0
       '@typescript-eslint/types': 8.65.0
-      '@typescript-eslint/typescript-estree': 8.65.0(typescript@5.9.3)
+      '@typescript-eslint/typescript-estree': 8.65.0(typescript@6.0.3)
       eslint: 10.8.0(jiti@1.21.7)
-      typescript: 5.9.3
+      typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
 
@@ -12491,11 +12491,11 @@ snapshots:
 
   csv-parse@5.6.0: {}
 
-  cva@1.0.0-beta.1(typescript@5.9.3):
+  cva@1.0.0-beta.1(typescript@6.0.3):
     dependencies:
       clsx: 2.0.0
     optionalDependencies:
-      typescript: 5.9.3
+      typescript: 6.0.3
 
   dataloader@2.2.3: {}
 
@@ -13352,15 +13352,15 @@ snapshots:
       - babel-plugin-macros
       - supports-color
 
-  jest-cli@30.4.2(@types/node@22.19.1)(ts-node@10.9.2(@swc/core@1.15.46)(@types/node@22.19.1)(typescript@5.9.3)):
+  jest-cli@30.4.2(@types/node@22.19.1)(ts-node@10.9.2(@swc/core@1.15.46)(@types/node@22.19.1)(typescript@6.0.3)):
     dependencies:
-      '@jest/core': 30.4.2(ts-node@10.9.2(@swc/core@1.15.46)(@types/node@22.19.1)(typescript@5.9.3))
+      '@jest/core': 30.4.2(ts-node@10.9.2(@swc/core@1.15.46)(@types/node@22.19.1)(typescript@6.0.3))
       '@jest/test-result': 30.4.1
       '@jest/types': 30.4.1
       chalk: 4.1.2
       exit-x: 0.2.2
       import-local: 3.2.0
-      jest-config: 30.4.2(@types/node@22.19.1)(ts-node@10.9.2(@swc/core@1.15.46)(@types/node@22.19.1)(typescript@5.9.3))
+      jest-config: 30.4.2(@types/node@22.19.1)(ts-node@10.9.2(@swc/core@1.15.46)(@types/node@22.19.1)(typescript@6.0.3))
       jest-util: 30.4.1
       jest-validate: 30.4.1
       yargs: 17.7.3
@@ -13371,7 +13371,7 @@ snapshots:
       - supports-color
       - ts-node
 
-  jest-config@30.4.2(@types/node@22.19.1)(ts-node@10.9.2(@swc/core@1.15.46)(@types/node@22.19.1)(typescript@5.9.3)):
+  jest-config@30.4.2(@types/node@22.19.1)(ts-node@10.9.2(@swc/core@1.15.46)(@types/node@22.19.1)(typescript@6.0.3)):
     dependencies:
       '@babel/core': 7.29.7
       '@jest/get-type': 30.1.0
@@ -13398,7 +13398,7 @@ snapshots:
       strip-json-comments: 3.1.1
     optionalDependencies:
       '@types/node': 22.19.1
-      ts-node: 10.9.2(@swc/core@1.15.46)(@types/node@22.19.1)(typescript@5.9.3)
+      ts-node: 10.9.2(@swc/core@1.15.46)(@types/node@22.19.1)(typescript@6.0.3)
     transitivePeerDependencies:
       - babel-plugin-macros
       - supports-color
@@ -13712,12 +13712,12 @@ snapshots:
       merge-stream: 2.0.0
       supports-color: 8.1.1
 
-  jest@30.4.2(@types/node@22.19.1)(ts-node@10.9.2(@swc/core@1.15.46)(@types/node@22.19.1)(typescript@5.9.3)):
+  jest@30.4.2(@types/node@22.19.1)(ts-node@10.9.2(@swc/core@1.15.46)(@types/node@22.19.1)(typescript@6.0.3)):
     dependencies:
-      '@jest/core': 30.4.2(ts-node@10.9.2(@swc/core@1.15.46)(@types/node@22.19.1)(typescript@5.9.3))
+      '@jest/core': 30.4.2(ts-node@10.9.2(@swc/core@1.15.46)(@types/node@22.19.1)(typescript@6.0.3))
       '@jest/types': 30.4.1
       import-local: 3.2.0
-      jest-cli: 30.4.2(@types/node@22.19.1)(ts-node@10.9.2(@swc/core@1.15.46)(@types/node@22.19.1)(typescript@5.9.3))
+      jest-cli: 30.4.2(@types/node@22.19.1)(ts-node@10.9.2(@swc/core@1.15.46)(@types/node@22.19.1)(typescript@6.0.3))
     transitivePeerDependencies:
       - '@types/node'
       - babel-plugin-macros
@@ -14430,7 +14430,7 @@ snapshots:
 
   posthog-node@5.46.1(rxjs@7.8.2):
     dependencies:
-      '@posthog/core': 1.45.1
+      '@posthog/core': 1.48.3
     optionalDependencies:
       rxjs: 7.8.2
 
@@ -15329,13 +15329,13 @@ snapshots:
 
   triple-beam@1.4.1: {}
 
-  ts-api-utils@2.5.0(typescript@5.9.3):
+  ts-api-utils@2.5.0(typescript@6.0.3):
     dependencies:
-      typescript: 5.9.3
+      typescript: 6.0.3
 
   ts-interface-checker@0.1.13: {}
 
-  ts-node@10.9.2(@swc/core@1.15.46)(@types/node@22.19.1)(typescript@5.9.3):
+  ts-node@10.9.2(@swc/core@1.15.46)(@types/node@22.19.1)(typescript@6.0.3):
     dependencies:
       '@cspotcode/source-map-support': 0.8.1
       '@tsconfig/node10': 1.0.12
@@ -15349,7 +15349,7 @@ snapshots:
       create-require: 1.1.1
       diff: 4.0.4
       make-error: 1.3.6
-      typescript: 5.9.3
+      typescript: 6.0.3
       v8-compile-cache-lib: 3.0.1
       yn: 3.1.1
     optionalDependencies:
@@ -15394,18 +15394,18 @@ snapshots:
 
   typedarray@0.0.6: {}
 
-  typescript-eslint@8.65.0(eslint@10.8.0(jiti@1.21.7))(typescript@5.9.3):
+  typescript-eslint@8.65.0(eslint@10.8.0(jiti@1.21.7))(typescript@6.0.3):
     dependencies:
-      '@typescript-eslint/eslint-plugin': 8.65.0(@typescript-eslint/parser@8.65.0(eslint@10.8.0(jiti@1.21.7))(typescript@5.9.3))(eslint@10.8.0(jiti@1.21.7))(typescript@5.9.3)
-      '@typescript-eslint/parser': 8.65.0(eslint@10.8.0(jiti@1.21.7))(typescript@5.9.3)
-      '@typescript-eslint/typescript-estree': 8.65.0(typescript@5.9.3)
-      '@typescript-eslint/utils': 8.65.0(eslint@10.8.0(jiti@1.21.7))(typescript@5.9.3)
+      '@typescript-eslint/eslint-plugin': 8.65.0(@typescript-eslint/parser@8.65.0(eslint@10.8.0(jiti@1.21.7))(typescript@6.0.3))(eslint@10.8.0(jiti@1.21.7))(typescript@6.0.3)
+      '@typescript-eslint/parser': 8.65.0(eslint@10.8.0(jiti@1.21.7))(typescript@6.0.3)
+      '@typescript-eslint/typescript-estree': 8.65.0(typescript@6.0.3)
+      '@typescript-eslint/utils': 8.65.0(eslint@10.8.0(jiti@1.21.7))(typescript@6.0.3)
       eslint: 10.8.0(jiti@1.21.7)
-      typescript: 5.9.3
+      typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
 
-  typescript@5.9.3: {}
+  typescript@6.0.3: {}
 
   uid-safe@2.1.5:
     dependencies:

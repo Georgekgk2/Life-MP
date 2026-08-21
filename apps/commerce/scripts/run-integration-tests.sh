@@ -6,6 +6,7 @@ for spec in integration-tests/http/*.spec.ts; do
     echo "=================================================="
     echo "Running integration test file: $spec"
     echo "=================================================="
-    npx jest "$spec" --runInBand
+    ./scripts/run-jest-with-warning-classification.sh \
+      pnpm exec jest "$spec" --runInBand
   fi
 done

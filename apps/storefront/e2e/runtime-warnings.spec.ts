@@ -1,18 +1,18 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Storefront runtime diagnostics", () => {
-  test("has no browser console errors or uncaught page errors", async ({
+  test("has no browser console warnings, errors, or uncaught page errors", async ({
     page,
   }) => {
-    const runtimeErrors: string[] = [];
+    const runtimeDiagnostics: string[] = [];
 
     page.on("console", (message) => {
-      if (message.type() === "error") {
-        runtimeErrors.push(`console.error: ${message.text()}`);
+      if (message.type() === "error" || message.type() === "warning") {
+        runtimeDiagnostics.push(`console.${message.type()}: ${message.text()}`);
       }
     });
     page.on("pageerror", (error) => {
-      runtimeErrors.push(`pageerror: ${error.message}`);
+      runtimeDiagnostics.push(`pageerror: ${error.message}`);
     });
 
     for (const route of [
@@ -24,6 +24,6 @@ test.describe("Storefront runtime diagnostics", () => {
       await expect(page.locator("body")).toBeVisible();
     }
 
-    expect(runtimeErrors).toEqual([]);
+    expect(runtimeDiagnostics).toEqual([]);
   });
 });

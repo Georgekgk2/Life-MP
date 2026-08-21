@@ -1,20 +1,5 @@
 const fs = require("fs");
 const path = require("path");
-// Medusa's database-template restore intentionally terminates the app's
-// pooled connections between tests; Knex logs that expected reset as an
-// error even though the runner reconnects and all requests still execute.
-if (process.env.NODE_ENV === "test") {
-  const originalConsoleLog = console.log;
-  console.log = function (...args) {
-    if (
-      args.length === 1 &&
-      args[0] === "Connection Error: Connection ended unexpectedly"
-    ) {
-      return;
-    }
-    return originalConsoleLog.apply(this, args);
-  };
-}
 
 // Fix V8 cross-realm Map/Set prototype receiver mismatch in Jest VM modules
 const NativeMapSet = Map.prototype.set;

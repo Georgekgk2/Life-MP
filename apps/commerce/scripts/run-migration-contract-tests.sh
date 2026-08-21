@@ -7,4 +7,5 @@ set -euo pipefail
 # cannot be hidden by a forced process termination.
 pnpm run db:migrate
 pnpm run db:migrate
-pnpm exec jest --silent=false --runInBand
+./scripts/run-jest-with-warning-classification.sh \
+  pnpm exec jest --silent=false --runInBand

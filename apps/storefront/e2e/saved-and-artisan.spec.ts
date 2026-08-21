@@ -53,6 +53,7 @@ test.describe("Saved Wishlist & Artisan Application E2E", () => {
 
     // Capture screenshot of /saved with item
     await page.screenshot({
+      caret: "initial",
       path: path.join(
         screenshotsDir,
         `saved-with-item-${testInfo.project.name}.png`,
@@ -75,6 +76,7 @@ test.describe("Saved Wishlist & Artisan Application E2E", () => {
 
     // Capture screenshot of empty /saved
     await page.screenshot({
+      caret: "initial",
       path: path.join(
         screenshotsDir,
         `saved-empty-${testInfo.project.name}.png`,
@@ -95,6 +97,7 @@ test.describe("Saved Wishlist & Artisan Application E2E", () => {
 
     // Capture screenshot of join page
     await page.screenshot({
+      caret: "initial",
       path: path.join(
         screenshotsDir,
         `join-as-artisan-${testInfo.project.name}.png`,
@@ -142,6 +145,7 @@ test.describe("Saved Wishlist & Artisan Application E2E", () => {
 
     // Capture screenshot of success screen
     await page.screenshot({
+      caret: "initial",
       path: path.join(
         screenshotsDir,
         `artisan-success-${testInfo.project.name}.png`,

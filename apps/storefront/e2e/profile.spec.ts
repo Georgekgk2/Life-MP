@@ -35,6 +35,7 @@ test.describe("Customer Profile & Preferences E2E", () => {
 
     // 4. Capture screenshot of default saved items tab
     await page.screenshot({
+      caret: "initial",
       path: path.join(
         screenshotsDir,
         `profile-saved-${testInfo.project.name}.png`,
@@ -75,6 +76,7 @@ test.describe("Customer Profile & Preferences E2E", () => {
 
     // Capture screenshot of notifications tab
     await page.screenshot({
+      caret: "initial",
       path: path.join(
         screenshotsDir,
         `profile-notifications-${testInfo.project.name}.png`,
@@ -103,6 +105,7 @@ test.describe("Customer Profile & Preferences E2E", () => {
 
     // Capture screenshot of details tab
     await page.screenshot({
+      caret: "initial",
       path: path.join(
         screenshotsDir,
         `profile-details-${testInfo.project.name}.png`,

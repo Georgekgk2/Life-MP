@@ -40,6 +40,7 @@ test.describe("Vendor Dashboard containment E2E (Phase 4D)", () => {
     ).toHaveCount(0);
 
     await page.screenshot({
+      caret: "initial",
       path: path.join(
         screenshotsDir,
         `vendor-dashboard-contained-${testInfo.project.name}.png`,

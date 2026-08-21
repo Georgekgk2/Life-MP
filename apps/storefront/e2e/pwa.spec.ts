@@ -64,6 +64,7 @@ test.describe("Progressive Web App (PWA) & Mobile Capabilities", () => {
 
     // 4. Capture screenshot of PWA home
     await page.screenshot({
+      caret: "initial",
       path: path.join(screenshotsDir, "pwa-home-desktop.png"),
       fullPage: false,
     });

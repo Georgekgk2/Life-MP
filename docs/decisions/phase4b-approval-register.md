@@ -27,6 +27,8 @@ Evidence ID: `P-2026-08-22`, синхронізоване з [реєстром �
 
 Це змінює `LOG-1` з `Без відповіді` на `Попереднє`, але не змінює жодного live approval. `COM-1`, `COM-2`, `COM-3`, `COM-5`, `LOG-1`, cold-chain, carrier, returns і fiscal requirements залишаються `PENDING` або заблокованими до відповідних `L`/`F`/`O` доказів.
 
+Для вибору вузької першої хвилі див. [швидку матрицю першої хвилі](customer-questionnaire.md). Вона не замінює `L`/`F`/`O` evidence і не відкриває live approval.
+
 
 ## 2. Матриця рішень
 

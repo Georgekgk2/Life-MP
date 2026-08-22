@@ -130,6 +130,8 @@ services:
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
       MEDUSA_API_URL: http://commerce:9000
+      # Reserved for an approved Medusa catalog/review source; production guards stay fail-closed.
+      MEDUSA_BACKEND_URL: http://commerce:9000
       NEXT_PUBLIC_MEDUSA_API_URL: ${NEXT_PUBLIC_MEDUSA_API_URL:-/api}
       CATALOG_SOURCE: medusa
       ALLOW_SYNTHETIC_CATALOG: "false"

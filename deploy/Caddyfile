@@ -9,7 +9,7 @@
 
 {$DOMAIN:localhost} {
     # Storefront
-    handle /api/* {
+    handle_path /api/* {
         reverse_proxy commerce:9000
     }
 

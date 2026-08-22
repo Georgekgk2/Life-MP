@@ -47,6 +47,16 @@ Production deployment неможливий до завершення всіх о
 
 Кожен результат має містити commit/worktree, дату, команду, exit status і чітку межу твердження.
 
+## 3A. Ціль доменної заміни (неопераційний acceptance checklist)
+
+До окремого owner approval та розблокування production gate цільовим доменом вважається лише запропонований `life-mp.pp.ua`.
+
+- Запропонований canonical host: `life-mp.pp.ua`.
+- Політика для `www.life-mp.pp.ua` не обрана; redirect або окремий host не вмикати без письмового рішення.
+- Попередній production host не визначений; не робити тверджень про його заміну або виведення з експлуатації без підтвердженого інвентарю інфраструктури.
+- Acceptance evidence має містити DNS records, TLS certificate SAN, rendered Caddy configuration, CORS/API probes, storefront/PWA checks, feature smoke tests і rollback path.
+- Цей блок не є дозволом на DNS, TLS, SSH, remote Docker або production Compose mutation.
+
 ## 4. Умови розблокування документа
 
 Цей файл можна перетворити на окремий операційний runbook лише через новий review/change pack, який містить:

@@ -47,6 +47,16 @@ Production deployment неможливий до завершення всіх о
 
 Кожен результат має містити commit/worktree, дату, команду, exit status і чітку межу твердження.
 
+## 3A. Ціль доменної заміни (неопераційний acceptance checklist)
+
+До окремого owner approval та розблокування production gate цільовим доменом вважається лише запропонований `life-mp.pp.ua`.
+
+- Запропонований canonical host: `life-mp.pp.ua`.
+- Політика для `www.life-mp.pp.ua` не обрана; redirect або окремий host не вмикати без письмового рішення.
+- `life.jorvis.app` не видаляти й не вважати заміненим, доки не доведені DNS, TLS, Caddy routing, CORS, canonical/PWA URL та public acceptance для нового домену.
+- Acceptance evidence має містити DNS records, TLS certificate SAN, rendered Caddy configuration, CORS/API probes, storefront/PWA checks, feature smoke tests і rollback path.
+- Цей блок не є дозволом на DNS, TLS, SSH, remote Docker або production Compose mutation.
+
 ## 4. Умови розблокування документа
 
 Цей файл можна перетворити на окремий операційний runbook лише через новий review/change pack, який містить:

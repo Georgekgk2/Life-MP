@@ -53,7 +53,7 @@ Production deployment неможливий до завершення всіх о
 
 - Запропонований canonical host: `life-mp.pp.ua`.
 - Політика для `www.life-mp.pp.ua` не обрана; redirect або окремий host не вмикати без письмового рішення.
-- `life.jorvis.app` не видаляти й не вважати заміненим, доки не доведені DNS, TLS, Caddy routing, CORS, canonical/PWA URL та public acceptance для нового домену.
+- Попередній production host не визначений; не робити тверджень про його заміну або виведення з експлуатації без підтвердженого інвентарю інфраструктури.
 - Acceptance evidence має містити DNS records, TLS certificate SAN, rendered Caddy configuration, CORS/API probes, storefront/PWA checks, feature smoke tests і rollback path.
 - Цей блок не є дозволом на DNS, TLS, SSH, remote Docker або production Compose mutation.
 

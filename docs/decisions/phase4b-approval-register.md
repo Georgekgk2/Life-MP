@@ -1,6 +1,6 @@
 # Реєстр погоджень Phase 4B
 
-- **Дата огляду:** 2026-08-21
+- **Дата огляду:** 2026-08-22
 - **Власник:** замовник + власники юридичного, фінансового, операційного та security-контурів
 - **Загальний статус:** `PENDING / NOT READY FOR LIVE`
 
@@ -19,6 +19,15 @@
 
 До цього дозволені лише локальні contract tests і synthetic fixtures з explicit guards.
 
+## Нове попереднє evidence від замовника
+
+Evidence ID: `P-2026-08-22`, синхронізоване з [реєстром відкритих рішень](open-questions.md).
+
+Повідомлення замовника уточнює кандидатну гібридну модель: товари ЛАЙФ і товари постачальників; обробка та пакування власного складу ЛАЙФ; supplier-side fulfillment і пакування постачальника; майбутній власний склад/холодильники; приймання оплати ЛАЙФ у більшості сценаріїв; групування кошика за постачальником/місцем товару.
+
+Це змінює `LOG-1` з `Без відповіді` на `Попереднє`, але не змінює жодного live approval. `COM-1`, `COM-2`, `COM-3`, `COM-5`, `LOG-1`, cold-chain, carrier, returns і fiscal requirements залишаються `PENDING` або заблокованими до відповідних `L`/`F`/`O` доказів.
+
+
 ## 2. Матриця рішень
 
 | Код                           | Питання                                                      | Поточний статус                           | Власник                                       | Необхідний доказ                                                 | Розпорядження                   |
@@ -29,7 +38,7 @@
 | `COM-4`                       | Яка комісія платформи?                                       | `Факт комісії є, формула не підтверджена` | Фінансовий керівник                           | Ставка/формула, база, податки, момент, refund і ledger policy    | Не рахувати live commission     |
 | `COM-5`                       | Як працює мультивендорний кошик і split?                     | `Технічний намір; live contract pending`  | Комерційний + фінансовий + технічний власники | Узгоджена модель, сумісна з COM-1/2/3 і fulfillment              | Live checkout заблоковано       |
 | `COM-6`                       | Хто відповідає за повернення, гарантії та support?           | `Без відповіді`                           | Операції + юрист                              | Responsibility matrix, SLA, channel і refund policy              | Продажі заблоковані             |
-| `LOG-1`                       | Хто виконує fulfillment першої хвилі?                        | `Без відповіді`                           | Операційний керівник                          | Storage/packing/shipping/SLA/exception policy                    | Carrier integration заблокована |
+| `LOG-1`                       | Хто виконує fulfillment першої хвилі?                        | `Попереднє; sign-off pending`               | Замовник + операційний керівник                | `P-2026-08-22`: власний склад/запас обробляє ЛАЙФ, supplier-side запас обробляє постачальник, ЛАЙФ контролює та розподіляє виконання; перша хвиля, handoff, carrier, SLA і винятки не визначені. Потрібні storage/packing/shipping/SLA/exception policy, RACI та carrier ownership. | Production fulfillment заблоковано |
 | `LOG-2`                       | Хто володіє carrier account і API credentials?               | `Без відповіді`                           | Операції + security                           | Договірна сторона, account owner, rotation і access policy       | Production keys заборонені      |
 | `LOG-3`                       | Хто платить за доставку і як робиться refund?                | `Без відповіді`                           | Фінанси + операції                            | Tariff, payer, subsidy, partial refund matrix                    | Shipping quote заблокований     |
 | `CAT-1`–`CAT-5`               | Категорії, supply, документи, content RACI, claim moderation | `Без відповіді`                           | Комерційний + compliance-власники             | Approved lists, evidence matrix, moderator role та appeal policy | Public claims/sales заблоковані |

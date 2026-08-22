@@ -14,6 +14,8 @@ Evidence ID: `P-2026-08-22`, також зафіксоване в [реєстр�
 
 Це не змінює дозволений scope: production checkout, live payment, fiscalization, carrier API, cold-chain fulfillment і production deployment залишаються заблокованими до COM/LOG evidence. Свіже м'ясо є лише прикладом потенційної категорії, а не дозволеною launch category.
 
+Кандидатний scope для обговорення наведено у [швидкій матриці першої хвилі](customer-questionnaire.md). До письмового прийняття та закриття залежних gate цей scope не є дозволеним production capability.
+
 ## 1. Статуси capability
 
 - **`implemented`** — код або маршрут існує.

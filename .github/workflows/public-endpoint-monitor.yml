@@ -1,0 +1,56 @@
+name: Public Endpoint Monitor
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: public-endpoint-monitor
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    name: Probe public ingress
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Probe apex storefront
+        shell: bash
+        run: |
+          set -euo pipefail
+          status="$(curl --silent --show-error --fail-with-body \
+            --proto '=https' --tlsv1.2 --retry 3 --retry-all-errors \
+            --connect-timeout 10 --max-time 30 \
+            -o /dev/null -w '%{http_code}' \
+            'https://life-mp.pp.ua/')"
+          test "$status" = "200"
+
+      - name: Probe www redirect
+        shell: bash
+        run: |
+          set -euo pipefail
+          headers="$(mktemp)"
+          trap 'rm -f "$headers"' EXIT
+          status="$(curl --silent --show-error --fail-with-body \
+            --proto '=https' --tlsv1.2 --retry 3 --retry-all-errors \
+            --connect-timeout 10 --max-time 30 \
+            -D "$headers" -o /dev/null -w '%{http_code}' \
+            'https://www.life-mp.pp.ua/')"
+          location="$(awk 'BEGIN { IGNORECASE = 1 } /^location:/ { sub(/\r$/, ""); print $2; exit }' "$headers")"
+          test "$status" = "301"
+          test "$location" = "https://life-mp.pp.ua/"
+
+      - name: Probe API health route
+        shell: bash
+        run: |
+          set -euo pipefail
+          status="$(curl --silent --show-error --fail-with-body \
+            --proto '=https' --tlsv1.2 --retry 3 --retry-all-errors \
+            --connect-timeout 10 --max-time 30 \
+            -o /dev/null -w '%{http_code}' \
+            'https://life-mp.pp.ua/api/health')"
+          test "$status" = "200"

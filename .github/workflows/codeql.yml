@@ -18,7 +18,7 @@ permissions:
 jobs:
   analyze:
     name: CodeQL Analysis
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, jorvis, jorvis-lite]
     timeout-minutes: 15
 
     strategy:

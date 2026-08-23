@@ -29,6 +29,14 @@ Evidence ID: `P-2026-08-22`, синхронізоване з [реєстром �
 
 Для вибору вузької першої хвилі див. [швидку матрицю першої хвилі](customer-questionnaire.md). Вона не замінює `L`/`F`/`O` evidence і не відкриває live approval.
 
+## Нове попереднє уточнення від замовника
+
+Evidence ID: `P-followup-2026-08-22`, синхронізоване з [реєстром відкритих рішень](open-questions.md). Видима дата повідомлень на скриншоті відсутня; raw screenshot не є repository evidence.
+
+Замовник попередньо називає ЛАЙФ відповідальним за seller/payment recipient, returns/refund/warranty/support, delivery payer, ТТН, loss/damage та packaging/control. Для чека/РРО потрібна консультація; комісія названа як «від 15% і вище» без повної формули; свіже м'ясо виключене з першої хвилі.
+
+Це переводить `COM-6` і `LOG-3` з `Без відповіді` у `Попереднє; sign-off pending`, але не змінює жодного live approval. `COM-1`, `COM-2`, `COM-3`, `COM-4`, `LOG-1`, `LOG-2`, carrier, fiscal, returns policy і supplier contracts залишаються `PENDING` або заблокованими до відповідних `L`/`F`/`O` доказів. Виключення свіжого м'яса стосується першої хвилі, а не є cold-chain plan.
+
 
 ## 2. Матриця рішень
 
@@ -39,10 +47,10 @@ Evidence ID: `P-2026-08-22`, синхронізоване з [реєстром �
 | `COM-3` / `FSC-1`             | Хто видає чек і як працює ПРРО?                              | `Не підтверджено`                         | Бухгалтерія + юрист                           | Письмова fiscal model і договір із ПРРО                          | Fiscalization заблокована       |
 | `COM-4`                       | Яка комісія платформи?                                       | `Факт комісії є, формула не підтверджена` | Фінансовий керівник                           | Ставка/формула, база, податки, момент, refund і ledger policy    | Не рахувати live commission     |
 | `COM-5`                       | Як працює мультивендорний кошик і split?                     | `Технічний намір; live contract pending`  | Комерційний + фінансовий + технічний власники | Узгоджена модель, сумісна з COM-1/2/3 і fulfillment              | Live checkout заблоковано       |
-| `COM-6`                       | Хто відповідає за повернення, гарантії та support?           | `Без відповіді`                           | Операції + юрист                              | Responsibility matrix, SLA, channel і refund policy              | Продажі заблоковані             |
-| `LOG-1`                       | Хто виконує fulfillment першої хвилі?                        | `Попереднє; sign-off pending`               | Замовник + операційний керівник                | `P-2026-08-22`: власний склад/запас обробляє ЛАЙФ, supplier-side запас обробляє постачальник, ЛАЙФ контролює та розподіляє виконання; перша хвиля, handoff, carrier, SLA і винятки не визначені. Потрібні storage/packing/shipping/SLA/exception policy, RACI та carrier ownership. | Production fulfillment заблоковано |
+| `COM-6`                       | Хто відповідає за повернення, гарантії та support?           | `Попереднє; sign-off pending`                 | Операції + юрист                              | `P-followup-2026-08-22`: ЛАЙФ названий відповідальним за returns/refund/warranty/support, але потрібні responsibility matrix, SLA, channel і refund policy | Продажі заблоковані             |
+| `LOG-1`                       | Хто виконує fulfillment першої хвилі?                        | `Попереднє; sign-off pending`               | Замовник + операційний керівник                | `P-2026-08-22` + `P-followup-2026-08-22`: ЛАЙФ пакує власний запас або контролює пакування, supplier-side виконання залишається під контролем ЛАЙФ; handoff, carrier, SLA, ТТН, returns і винятки не визначені. Потрібні storage/packing/shipping/SLA/exception policy, RACI та carrier ownership. | Production fulfillment заблоковано |
 | `LOG-2`                       | Хто володіє carrier account і API credentials?               | `Без відповіді`                           | Операції + security                           | Договірна сторона, account owner, rotation і access policy       | Production keys заборонені      |
-| `LOG-3`                       | Хто платить за доставку і як робиться refund?                | `Без відповіді`                           | Фінанси + операції                            | Tariff, payer, subsidy, partial refund matrix                    | Shipping quote заблокований     |
+| `LOG-3`                       | Хто платить за доставку і як робиться refund?                | `Попереднє; sign-off pending`               | Фінанси + операції                            | `P-followup-2026-08-22`: відповідь «ЛАЙФ» стосується payer і loss/damage responsibility, але потрібні tariff, payer, subsidy, claim/refund matrix та partial refund policy | Shipping quote заблокований     |
 | `CAT-1`–`CAT-5`               | Категорії, supply, документи, content RACI, claim moderation | `Без відповіді`                           | Комерційний + compliance-власники             | Approved lists, evidence matrix, moderator role та appeal policy | Public claims/sales заблоковані |
 | `Production Server Discovery` | Чи є незалежна та дозволена інфраструктура?                  | `Не виконано`                             | Інфраструктурний власник                      | One-time written authorization, read-only report, attestations   | Remote action заблокована       |
 

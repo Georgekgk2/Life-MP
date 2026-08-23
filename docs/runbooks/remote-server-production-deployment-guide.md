@@ -1,7 +1,7 @@
 # Інструкція віддаленого production-розгортання «ЛАЙФ»
 
 - **Статус:** `ЗАБЛОКОВАНО / НЕОПЕРАЦІЙНИЙ ДОКУМЕНТ`
-- **Дата огляду:** 2026-08-21
+- **Дата огляду:** 2026-08-23
 - **Власник:** інфраструктурний власник + security-власник
 - **Середовище:** жодне; remote action не дозволена
 
@@ -47,15 +47,20 @@ Production deployment неможливий до завершення всіх о
 
 Кожен результат має містити commit/worktree, дату, команду, exit status і чітку межу твердження.
 
-## 3A. Ціль доменної заміни (неопераційний acceptance checklist)
+## 3A. Поточний public ingress evidence (неопераційний acceptance record)
 
-До окремого owner approval та розблокування production gate цільовим доменом вважається лише запропонований `life-mp.pp.ua`.
+Sanitized public probes на 2026-08-23 підтверджують поточний ingress path через Cloudflare Edge і Cloudflare Tunnel:
 
-- Запропонований canonical host: `life-mp.pp.ua`.
-- Політика для `www.life-mp.pp.ua` не обрана; redirect або окремий host не вмикати без письмового рішення.
-- Попередній production host не визначений; не робити тверджень про його заміну або виведення з експлуатації без підтвердженого інвентарю інфраструктури.
-- Acceptance evidence має містити DNS records, TLS certificate SAN, rendered Caddy configuration, CORS/API probes, storefront/PWA checks, feature smoke tests і rollback path.
-- Цей блок не є дозволом на DNS, TLS, SSH, remote Docker або production Compose mutation.
+- canonical host: `life-mp.pp.ua`;
+- `www.life-mp.pp.ua` policy: `301` redirect на apex;
+- public service: `http://jorvis-proxy:8080` через Tunnel;
+- `/api/health`: HTTP `200`;
+- Edge certificate: SAN для `life-mp.pp.ua` та `*.life-mp.pp.ua`;
+- стару `www` parking delegation видалено.
+
+Канонічний запис evidence: [production infrastructure cutover](../decisions/production-infrastructure-cutover-2026-08-23.md).
+
+Це лише факт публічної доступності на дату probe. Він не є дозволом на remote mutation, deployment, payment, fiscalization, fulfillment або commercial production. Tunnel restart/recreation durability, credential persistence і direct-origin fallback залишаються окремими gates.
 
 ## 4. Умови розблокування документа
 

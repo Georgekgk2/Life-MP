@@ -1,6 +1,6 @@
 # Документація «ЛАЙФ»
 
-**Дата огляду структури:** 2026-08-21
+**Дата огляду структури:** 2026-08-23
 **Поточний статус системи:** локальна розробка та контрольований sandbox; комерційний production — **не готовий і заблокований**.
 
 Цей файл є головною картою документації. Він не замінює рішення або докази, на які посилається.
@@ -45,6 +45,7 @@
 | Увімкнені, вимкнені та заблоковані можливості | [Межі запуску](decisions/launch-scope.md)                             |
 | Бізнесові, юридичні та операційні блокери     | [Реєстр відкритих рішень](decisions/open-questions.md)                |
 | Докази та статус production gate              | [Ворота production readiness](decisions/production-readiness-gate.md) |
+| Public DNS/TLS/HTTP infrastructure evidence    | [Infrastructure cutover evidence](decisions/production-infrastructure-cutover-2026-08-23.md) |
 | Фактична структура системи                    | [Огляд архітектури](architecture/overview.md)                         |
 | Фактична модель даних marketplace             | [ERD v1](architecture/erd-v1.md)                                      |
 | Рішення, які не можна змінювати неявно        | [Каталог ADR](adr/)                                                   |

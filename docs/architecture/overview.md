@@ -1,6 +1,6 @@
 # Фактичний огляд архітектури «ЛАЙФ»
 
-- **Дата огляду:** 2026-08-21
+- **Дата огляду:** 2026-08-23
 - **Власник:** технічний власник Life-MP
 - **Статус:** локальна розробка та контрольований sandbox
 - **Канонічні межі:** [межі запуску](../decisions/launch-scope.md), [реєстр відкритих рішень](../decisions/open-questions.md), [production readiness gate](../decisions/production-readiness-gate.md)
@@ -34,6 +34,7 @@
 | CMS                                                                          | `apps/cms`, ADR 0005                                | Заблоковано                           | Payload runtime не встановлений і не має authority над каталогом.                                                                              |
 | Payment, fiscalization, shipment provider, payout, booking, affiliate payout | `apps/commerce/src/index.ts`, launch scope          | Заблоковано / не реалізовано для live | Будь-які sandbox-моделі лише тестові; бойові ключі й webhook-и не підключаються.                                                               |
 | Production/staging deployment                                                | `deploy/`, containment policy, readiness gate       | Заблоковано                           | Немає дозволу на remote provisioning або promotion. Потрібні окремі infrastructure та external gates.                                          |
+| Публічний DNS/TLS/HTTP ingress                                              | [external infrastructure evidence](../decisions/production-infrastructure-cutover-2026-08-23.md) | Infrastructure path verified | Public behavior підтверджено окремими probes; це не application або commercial production sign-off. |
 
 ## 3. Фактична структура репозиторію
 
@@ -116,7 +117,18 @@ vendor_id з membership ──► listing/document/verification route
 5. Containment policy блокує непогоджені deployment capability; її перевірка не доводить наявність production-сервера.
 6. CodeQL, Trivy, Gitleaks, GitHub CI та зовнішні договори мають окрему provenance; локальний тест не замінює жоден із цих доказів.
 
-## 8. Заборонені висновки
+## 8. Зовнішній інфраструктурний evidence
+
+Окремий operator-provided запис [production infrastructure cutover evidence](../decisions/production-infrastructure-cutover-2026-08-23.md) фіксує публічний DNS/TLS/HTTP path через Cloudflare Edge і Tunnel. Прямі probes на дату запису показали apex `200`, `www` redirect `301`, `/api/health` `200` та валідний Edge certificate.
+
+Цей evidence має окрему provenance і не змінює фактичні межі коду в цьому репозиторії. Він не доводить:
+
+- durability Tunnel після restart/recreation;
+- direct-origin fallback TLS;
+- payment, fiscalization, carrier, vendor або commercial readiness;
+- дозвіл на remote provisioning, deployment або production promotion.
+
+## 9. Заборонені висновки
 
 Не робіть із цього документа висновків, що:
 

@@ -48,9 +48,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          body="$(mktemp)"
+          trap 'rm -f "$body"' EXIT
           status="$(curl --silent --show-error --fail-with-body \
             --proto '=https' --tlsv1.2 --retry 3 --retry-all-errors \
             --connect-timeout 10 --max-time 30 \
-            -o /dev/null -w '%{http_code}' \
+            -o "$body" -w '%{http_code}' \
             'https://life-mp.pp.ua/api/health')"
+          response="$(tr -d '\r\n' < "$body")"
           test "$status" = "200"
+          test "$response" = "OK"

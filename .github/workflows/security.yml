@@ -29,7 +29,8 @@ jobs:
   # ===========================================================================
   secrets-scan:
     name: Secret Detection
-    runs-on: [self-hosted, Linux, X64, jorvis-lite]
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: [self-hosted, Linux, X64, life-mp-lite]
     steps:
       - uses: actions/checkout@v5
         with:
@@ -45,7 +46,8 @@ jobs:
   # ===========================================================================
   dependency-audit:
     name: Dependency Audit
-    runs-on: [self-hosted, Linux, X64, jorvis-lite]
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: [self-hosted, Linux, X64, life-mp-heavy]
     steps:
       - uses: actions/checkout@v5
 
@@ -69,7 +71,8 @@ jobs:
   # ===========================================================================
   container-scan:
     name: Container Scan
-    runs-on: [self-hosted, Linux, X64, jorvis-heavy]
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: [self-hosted, Linux, X64, life-mp-heavy]
     strategy:
       fail-fast: false
       matrix:

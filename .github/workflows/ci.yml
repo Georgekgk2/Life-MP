@@ -15,7 +15,7 @@ permissions:
 jobs:
   verify:
     name: Verify
-    runs-on: [self-hosted, Linux, X64, jorvis-lite]
+    runs-on: [self-hosted, Linux, X64, jorvis, jorvis-lite]
     timeout-minutes: 15
 
     steps:
@@ -53,7 +53,7 @@ jobs:
 
   catalog-provider-integration:
     name: Catalog Provider Integration
-    runs-on: [self-hosted, Linux, X64, jorvis-lite]
+    runs-on: [self-hosted, Linux, X64, jorvis, jorvis-lite]
     timeout-minutes: 15
 
     services:
@@ -120,7 +120,7 @@ jobs:
 
   catalog-provider-migrations:
     name: Catalog Provider Migrations
-    runs-on: [self-hosted, Linux, X64, jorvis-lite]
+    runs-on: [self-hosted, Linux, X64, jorvis, jorvis-lite]
     timeout-minutes: 15
 
     services:
@@ -187,7 +187,7 @@ jobs:
 
   storefront-e2e:
     name: Storefront E2E
-    runs-on: [self-hosted, Linux, X64, jorvis-lite]
+    runs-on: [self-hosted, Linux, X64, jorvis, jorvis-lite]
     timeout-minutes: 15
 
     steps:

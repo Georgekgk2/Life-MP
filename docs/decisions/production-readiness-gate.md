@@ -1,6 +1,6 @@
 # Ворота готовності до виробничого запуску
 
-- **Дата огляду:** 2026-08-21
+- **Дата огляду:** 2026-08-23
 - **Власник:** технічний власник + gatekeeper
 - **Рішення:** **НЕ ДОЗВОЛЕНО ДЛЯ PRODUCTION; ДОЗВОЛЕНО ЛИШЕ ДЛЯ КОНТРОЛЬОВАНОЇ ЛОКАЛЬНОЇ РОЗРОБКИ, SANDBOX І ВНУТРІШНЬОГО ТЕСТУВАННЯ.**
 
@@ -61,6 +61,24 @@
 
 Джерело статусів — [реєстр відкритих рішень](open-questions.md) та [реєстр погоджень Phase 4B](phase4b-approval-register.md).
 
+## 4A. Зовнішній infrastructure evidence
+
+Окремий sanitized запис [production infrastructure cutover evidence](production-infrastructure-cutover-2026-08-23.md) містить public DNS/TLS/HTTP probes для Cloudflare Edge і Tunnel.
+
+Поточний evidence-bound статус:
+
+| Gate | Статус | Межа |
+| --- | --- | --- |
+| Public apex HTTPS | `VERIFIED` | HTTP `200` через Cloudflare Edge. |
+| `www` canonical redirect | `VERIFIED` | HTTP `301` на `https://life-mp.pp.ua/`. |
+| Public API health | `VERIFIED` | `/api/health` повертає HTTP `200`. |
+| Edge certificate | `VERIFIED` | SAN містить apex і wildcard host. |
+| Tunnel restart/recreation durability | `NOT VERIFIED` | Потрібен контрольований restart/recreation test. |
+| Direct-origin fallback TLS | `NOT VERIFIED / FAILED HISTORICAL PATH` | Попередній direct-origin шлях мав TLS/522 failure. |
+| Commercial production | `BLOCKED / NOT READY` | COM/LOG/CAT gates залишаються обов’язковими. |
+
+Public infrastructure accessibility не є application, legal, financial або commercial production sign-off. Цей розділ не дозволяє remote mutation, promotion або real transactions.
+
 ## 5. Заборона promotion
 
 До закриття всіх gate заборонено:
@@ -75,6 +93,7 @@
 ## 6. Підсумок
 
 - **Локальний sandbox:** `PARTIAL / evidence-bound`.
+- **Public infrastructure ingress:** `VERIFIED` за прямими DNS/TLS/HTTP probes; durability не перевірена.
 - **Staging:** `NOT VERIFIED`.
 - **Commercial production:** `BLOCKED / NOT READY`.
 - **Незалежний reviewer:** обов’язковий до merge; виконавець не сертифікує власну зміну.

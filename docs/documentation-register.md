@@ -1,6 +1,6 @@
 # Реєстр документації
 
-**Дата інвентаризації:** 2026-08-21
+**Дата інвентаризації:** 2026-08-23
 **Власник реєстру:** технічний власник Life-MP
 **Критерій:** «Канонічний» означає, що документ є першим місцем для певного типу тверджень; це не означає production readiness.
 
@@ -29,6 +29,7 @@
 | `docs/decisions/launch-scope.md`                                 | Scope                  | Канонічний               | Замовник + технічний власник       | Що дозволено, вимкнено та заблоковано                |
 | `docs/decisions/open-questions.md`                               | Рішення                | Канонічний               | Замовник і функціональні власники  | Відкриті COM/LOG/CAT/EVT/AFF-рішення                 |
 | `docs/decisions/production-readiness-gate.md`                    | Готовність             | Канонічний               | Gatekeeper / технічний власник     | Evidence ledger і заборона production                |
+| `docs/decisions/production-infrastructure-cutover-2026-08-23.md`   | Infrastructure evidence | Довідковий evidence     | Інфраструктурний власник + gatekeeper | Sanitized public DNS/TLS/HTTP path; не commercial sign-off |
 | `docs/decisions/customer-questionnaire.md`                       | Рішення                | Робочий посібник         | Замовник                           | Форма отримання відсутніх рішень                     |
 | `docs/decisions/customer-input-2026-07-27.md`                    | Рішення                | Довідковий               | Замовник + технічний власник       | Датований вхідний контекст; не замінює договір       |
 | `docs/decisions/phase3-4a-deferred-decision-development-plan.md` | План                   | План / чернетка          | Технічний власник                  | Послідовність sandbox-робіт до зовнішніх gate        |

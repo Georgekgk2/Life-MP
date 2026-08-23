@@ -19,8 +19,7 @@ concurrency:
 jobs:
   verify:
     name: Verify
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: [self-hosted, Linux, X64, life-mp-heavy]
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'life-mp-heavy' || 'ubuntu-latest' }}
     timeout-minutes: 15
 
     steps:
@@ -58,8 +57,7 @@ jobs:
 
   catalog-provider-integration:
     name: Catalog Provider Integration
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: [self-hosted, Linux, X64, life-mp-heavy]
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'life-mp-heavy' || 'ubuntu-latest' }}
     timeout-minutes: 15
 
     services:
@@ -126,8 +124,7 @@ jobs:
 
   catalog-provider-migrations:
     name: Catalog Provider Migrations
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: [self-hosted, Linux, X64, life-mp-heavy]
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'life-mp-heavy' || 'ubuntu-latest' }}
     timeout-minutes: 15
 
     services:
@@ -194,8 +191,7 @@ jobs:
 
   storefront-e2e:
     name: Storefront E2E
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: [self-hosted, Linux, X64, life-mp-heavy]
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'life-mp-heavy' || 'ubuntu-latest' }}
     timeout-minutes: 15
 
     steps:

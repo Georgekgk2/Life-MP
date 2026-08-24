@@ -1,13 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
-import {
-  CartDrawer,
-  InstallPwaPrompt,
-  PwaRegister,
-  SiteFooter,
-  SiteHeader,
-} from "@/components";
+import { CartDrawer, PwaRegister, SiteFooter, SiteHeader } from "@/components";
 import { CartProvider } from "@/context/cart-context";
 import { SavedProvider } from "@/context/saved-context";
 import { ProfileProvider } from "@/context/profile-context";
@@ -23,11 +17,11 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    default: "Life-MP — вітрина можливостей",
+    default: "Life-MP — демонстраційна вітрина спільноти",
     template: "%s | Life-MP",
   },
   description:
-    "Український маркетплейс локальних крафтових виробів, натуральних продуктів та спільноти майстрів.",
+    "Демонстраційна вітрина Life-MP із синтетичними даними: майстри, вироби та історії локальної спільноти в sandbox-режимі.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
@@ -65,9 +59,6 @@ export default function RootLayout({
               <SiteHeader />
               <CartDrawer />
               <main id="main-content" tabIndex={-1}>
-                <div className="layout-shell">
-                  <InstallPwaPrompt />
-                </div>
                 {children}
               </main>
               <SiteFooter />

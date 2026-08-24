@@ -18,15 +18,19 @@ export async function getCatalogSnapshot(): Promise<CatalogReadResult> {
   const isLocalOrTest =
     process.env["NODE_ENV"] === "development" ||
     process.env["NODE_ENV"] === "test";
+  const isExplicitE2e = process.env["LIFE_E2E"] === "true";
   const allowSyntheticCatalog =
     process.env["ALLOW_SYNTHETIC_CATALOG"] === "true";
+  const isControlledE2e = isExplicitE2e && allowSyntheticCatalog;
+  const isControlledFixtureE2e = isControlledE2e && source === "fixtures";
 
   // Production must never silently serve fixtures or a non-commercial Medusa
-  // catalog. An explicit synthetic flag is reserved for controlled local/test
-  // runs; commercial publication remains a separate approved capability.
+  // catalog. Both E2E switches are required for the local Playwright server;
+  // setting either one alone leaves the production guard closed.
   if (
-    isProduction ||
-    (source === "medusa" && (!isLocalOrTest || !allowSyntheticCatalog))
+    (isProduction && !isControlledFixtureE2e) ||
+    (source === "medusa" &&
+      (!(isLocalOrTest || isControlledE2e) || !allowSyntheticCatalog))
   ) {
     return {
       kind: "unavailable",
@@ -40,6 +44,7 @@ export async function getCatalogSnapshot(): Promise<CatalogReadResult> {
       slug: c.slug,
       name: c.name,
       description: c.description,
+      imageSrc: c.imageSrc,
     }));
 
     const products = fixtureProducts.map((p) => ({
@@ -49,6 +54,7 @@ export async function getCatalogSnapshot(): Promise<CatalogReadResult> {
       name: p.name,
       description: p.description,
       priceUah: p.priceUah,
+      imageSrc: p.imageSrc,
       provider: {
         handle: "demo-provider",
         name: "Локальний майстер",

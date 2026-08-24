@@ -14,36 +14,42 @@ export const categories = [
     slug: "odiah",
     name: "Одяг і аксесуари",
     description: "Речі для повсякденних моментів і демонстрації каталогу.",
+    imageSrc: "/images/categories/category-odiah.webp",
   },
   {
     id: "category-dim",
     slug: "dim",
     name: "Дім і затишок",
     description: "Невеликі предмети для теплих домашніх ритуалів.",
+    imageSrc: "/images/categories/category-dim.webp",
   },
   {
     id: "category-knyhy",
     slug: "knyhy",
     name: "Книги й читання",
     description: "Видання та нотатки для спокійного читання.",
+    imageSrc: "/images/categories/category-knyhy.webp",
   },
   {
     id: "category-kanzeliariia",
     slug: "kanzeliariia",
     name: "Канцелярія",
     description: "Прості інструменти для записів і творчих задумів.",
+    imageSrc: "/images/categories/category-kanzeliariia.webp",
   },
   {
     id: "category-podarunky",
     slug: "podarunky",
     name: "Подарунки",
     description: "Знаки уваги для близьких у межах демо-вітрини.",
+    imageSrc: "/images/categories/category-podarunky.webp",
   },
   {
     id: "category-maisteria",
     slug: "maisteria",
     name: "Майстерня",
     description: "Матеріали для спільних творчих занять.",
+    imageSrc: "/images/categories/category-maisteria.webp",
   },
 ] as const satisfies readonly Category[];
 
@@ -53,6 +59,7 @@ export const products = [
   {
     id: "product-futbolka-svitlo",
     slug: "futbolka-svitlo",
+    imageSrc: "/images/products/futbolka-svitlo.webp",
     categorySlug: "odiah",
     name: "Футболка «Світло»",
     description:
@@ -63,6 +70,7 @@ export const products = [
   {
     id: "product-shoper-razom",
     slug: "shoper-razom",
+    imageSrc: "/images/products/shoper-razom.webp",
     categorySlug: "odiah",
     name: "Шопер «Разом»",
     description:
@@ -73,6 +81,7 @@ export const products = [
   {
     id: "product-chashka-ranok",
     slug: "chashka-ranok",
+    imageSrc: "/images/products/chashka-ranok.webp",
     categorySlug: "dim",
     name: "Чашка «Ранок»",
     description:
@@ -83,6 +92,7 @@ export const products = [
   {
     id: "product-svichka-vechir",
     slug: "svichka-vechir",
+    imageSrc: "/images/products/svichka-vechir.webp",
     categorySlug: "dim",
     name: "Свічка «Вечір»",
     description:
@@ -93,6 +103,7 @@ export const products = [
   {
     id: "product-notatnyk-istorii",
     slug: "notatnyk-istorii",
+    imageSrc: "/images/products/notatnyk-istorii.webp",
     categorySlug: "knyhy",
     name: "Нотатник «Історії»",
     description:
@@ -103,6 +114,7 @@ export const products = [
   {
     id: "product-zbirka-opovidan",
     slug: "zbirka-opovidan",
+    imageSrc: "/images/products/notatnyk-istorii.webp",
     categorySlug: "knyhy",
     name: "Збірка оповідань «Поруч»",
     description:
@@ -113,6 +125,7 @@ export const products = [
   {
     id: "product-olivtsi-kolir",
     slug: "olivtsi-kolir",
+    imageSrc: "/images/products/nabir-oliva.webp",
     categorySlug: "kanzeliariia",
     name: "Набір олівців «Колір»",
     description:
@@ -123,6 +136,7 @@ export const products = [
   {
     id: "product-zakladka-hvylya",
     slug: "zakladka-hvylya",
+    imageSrc: "/images/products/notatnyk-istorii.webp",
     categorySlug: "kanzeliariia",
     name: "Закладка «Хвиля»",
     description:
@@ -133,6 +147,7 @@ export const products = [
   {
     id: "product-lystivka-teplo",
     slug: "lystivka-teplo",
+    imageSrc: "/images/products/svichka-vechir.webp",
     categorySlug: "podarunky",
     name: "Листівка «Тепло»",
     description:
@@ -143,6 +158,7 @@ export const products = [
   {
     id: "product-nabor-podarunok",
     slug: "nabor-podarunok",
+    imageSrc: "/images/products/plate-berehynia.webp",
     categorySlug: "podarunky",
     name: "Набір «Добрий знак»",
     description:
@@ -153,6 +169,7 @@ export const products = [
   {
     id: "product-nabor-tvorchist",
     slug: "nabor-tvorchist",
+    imageSrc: "/images/products/nabir-oliva.webp",
     categorySlug: "maisteria",
     name: "Набір для творчості «Разом»",
     description:
@@ -163,6 +180,7 @@ export const products = [
   {
     id: "product-plakat-spilnota",
     slug: "plakat-spilnota",
+    imageSrc: "/images/products/nabir-oliva.webp",
     categorySlug: "maisteria",
     name: "Плакат «Спільнота»",
     description:
@@ -178,6 +196,7 @@ export const people = [
   {
     id: "person-olena",
     slug: "olena",
+    imageSrc: "/images/people/person-olena.webp",
     name: "Олена",
     role: "Авторка майстерні",
     description:
@@ -187,6 +206,7 @@ export const people = [
   {
     id: "person-marko",
     slug: "marko",
+    imageSrc: "/images/people/person-marko.webp",
     name: "Марко",
     role: "Куратор творчих занять",
     description:
@@ -196,6 +216,7 @@ export const people = [
   {
     id: "person-solomiia",
     slug: "solomiia",
+    imageSrc: "/images/people/person-solomiia.webp",
     name: "Соломія",
     role: "Редакторка історій",
     description:
@@ -231,6 +252,7 @@ export const stories = [
     title: "Полиця для історій",
     summary:
       "Олена показує, як короткі нотатки й вибрані оповідання стають приводом для розмови у спільноті.",
+    imageSrc: "/images/stories/story-politsia.webp",
     personSlug: "olena",
     relatedProductSlugs: ["notatnyk-istorii", "zbirka-opovidan"],
   },
@@ -240,6 +262,7 @@ export const stories = [
     title: "Колір у майстерні",
     summary:
       "Марко збирає ідеї для відкритого творчого столу з простими матеріалами та уважною розмовою.",
+    imageSrc: "/images/stories/story-kolir.webp",
     personSlug: "marko",
     relatedProductSlugs: ["olivtsi-kolir", "nabor-tvorchist"],
   },
@@ -249,6 +272,7 @@ export const stories = [
     title: "Ранок у спільноті",
     summary:
       "Соломія ділиться сценарієм неквапливої зустрічі з читанням, нотатками та чашкою чаю.",
+    imageSrc: "/images/stories/story-ranok.webp",
     personSlug: "solomiia",
     relatedProductSlugs: ["chashka-ranok", "zakladka-hvylya"],
   },
@@ -260,7 +284,8 @@ export const events = [
     slug: "vidkryta-maisteria",
     title: "Відкрита майстерня",
     summary:
-      "Демонстраційна зустріч про спільну творчість без реєстрації, продажу чи збору даних.",
+      "Практична зустріч про спільну творчість, природні матеріали та уважний діалог.",
+    imageSrc: "/images/events/event-maisteria.webp",
     dateLabel: "12 вересня 2026",
     timeLabel: "14:00 – 17:30",
     typeLabel: "Практичний воркшоп",
@@ -295,7 +320,8 @@ export const events = [
     slug: "chytannia-razom",
     title: "Читання разом",
     summary:
-      "Демонстраційний формат тихого читання та обміну враженнями від коротких історій.",
+      "Тихе читання та обмін враженнями від коротких історій у затишному форматі.",
+    imageSrc: "/images/events/event-chytannia.webp",
     dateLabel: "26 вересня 2026",
     timeLabel: "18:30 – 20:00",
     typeLabel: "Літературний клуб",
@@ -333,7 +359,8 @@ export const events = [
     slug: "den-dobrykh-rechei",
     title: "День добрих речей",
     summary:
-      "Демонстраційна розмова про повторне використання речей і творчі ідеї для спільноти.",
+      "Розмова про повторне використання речей, апсайклінг і творчі ідеї для спільноти.",
+    imageSrc: "/images/events/event-charity.webp",
     dateLabel: "10 жовтня 2026",
     timeLabel: "11:00 – 16:00",
     typeLabel: "Ярмарок та лекторій",

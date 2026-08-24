@@ -28,6 +28,7 @@ describe("storefront src/catalog/server.ts", () => {
       expect(result.snapshot.products.every((p) => p.isSynthetic)).toBe(true);
     }
   });
+
   it("fails closed in production even when synthetic catalog mode is explicit", async () => {
     process.env = {
       ...process.env,
@@ -35,11 +36,66 @@ describe("storefront src/catalog/server.ts", () => {
       CATALOG_SOURCE: "fixtures",
       ALLOW_SYNTHETIC_CATALOG: "true",
     };
+    delete process.env["LIFE_E2E"];
 
     const result = await getCatalogSnapshot();
     expect(result.kind).toBe("unavailable");
     if (result.kind === "unavailable") {
       expect(result.reason).toBe("missing_configuration");
+    }
+  });
+
+  it("fails closed when production receives LIFE_E2E without synthetic permission", async () => {
+    process.env = {
+      ...process.env,
+      NODE_ENV: "production",
+      CATALOG_SOURCE: "fixtures",
+      LIFE_E2E: "true",
+    };
+    delete process.env["ALLOW_SYNTHETIC_CATALOG"];
+
+    const result = await getCatalogSnapshot();
+    expect(result.kind).toBe("unavailable");
+    if (result.kind === "unavailable") {
+      expect(result.reason).toBe("missing_configuration");
+    }
+  });
+
+  it("fails closed when production E2E flags target the Medusa source", async () => {
+    process.env = {
+      ...process.env,
+      NODE_ENV: "production",
+      CATALOG_SOURCE: "medusa",
+      MEDUSA_BACKEND_URL: "http://127.0.0.1:9000",
+      ALLOW_SYNTHETIC_CATALOG: "true",
+      LIFE_E2E: "true",
+    };
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await getCatalogSnapshot();
+    expect(result.kind).toBe("unavailable");
+    if (result.kind === "unavailable") {
+      expect(result.reason).toBe("missing_configuration");
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("allows fixtures in a production-style server only with both explicit E2E switches", async () => {
+    process.env = {
+      ...process.env,
+      NODE_ENV: "production",
+      CATALOG_SOURCE: "fixtures",
+      ALLOW_SYNTHETIC_CATALOG: "true",
+      LIFE_E2E: "true",
+    };
+
+    const result = await getCatalogSnapshot();
+
+    expect(result.kind).toBe("ready");
+    if (result.kind === "ready") {
+      expect(result.snapshot.source).toBe("fixtures");
+      expect(result.snapshot.products.length).toBe(12);
     }
   });
 
@@ -53,6 +109,7 @@ describe("storefront src/catalog/server.ts", () => {
       expect(result.reason).toBe("missing_configuration");
     }
   });
+
   it("does not read Medusa without explicit synthetic catalog mode", async () => {
     process.env = {
       ...process.env,
@@ -73,6 +130,7 @@ describe("storefront src/catalog/server.ts", () => {
     });
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
   it("returns unavailable when Medusa endpoint responds with non-200 or invalid payload without falling back to fixtures", async () => {
     process.env["CATALOG_SOURCE"] = "medusa";
     process.env["ALLOW_SYNTHETIC_CATALOG"] = "true";

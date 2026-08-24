@@ -40,6 +40,43 @@ type VariantPrice = {
   amount?: number;
 };
 
+function getImageUrl(value: unknown): string | undefined {
+  const rawUrl =
+    typeof value === "string"
+      ? value
+      : typeof value === "object" && value !== null
+        ? (value as Record<string, unknown>)["url"]
+        : undefined;
+
+  if (typeof rawUrl !== "string") {
+    return undefined;
+  }
+
+  const url = rawUrl.trim();
+  return url || undefined;
+}
+
+function getImageSrc(product: Record<string, unknown>): string | undefined {
+  const thumbnail = getImageUrl(product["thumbnail"]);
+  if (thumbnail) {
+    return thumbnail;
+  }
+
+  const images = product["images"];
+  if (!Array.isArray(images)) {
+    return undefined;
+  }
+
+  for (const image of images) {
+    const url = getImageUrl(image);
+    if (url) {
+      return url;
+    }
+  }
+
+  return undefined;
+}
+
 export function mapPublicCatalog(
   listings: ListingRow[],
   vendorMap: Map<string, VendorRow>,
@@ -142,6 +179,7 @@ export function mapPublicCatalog(
       description:
         listing.description || (product["description"] as string) || "",
       priceUah,
+      imageSrc: getImageSrc(product),
       provider: {
         handle: vendor.handle,
         name: vendor.name,

@@ -22,13 +22,17 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "pnpm run dev",
+    command:
+      "pnpm run build && mkdir -p .next/standalone/apps/storefront/public .next/standalone/apps/storefront/.next/static && cp -R public/. .next/standalone/apps/storefront/public/ && cp -R .next/static/. .next/standalone/apps/storefront/.next/static/ && node .next/standalone/apps/storefront/server.js",
     url: "http://127.0.0.1:3100",
-    reuseExistingServer: true,
+    reuseExistingServer: false,
     env: {
-      NODE_ENV: "development",
+      NODE_ENV: "production",
+      PORT: "3100",
+      HOSTNAME: "127.0.0.1",
       CATALOG_SOURCE: "fixtures",
       ALLOW_SYNTHETIC_CATALOG: "true",
+      LIFE_E2E: "true",
     },
   },
 });

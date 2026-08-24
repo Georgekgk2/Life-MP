@@ -57,6 +57,7 @@ export type StorefrontCatalogCategory = Readonly<{
   slug: string;
   name: string;
   description: string;
+  imageSrc?: string;
 }>;
 
 export type StorefrontCatalogProduct = Readonly<{
@@ -66,6 +67,7 @@ export type StorefrontCatalogProduct = Readonly<{
   name: string;
   description: string;
   priceUah: number;
+  imageSrc?: string;
   provider: Readonly<{
     handle: string;
     name: string;
@@ -87,6 +89,7 @@ export type Category<Slug extends string = string> = Readonly<{
   slug: Slug;
   name: string;
   description: string;
+  imageSrc?: string;
 }>;
 
 export type Product<
@@ -99,6 +102,7 @@ export type Product<
   name: string;
   description: string;
   priceUah: number;
+  imageSrc?: string;
   availability: DemoAvailability;
 }>;
 
@@ -111,6 +115,7 @@ export type Person<
   name: string;
   role: string;
   description: string;
+  imageSrc?: string;
   featuredProductSlugs: readonly ProductSlug[];
 }>;
 
@@ -123,6 +128,7 @@ export type Story<
   slug: Slug;
   title: string;
   summary: string;
+  imageSrc?: string;
   personSlug: PersonSlug;
   relatedProductSlugs: readonly ProductSlug[];
 }>;
@@ -142,6 +148,7 @@ export type Event<
   slug: Slug;
   title: string;
   summary: string;
+  imageSrc?: string;
   dateLabel: string;
   timeLabel?: string;
   typeLabel?: string;

@@ -7,7 +7,7 @@ type NavigationItem = Readonly<{
 
 const footerNavigation: readonly NavigationItem[] = [
   { href: "/catalog", label: "Каталог" },
-  { href: "/people", label: "Люди" },
+  { href: "/people", label: "Майстри" },
   { href: "/stories", label: "Історії" },
   { href: "/events", label: "Події" },
   { href: "/charity", label: "Підтримка" },
@@ -34,8 +34,7 @@ export function SiteFooter() {
             <span className="site-brand__descriptor">демо</span>
           </Link>
           <p className="site-footer__description">
-            Некомерційний прототип із локальними демонстраційними даними про
-            людей, вироби та спільноту.
+            Демонстраційна вітрина локальних виробів, майстрів та історій.
           </p>
         </div>
         <nav
@@ -54,8 +53,7 @@ export function SiteFooter() {
           </ul>
         </nav>
         <p className="site-footer__legal">
-          Це демонстрація: купівля, оплата, доставка, реєстрація та збір даних
-          недоступні.
+          Демо-режим: оплату, доставку та збір персональних даних не виконують.
         </p>
       </div>
     </footer>

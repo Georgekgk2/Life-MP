@@ -14,16 +14,22 @@ export type CatalogReadResult =
 
 export async function getCatalogSnapshot(): Promise<CatalogReadResult> {
   const source = process.env["CATALOG_SOURCE"] || "fixtures";
-  const isProduction = process.env["NODE_ENV"] === "production";
-  const isLocalOrTest =
-    process.env["NODE_ENV"] === "development" ||
-    process.env["NODE_ENV"] === "test";
+  // Next standalone builds inline NODE_ENV as production. Keep the build in
+  // production mode while allowing the E2E server to declare its app runtime
+  // explicitly as test without opening the real production catalog path.
+  const nodeEnvironment = process.env["NODE_ENV"];
+  const runtimeEnvironment = process.env["LIFE_RUNTIME_ENV"] || nodeEnvironment;
+  const isTestRuntime = runtimeEnvironment === "test";
+  const isDevelopmentRuntime =
+    runtimeEnvironment === "development" && nodeEnvironment !== "production";
+  const isProduction = nodeEnvironment === "production" && !isTestRuntime;
+  const isLocalOrTest = isDevelopmentRuntime || isTestRuntime;
   const allowSyntheticCatalog =
     process.env["ALLOW_SYNTHETIC_CATALOG"] === "true";
 
   // Production must never silently serve fixtures or a non-commercial Medusa
-  // catalog. An explicit synthetic flag is reserved for controlled local/test
-  // runs; commercial publication remains a separate approved capability.
+  // catalog. Synthetic catalog access is restricted to explicit development/
+  // test runs; the production fallback stays unavailable.
   if (
     isProduction ||
     (source === "medusa" && (!isLocalOrTest || !allowSyntheticCatalog))
@@ -40,6 +46,7 @@ export async function getCatalogSnapshot(): Promise<CatalogReadResult> {
       slug: c.slug,
       name: c.name,
       description: c.description,
+      imageSrc: c.imageSrc,
     }));
 
     const products = fixtureProducts.map((p) => ({
@@ -49,6 +56,7 @@ export async function getCatalogSnapshot(): Promise<CatalogReadResult> {
       name: p.name,
       description: p.description,
       priceUah: p.priceUah,
+      imageSrc: p.imageSrc,
       provider: {
         handle: "demo-provider",
         name: "Локальний майстер",

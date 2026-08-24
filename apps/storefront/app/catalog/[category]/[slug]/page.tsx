@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import {
   AddToCartButton,
+  CardImage,
   ProductCard,
   ProductReviewsSection,
   SaveButton,
@@ -183,15 +184,10 @@ export default async function ProductDetailPage({
                   backgroundColor: "var(--color-sand-200)",
                 }}
               >
-                <img
-                  src={`/images/products/${product.slug}.webp`}
-                  alt={product.name}
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    display: "block",
-                  }}
+                <CardImage
+                  src={product.imageSrc}
+                  alt={`Фото виробу «${product.name}»`}
+                  loading="eager"
                 />
                 <span className="card__visual-label">{product.name}</span>
               </div>

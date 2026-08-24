@@ -1,8 +1,22 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import { useCart } from "@/context/cart-context";
 import { formatHryvnia } from "@/formatters";
+
+const FOCUSABLE_SELECTOR =
+  'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function getFocusableElements(container: HTMLElement): HTMLElement[] {
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+  ).filter(
+    (element) =>
+      element.getAttribute("aria-hidden") !== "true" &&
+      element.getClientRects().length > 0,
+  );
+}
 
 export function CartDrawer() {
   const {
@@ -16,6 +30,81 @@ export function CartDrawer() {
     removeItem,
     clearCart,
   } = useCart();
+  const panelRef = useRef<HTMLElement | null>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+  const wasOpenRef = useRef(false);
+
+  useEffect(() => {
+    if (!isCartOpen) {
+      if (wasOpenRef.current) {
+        wasOpenRef.current = false;
+        const opener = openerRef.current;
+        openerRef.current = null;
+        if (opener && document.contains(opener)) {
+          window.requestAnimationFrame(() => opener.focus());
+        }
+      }
+      return;
+    }
+
+    if (!wasOpenRef.current) {
+      const activeElement = document.activeElement;
+      openerRef.current =
+        activeElement instanceof HTMLElement ? activeElement : null;
+      wasOpenRef.current = true;
+    }
+
+    const panel = panelRef.current;
+    const initialFocusFrame = window.requestAnimationFrame(() => {
+      const initialFocus = panel?.querySelector<HTMLElement>(
+        '[data-cart-initial-focus="true"]',
+      );
+      initialFocus?.focus();
+    });
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeCart();
+        return;
+      }
+
+      if (event.key !== "Tab" || !panel) {
+        return;
+      }
+
+      const focusableElements = getFocusableElements(panel);
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        return;
+      }
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+      if (!firstElement || !lastElement) {
+        event.preventDefault();
+        return;
+      }
+      const activeElement = document.activeElement;
+
+      if (event.shiftKey && activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      } else if (!panel.contains(activeElement)) {
+        event.preventDefault();
+        (event.shiftKey ? lastElement : firstElement).focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(initialFocusFrame);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [closeCart, isCartOpen]);
 
   if (!isCartOpen) {
     return null;
@@ -27,236 +116,80 @@ export function CartDrawer() {
       role="dialog"
       aria-modal="true"
       aria-labelledby="cart-drawer-title"
-      style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
-        zIndex: 1000,
-        display: "flex",
-        justifyContent: "flex-end",
-        backdropFilter: "blur(2px)",
-      }}
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           closeCart();
         }
       }}
     >
-      <div
-        className="cart-drawer-panel"
-        style={{
-          width: "100%",
-          maxWidth: "480px",
-          backgroundColor: "#fff",
-          height: "100%",
-          display: "flex",
-          flexDirection: "column",
-          boxShadow: "-4px 0 24px rgba(0, 0, 0, 0.15)",
-          position: "relative",
-        }}
-      >
-        {/* Header */}
-        <div
-          style={{
-            padding: "1.25rem 1.5rem",
-            borderBottom: "1px solid var(--color-sand-200)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            backgroundColor: "var(--color-sand-100)",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <h2
-              id="cart-drawer-title"
-              style={{
-                margin: 0,
-                fontSize: "1.25rem",
-                color: "var(--color-ink-muted)",
-              }}
-            >
-              Кошик покупок
-            </h2>
-            <span
-              style={{
-                fontSize: "0.85rem",
-                backgroundColor: "var(--color-pine-900)",
-                color: "#fff",
-                padding: "0.15rem 0.5rem",
-                borderRadius: "12px",
-                fontWeight: 600,
-              }}
-            >
-              {totalItems}
-            </span>
+      <aside className="cart-drawer-panel" ref={panelRef}>
+        <header className="cart-drawer__header">
+          <div className="cart-drawer__title">
+            <h2 id="cart-drawer-title">Кошик покупок</h2>
+            <span className="cart-drawer__count">{totalItems}</span>
           </div>
-
           <button
             type="button"
             onClick={closeCart}
             aria-label="Закрити кошик"
-            style={{
-              background: "transparent",
-              border: "none",
-              fontSize: "1.5rem",
-              cursor: "pointer",
-              color: "var(--color-ink-muted)",
-              lineHeight: 1,
-              padding: "0.25rem",
-            }}
+            className="button button--icon cart-drawer__close"
+            data-cart-initial-focus="true"
           >
-            ✕
+            <span aria-hidden="true">×</span>
           </button>
-        </div>
+        </header>
 
-        {/* Body */}
-        <div
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            padding: "1.25rem 1.5rem",
-            display: "flex",
-            flexDirection: "column",
-            gap: "1.5rem",
-          }}
-        >
+        <div className="cart-drawer__body">
           {items.length === 0 ? (
-            <div
-              style={{
-                textAlign: "center",
-                padding: "3rem 1rem",
-                color: "var(--color-ink-muted)",
-              }}
-            >
-              <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🧺</div>
-              <h3 style={{ margin: "0 0 0.5rem 0" }}>Ваш кошик порожній</h3>
-              <p
-                style={{
-                  fontSize: "0.9rem",
-                  color: "var(--color-ink-muted)",
-                  marginBottom: "1.5rem",
-                }}
-              >
+            <div className="cart-drawer__empty">
+              <div className="cart-drawer__empty-icon" aria-hidden="true">
+                🧺
+              </div>
+              <h3>Ваш кошик порожній</h3>
+              <p>
                 Оберіть унікальні крафтові вироби від українських майстрів у
                 каталозі.
               </p>
               <Link
                 href="/catalog"
                 onClick={closeCart}
-                className="button button-primary"
-                style={{ display: "inline-block" }}
+                className="button button--primary"
               >
                 Перейти до каталогу
               </Link>
             </div>
           ) : (
             vendorGroups.map((group) => (
-              <div
-                key={group.vendorHandle}
-                style={{
-                  border: "1px solid var(--color-sand-200)",
-                  borderRadius: "var(--radius-md)",
-                  padding: "1rem",
-                  backgroundColor: "var(--color-sand-50)",
-                }}
-              >
-                {/* Vendor Header */}
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: "0.75rem",
-                    borderBottom: "1px dashed var(--color-sand-200)",
-                    paddingBottom: "0.5rem",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.4rem",
-                    }}
-                  >
-                    <span style={{ fontSize: "1rem" }}>🌿</span>
-                    <span
-                      style={{
-                        fontWeight: 600,
-                        fontSize: "0.95rem",
-                        color: "var(--color-pine-900)",
-                      }}
-                    >
-                      {group.vendorName}
-                    </span>
+              <section className="cart-drawer__vendor" key={group.vendorHandle}>
+                <div className="cart-drawer__vendor-header">
+                  <div className="cart-drawer__vendor-name">
+                    <span aria-hidden="true">🌿</span>
+                    <strong>{group.vendorName}</strong>
                   </div>
-                  <span
-                    style={{
-                      fontSize: "0.75rem",
-                      color: "var(--color-ink-muted)",
-                    }}
-                  >
+                  <span className="cart-drawer__vendor-note">
                     Пряма відправка
                   </span>
                 </div>
 
-                {/* Items in Vendor Group */}
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "0.75rem",
-                  }}
-                >
+                <div className="cart-drawer__items">
                   {group.items.map((item) => (
-                    <div
-                      key={item.id}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: "0.75rem",
-                        backgroundColor: "#fff",
-                        padding: "0.6rem 0.8rem",
-                        borderRadius: "var(--radius-sm)",
-                        border: "1px solid var(--color-sand-200)",
-                      }}
-                    >
-                      <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="cart-drawer__item" key={item.id}>
+                      <div className="cart-drawer__item-copy">
                         <Link
                           href={`/catalog/${item.categorySlug}/${item.slug}`}
                           onClick={closeCart}
-                          style={{
-                            fontWeight: 600,
-                            fontSize: "0.9rem",
-                            color: "var(--color-pine-900)",
-                            textDecoration: "none",
-                            display: "block",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
+                          className="cart-drawer__item-name"
                         >
                           {item.name}
                         </Link>
-                        <div
-                          style={{
-                            fontSize: "0.85rem",
-                            color: "var(--color-terracotta-500)",
-                            fontWeight: 600,
-                            marginTop: "2px",
-                          }}
-                        >
+                        <span className="cart-drawer__item-price">
                           {formatHryvnia(item.priceUah)}
-                        </div>
+                        </span>
                       </div>
 
-                      {/* Quantity Controls */}
                       <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "0.4rem",
-                        }}
+                        className="cart-drawer__quantity"
+                        aria-label="Кількість"
                       >
                         <button
                           type="button"
@@ -264,29 +197,11 @@ export function CartDrawer() {
                             updateQuantity(item.id, item.quantity - 1)
                           }
                           aria-label={`Зменшити кількість ${item.name}`}
-                          style={{
-                            width: "24px",
-                            height: "24px",
-                            borderRadius: "4px",
-                            border: "1px solid var(--color-sand-200)",
-                            backgroundColor: "var(--color-sand-100)",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontWeight: "bold",
-                          }}
+                          className="button button--icon button--square"
                         >
-                          -
+                          −
                         </button>
-                        <span
-                          style={{
-                            fontSize: "0.85rem",
-                            fontWeight: 600,
-                            minWidth: "16px",
-                            textAlign: "center",
-                          }}
-                        >
+                        <span className="cart-drawer__quantity-value">
                           {item.quantity}
                         </span>
                         <button
@@ -295,18 +210,7 @@ export function CartDrawer() {
                             updateQuantity(item.id, item.quantity + 1)
                           }
                           aria-label={`Збільшити кількість ${item.name}`}
-                          style={{
-                            width: "24px",
-                            height: "24px",
-                            borderRadius: "4px",
-                            border: "1px solid var(--color-sand-200)",
-                            backgroundColor: "var(--color-sand-100)",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontWeight: "bold",
-                          }}
+                          className="button button--icon button--square"
                         >
                           +
                         </button>
@@ -314,131 +218,56 @@ export function CartDrawer() {
                           type="button"
                           onClick={() => removeItem(item.id)}
                           aria-label={`Видалити ${item.name}`}
-                          style={{
-                            background: "transparent",
-                            border: "none",
-                            color: "var(--color-terracotta-500)",
-                            cursor: "pointer",
-                            fontSize: "1rem",
-                            marginLeft: "0.25rem",
-                            padding: "0.2rem",
-                          }}
+                          className="button button--icon cart-drawer__remove"
                         >
-                          🗑️
+                          <span aria-hidden="true">⌫</span>
                         </button>
                       </div>
                     </div>
                   ))}
                 </div>
 
-                {/* Vendor Subtotal */}
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    marginTop: "0.75rem",
-                    fontSize: "0.85rem",
-                    color: "var(--color-ink-muted)",
-                    paddingTop: "0.4rem",
-                    borderTop: "1px dashed var(--color-sand-200)",
-                  }}
-                >
-                  <span>Підсумок майстерні:</span>
-                  <strong style={{ color: "var(--color-pine-900)" }}>
-                    {formatHryvnia(group.subtotalUah)}
-                  </strong>
+                <div className="cart-drawer__subtotal">
+                  <span>Підсумок майстерні</span>
+                  <strong>{formatHryvnia(group.subtotalUah)}</strong>
                 </div>
-              </div>
+              </section>
             ))
           )}
         </div>
 
-        {/* Footer with checkout action */}
         {items.length > 0 && (
-          <div
-            style={{
-              padding: "1.25rem 1.5rem",
-              borderTop: "1px solid var(--color-sand-200)",
-              backgroundColor: "var(--color-sand-100)",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "1rem",
-              }}
-            >
-              <span
-                style={{
-                  fontSize: "1rem",
-                  fontWeight: 600,
-                  color: "var(--color-ink-muted)",
-                }}
-              >
-                Разом до сплати:
-              </span>
-              <span
-                style={{
-                  fontSize: "1.35rem",
-                  fontWeight: 700,
-                  color: "var(--color-pine-900)",
-                }}
-              >
-                {formatHryvnia(totalAmountUah)}
-              </span>
+          <footer className="cart-drawer__footer">
+            <div className="cart-drawer__total">
+              <span>Разом до сплати</span>
+              <strong>{formatHryvnia(totalAmountUah)}</strong>
             </div>
 
-            <div style={{ display: "flex", gap: "0.5rem" }}>
+            <div className="cart-drawer__footer-actions">
               <Link
                 href="/checkout"
                 onClick={closeCart}
-                className="button button-primary"
-                style={{
-                  flex: 1,
-                  textAlign: "center",
-                  padding: "0.75rem 1rem",
-                  fontSize: "1rem",
-                  fontWeight: 600,
-                  backgroundColor: "var(--color-terracotta-500)",
-                  color: "#fff",
-                  textDecoration: "none",
-                  borderRadius: "var(--radius-sm)",
-                }}
+                className="button button--primary cart-drawer__checkout"
               >
-                Оформити замовлення →
+                Оформити замовлення <span aria-hidden="true">→</span>
               </Link>
               <button
                 type="button"
                 onClick={clearCart}
                 title="Очистити кошик"
-                style={{
-                  padding: "0.75rem",
-                  background: "transparent",
-                  border: "1px solid var(--color-sand-200)",
-                  borderRadius: "var(--radius-sm)",
-                  cursor: "pointer",
-                }}
+                className="button button--secondary"
               >
                 Очистити
               </button>
             </div>
 
-            <p
-              style={{
-                fontSize: "0.75rem",
-                color: "var(--color-ink-muted)",
-                textAlign: "center",
-                margin: "0.75rem 0 0 0",
-              }}
-            >
-              🧪 Чернетка кошика: серверне замовлення, оплата й доставка не
-              створюються
+            <p className="cart-drawer__disclaimer">
+              Чернетка кошика: серверне замовлення, оплата й доставка не
+              створюються.
             </p>
-          </div>
+          </footer>
         )}
-      </div>
+      </aside>
     </div>
   );
 }

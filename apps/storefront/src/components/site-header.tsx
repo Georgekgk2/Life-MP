@@ -13,7 +13,7 @@ type NavigationItem = Readonly<{
 
 const primaryNavigation: readonly NavigationItem[] = [
   { href: "/catalog", label: "Каталог" },
-  { href: "/people", label: "Люди" },
+  { href: "/people", label: "Майстри" },
   { href: "/stories", label: "Історії" },
   { href: "/events", label: "Події" },
   { href: "/charity", label: "Підтримка" },
@@ -24,6 +24,7 @@ export function SiteHeader() {
   const { totalItems, isHydrated: isCartHydrated, toggleCart } = useCart();
   const [mounted, setMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -41,6 +42,7 @@ export function SiteHeader() {
 
   const savedCount = mounted && isSavedHydrated ? count : 0;
   const cartCount = mounted && isCartHydrated ? totalItems : 0;
+  const closeMenu = () => setIsMenuOpen(false);
 
   return (
     <>
@@ -53,6 +55,7 @@ export function SiteHeader() {
             aria-label="Life-MP — на головну"
             className="site-brand"
             href="/"
+            onClick={closeMenu}
           >
             <span aria-hidden="true" className="site-brand__mark">
               Л
@@ -60,44 +63,64 @@ export function SiteHeader() {
             <span>Life-MP</span>
             <span className="site-brand__descriptor">демо</span>
           </Link>
-          <nav aria-label="Основна навігація" className="site-navigation">
+
+          <nav
+            id="primary-navigation"
+            aria-label="Основна навігація"
+            className={`site-navigation${isMenuOpen ? " site-navigation--open" : ""}`}
+          >
             <ul className="site-navigation__list">
               {primaryNavigation.map(({ href, label }) => (
                 <li key={href}>
-                  <Link className="site-navigation__link" href={href}>
+                  <Link
+                    className="site-navigation__link"
+                    href={href}
+                    onClick={closeMenu}
+                  >
                     {label}
                   </Link>
                 </li>
               ))}
             </ul>
+            <div className="site-navigation__mobile-actions">
+              <Link
+                className="button button--secondary"
+                href="/profile"
+                onClick={closeMenu}
+              >
+                Особистий кабінет
+              </Link>
+              <Link
+                className="button button--primary"
+                href="/join-as-artisan"
+                onClick={closeMenu}
+              >
+                Стати майстром
+              </Link>
+            </div>
           </nav>
+
           <div className="site-header__actions">
             <button
               type="button"
               onClick={() => setIsSearchOpen(true)}
-              className="site-header__search-btn site-header__saved-link"
+              className="site-header__action site-header__search-btn"
               aria-label="Швидкий пошук (Cmd+K)"
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                fontFamily: "inherit",
-              }}
             >
-              <span aria-hidden="true">🔍</span>
-              <span className="site-header__saved-text">Пошук</span>
+              <span aria-hidden="true">⌕</span>
+              <span className="site-header__action-label">Пошук</span>
             </button>
             <Link
               href="/saved"
-              className="site-header__saved-link"
+              className="site-header__action site-header__saved-link"
               aria-label={
                 savedCount > 0
                   ? `Збережені товари: ${savedCount}`
                   : "Збережені товари"
               }
             >
-              <span aria-hidden="true">❤️</span>
-              <span className="site-header__saved-text">Збережене</span>
+              <span aria-hidden="true">♡</span>
+              <span className="site-header__action-label">Збережене</span>
               {savedCount > 0 && (
                 <span className="site-header__saved-badge" aria-hidden="true">
                   {savedCount}
@@ -107,40 +130,43 @@ export function SiteHeader() {
             <button
               type="button"
               onClick={toggleCart}
-              className="site-header__saved-link site-header__cart-btn"
+              className="site-header__action site-header__cart-btn"
               aria-label={cartCount > 0 ? `Кошик: ${cartCount}` : "Кошик"}
-              style={{
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                fontFamily: "inherit",
-              }}
             >
               <span aria-hidden="true">🧺</span>
-              <span className="site-header__saved-text">Кошик</span>
+              <span className="site-header__action-label">Кошик</span>
               {cartCount > 0 && (
-                <span
-                  className="site-header__cart-badge site-header__saved-badge"
-                  aria-hidden="true"
-                >
+                <span className="site-header__saved-badge" aria-hidden="true">
                   {cartCount}
                 </span>
               )}
             </button>
             <Link
               href="/profile"
-              className="site-header__profile-link"
+              className="site-header__action site-header__profile-link"
               aria-label="Особистий кабінет покупця"
             >
-              <span aria-hidden="true">👤</span>
-              <span className="site-header__saved-text">Профіль</span>
+              <span aria-hidden="true">◯</span>
+              <span className="site-header__action-label">Профіль</span>
             </Link>
             <Link
               href="/join-as-artisan"
-              className="button button--secondary button--sm site-header__artisan-btn"
+              className="button button--primary button--sm site-header__artisan-btn"
             >
               Стати майстром
             </Link>
+            <button
+              type="button"
+              className="site-header__menu-toggle"
+              aria-expanded={isMenuOpen}
+              aria-controls="primary-navigation"
+              onClick={() => setIsMenuOpen((prev) => !prev)}
+            >
+              <span className="site-header__menu-icon" aria-hidden="true">
+                {isMenuOpen ? "×" : "☰"}
+              </span>
+              <span className="site-header__menu-label">Меню</span>
+            </button>
           </div>
         </div>
       </header>

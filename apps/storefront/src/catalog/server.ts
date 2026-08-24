@@ -17,11 +17,13 @@ export async function getCatalogSnapshot(): Promise<CatalogReadResult> {
   // Next standalone builds inline NODE_ENV as production. Keep the build in
   // production mode while allowing the E2E server to declare its app runtime
   // explicitly as test without opening the real production catalog path.
-  const runtimeEnvironment =
-    process.env["LIFE_RUNTIME_ENV"] || process.env["NODE_ENV"];
-  const isProduction = runtimeEnvironment === "production";
-  const isLocalOrTest =
-    runtimeEnvironment === "development" || runtimeEnvironment === "test";
+  const nodeEnvironment = process.env["NODE_ENV"];
+  const runtimeEnvironment = process.env["LIFE_RUNTIME_ENV"] || nodeEnvironment;
+  const isTestRuntime = runtimeEnvironment === "test";
+  const isDevelopmentRuntime =
+    runtimeEnvironment === "development" && nodeEnvironment !== "production";
+  const isProduction = nodeEnvironment === "production" && !isTestRuntime;
+  const isLocalOrTest = isDevelopmentRuntime || isTestRuntime;
   const allowSyntheticCatalog =
     process.env["ALLOW_SYNTHETIC_CATALOG"] === "true";
 

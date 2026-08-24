@@ -80,6 +80,25 @@ describe("storefront src/catalog/server.ts", () => {
     }
   });
 
+  it("fails closed when a production build is mislabeled as development runtime", async () => {
+    process.env = {
+      ...process.env,
+      NODE_ENV: "production",
+      LIFE_RUNTIME_ENV: "development",
+      CATALOG_SOURCE: "fixtures",
+      ALLOW_SYNTHETIC_CATALOG: "true",
+      LIFE_E2E: "true",
+    };
+
+    const result = await getCatalogSnapshot();
+
+    expect(result).toEqual({
+      kind: "unavailable",
+      source: "medusa",
+      reason: "missing_configuration",
+    });
+  });
+
   it("fails closed when production E2E flags target the Medusa source", async () => {
     process.env = {
       ...process.env,
@@ -104,6 +123,25 @@ describe("storefront src/catalog/server.ts", () => {
     process.env = {
       ...process.env,
       NODE_ENV: "production",
+      CATALOG_SOURCE: "fixtures",
+      ALLOW_SYNTHETIC_CATALOG: "true",
+      LIFE_E2E: "true",
+    };
+
+    const result = await getCatalogSnapshot();
+
+    expect(result).toEqual({
+      kind: "unavailable",
+      source: "medusa",
+      reason: "missing_configuration",
+    });
+  });
+
+  it("fails closed when the explicit runtime is production", async () => {
+    process.env = {
+      ...process.env,
+      NODE_ENV: "production",
+      LIFE_RUNTIME_ENV: "production",
       CATALOG_SOURCE: "fixtures",
       ALLOW_SYNTHETIC_CATALOG: "true",
       LIFE_E2E: "true",

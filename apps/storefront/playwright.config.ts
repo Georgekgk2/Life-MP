@@ -28,6 +28,7 @@ export default defineConfig({
     reuseExistingServer: false,
     env: {
       NODE_ENV: "production",
+      LIFE_RUNTIME_ENV: "test",
       PORT: "3100",
       HOSTNAME: "127.0.0.1",
       CATALOG_SOURCE: "fixtures",

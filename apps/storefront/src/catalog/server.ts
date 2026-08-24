@@ -14,23 +14,23 @@ export type CatalogReadResult =
 
 export async function getCatalogSnapshot(): Promise<CatalogReadResult> {
   const source = process.env["CATALOG_SOURCE"] || "fixtures";
-  const isProduction = process.env["NODE_ENV"] === "production";
+  // Next standalone builds inline NODE_ENV as production. Keep the build in
+  // production mode while allowing the E2E server to declare its app runtime
+  // explicitly as test without opening the real production catalog path.
+  const runtimeEnvironment =
+    process.env["LIFE_RUNTIME_ENV"] || process.env["NODE_ENV"];
+  const isProduction = runtimeEnvironment === "production";
   const isLocalOrTest =
-    process.env["NODE_ENV"] === "development" ||
-    process.env["NODE_ENV"] === "test";
-  const isExplicitE2e = process.env["LIFE_E2E"] === "true";
+    runtimeEnvironment === "development" || runtimeEnvironment === "test";
   const allowSyntheticCatalog =
     process.env["ALLOW_SYNTHETIC_CATALOG"] === "true";
-  const isControlledE2e = isExplicitE2e && allowSyntheticCatalog;
-  const isControlledFixtureE2e = isControlledE2e && source === "fixtures";
 
   // Production must never silently serve fixtures or a non-commercial Medusa
-  // catalog. Both E2E switches are required for the local Playwright server;
-  // setting either one alone leaves the production guard closed.
+  // catalog. Synthetic catalog access is restricted to explicit development/
+  // test runs; the production fallback stays unavailable.
   if (
-    (isProduction && !isControlledFixtureE2e) ||
-    (source === "medusa" &&
-      (!(isLocalOrTest || isControlledE2e) || !allowSyntheticCatalog))
+    isProduction ||
+    (source === "medusa" && (!isLocalOrTest || !allowSyntheticCatalog))
   ) {
     return {
       kind: "unavailable",

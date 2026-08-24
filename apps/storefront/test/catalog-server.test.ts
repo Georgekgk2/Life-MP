@@ -61,6 +61,25 @@ describe("storefront src/catalog/server.ts", () => {
     }
   });
 
+  it("allows fixtures only for an explicit test runtime in a production build", async () => {
+    process.env = {
+      ...process.env,
+      NODE_ENV: "production",
+      LIFE_RUNTIME_ENV: "test",
+      CATALOG_SOURCE: "fixtures",
+      ALLOW_SYNTHETIC_CATALOG: "true",
+      LIFE_E2E: "true",
+    };
+
+    const result = await getCatalogSnapshot();
+
+    expect(result.kind).toBe("ready");
+    if (result.kind === "ready") {
+      expect(result.snapshot.source).toBe("fixtures");
+      expect(result.snapshot.products.length).toBe(12);
+    }
+  });
+
   it("fails closed when production E2E flags target the Medusa source", async () => {
     process.env = {
       ...process.env,
@@ -81,7 +100,7 @@ describe("storefront src/catalog/server.ts", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("allows fixtures in a production-style server only with both explicit E2E switches", async () => {
+  it("fails closed for production fixtures even with both explicit E2E switches", async () => {
     process.env = {
       ...process.env,
       NODE_ENV: "production",
@@ -92,11 +111,11 @@ describe("storefront src/catalog/server.ts", () => {
 
     const result = await getCatalogSnapshot();
 
-    expect(result.kind).toBe("ready");
-    if (result.kind === "ready") {
-      expect(result.snapshot.source).toBe("fixtures");
-      expect(result.snapshot.products.length).toBe(12);
-    }
+    expect(result).toEqual({
+      kind: "unavailable",
+      source: "medusa",
+      reason: "missing_configuration",
+    });
   });
 
   it("returns unavailable when CATALOG_SOURCE=medusa and MEDUSA_BACKEND_URL is missing", async () => {

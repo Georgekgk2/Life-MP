@@ -12,6 +12,7 @@
 # 4. Strict Resource Limits: Memory bounded to <= 2.0GB total across all 4 containers.
 # 5. Fail-Closed Integrity: strict migration checks, verified health loops, HTTP 200 asserts,
 #    host-key verification (accept-new), pre-deployment backups, and rollback metadata.
+# 6. Dirty-Tree Protection: refuses deployment on dirty working tree unless --allow-dirty is passed.
 # =============================================================================
 
 set -euo pipefail
@@ -24,21 +25,34 @@ REMOTE_DEST="/opt/life-mp"
 DOMAIN="life-mp.pp.ua"
 
 DRY_RUN=0
+ALLOW_DIRTY=0
+ROLLBACK=0
+
 for arg in "$@"; do
-  if [ "$arg" = "--dry-run" ]; then
-    DRY_RUN=1
-  fi
+  case "$arg" in
+    --dry-run)
+      DRY_RUN=1
+      ;;
+    --allow-dirty)
+      ALLOW_DIRTY=1
+      ;;
+    --rollback)
+      ROLLBACK=1
+      ;;
+  esac
 done
 
 echo "================================================================================"
-echo "  🚀 DEPLOYING LIFE-MP (ISOLATED PRODUCTION PROFILE)                          "
+echo "  🚀 LIFE-MP PRODUCTION DEPLOYMENT & ROLLBACK RUNNER                          "
 echo "  Target: $VM_HOST | Domain: https://$DOMAIN                                   "
 if [ "$DRY_RUN" -eq 1 ]; then
   echo "  Mode: DRY RUN (Inspections only; no mutations applied)                     "
+elif [ "$ROLLBACK" -eq 1 ]; then
+  echo "  Mode: ROLLBACK (Restoring from latest verified server backup)               "
 fi
 echo "================================================================================"
 
-# 1. Local Preflights
+# 1. Local Preflights: SSH Key
 if [ ! -f "$SSH_KEY" ]; then
   if [ -f "$HOME/.ssh/id_rsa" ]; then
     SSH_KEY="$HOME/.ssh/id_rsa"
@@ -50,15 +64,64 @@ fi
 
 chmod 600 "$SSH_KEY"
 
+# 2. Local Preflights: Dirty Worktree Guard (P0)
 LOCAL_COMMIT=$(git -C "$LOCAL_SRC" rev-parse HEAD 2>/dev/null || echo "unknown")
 LOCAL_BRANCH=$(git -C "$LOCAL_SRC" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "detached")
-echo "✔ Local Git Commit: $LOCAL_COMMIT ($LOCAL_BRANCH)"
+DIRTY_FILES=$(git -C "$LOCAL_SRC" status --porcelain | wc -l | tr -d ' ')
 
+if [ "$DIRTY_FILES" -ne 0 ] && [ "$ALLOW_DIRTY" -eq 0 ] && [ "$ROLLBACK" -eq 0 ]; then
+  echo "❌ Error: Local working tree has $DIRTY_FILES uncommitted changes or untracked files." >&2
+  echo "   Deploying from dirty tree creates mismatch with Git commit SHA metadata ($LOCAL_COMMIT)." >&2
+  echo "   Commit your changes first, or pass --allow-dirty if intentionally deploying uncommitted changes." >&2
+  git -C "$LOCAL_SRC" status --short >&2
+  exit 1
+fi
+
+echo "✔ Local Git Commit: $LOCAL_COMMIT ($LOCAL_BRANCH) [Dirty files: $DIRTY_FILES]"
+
+# 3. Verify SSH Connectivity
 echo "=== [1/7] VERIFYING SSH CONNECTIVITY & REMOTE DOCKER ENGINE ==="
 ssh -i "$SSH_KEY" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 "$VM_HOST" "
   uname -srm && sudo docker --version && sudo docker compose version
 "
 
+# 4. Handle Rollback Mode
+if [ "$ROLLBACK" -eq 1 ]; then
+  echo -e "\n=== [ROLLBACK] RESTORING DATABASE & CONFIGURATION FROM LATEST BACKUP ==="
+  ssh -i "$SSH_KEY" -o StrictHostKeyChecking=accept-new "$VM_HOST" bash -s << 'ROLLBACK_EOF'
+set -euo pipefail
+BACKUP_PARENT="/var/backups/life-mp"
+LATEST_BACKUP=$(ls -1td "$BACKUP_PARENT"/2* 2>/dev/null | head -n 1 || true)
+
+if [ -z "$LATEST_BACKUP" ] || [ ! -d "$LATEST_BACKUP" ]; then
+  echo "❌ Error: No backup directories found under $BACKUP_PARENT to rollback to!" >&2
+  exit 1
+fi
+
+echo "Restoring from latest verified backup: $LATEST_BACKUP"
+
+if [ -f "$LATEST_BACKUP/.env.production.bak" ]; then
+  cp "$LATEST_BACKUP/.env.production.bak" /opt/life-mp/deploy/.env.production
+  echo "✔ Production environment restored from backup."
+fi
+
+if [ -f "$LATEST_BACKUP/life_production.sql" ] && [ -s "$LATEST_BACKUP/life_production.sql" ]; then
+  echo "Restoring PostgreSQL database from $LATEST_BACKUP/life_production.sql..."
+  sudo docker exec -i life-mp-postgres psql -U life_prod -d life_production < "$LATEST_BACKUP/life_production.sql"
+  echo "✔ Database restored successfully."
+fi
+
+cd /opt/life-mp/deploy
+sudo docker compose -p life-mp -f docker-compose.prod.yml --env-file .env.production restart commerce storefront
+echo "✔ Services restarted after rollback."
+ROLLBACK_EOF
+  echo "================================================================================"
+  echo "  🎉 ROLLBACK COMPLETED SUCCESSFULLY                                            "
+  echo "================================================================================"
+  exit 0
+fi
+
+# 5. Handle Dry Run Mode
 if [ "$DRY_RUN" -eq 1 ]; then
   echo -e "\n=== [DRY RUN] INSPECTING REMOTE DISK & EXISTING CONTAINERS ==="
   ssh -i "$SSH_KEY" -o StrictHostKeyChecking=accept-new "$VM_HOST" "
@@ -70,12 +133,14 @@ if [ "$DRY_RUN" -eq 1 ]; then
   exit 0
 fi
 
+# 6. Prepare Remote Directory
 echo "=== [2/7] PREPARING REMOTE DIRECTORY STRUCTURE ==="
 ssh -i "$SSH_KEY" -o StrictHostKeyChecking=accept-new "$VM_HOST" "
   sudo mkdir -p $REMOTE_DEST $REMOTE_DEST/deploy /var/backups/life-mp
   sudo chown -R \$USER:\$USER $REMOTE_DEST /var/backups/life-mp
 "
 
+# 7. Synchronize Codebase
 echo "=== [3/7] SYNCHRONIZING CODEBASE VIA RSYNC ==="
 rsync -avz \
   -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=accept-new" \
@@ -94,17 +159,18 @@ rsync -avz \
 
 echo "✔ Codebase synchronized successfully."
 
-# 4. Remote Execution & Zero-Conflict Orchestration
-echo "=== [4/7] EXECUTING REMOTE CONTAINER BOOTSTRAP & BACKUP ==="
-ssh -i "$SSH_KEY" -o StrictHostKeyChecking=accept-new "$VM_HOST" bash -s -- "$LOCAL_COMMIT" "$LOCAL_BRANCH" << 'EOF'
+# 8. Remote Deployment Execution
+echo "=== [4/7] EXECUTING REMOTE CONTAINER BOOTSTRAP & FAIL-CLOSED BACKUP ==="
+ssh -i "$SSH_KEY" -o StrictHostKeyChecking=accept-new "$VM_HOST" bash -s -- "$LOCAL_COMMIT" "$LOCAL_BRANCH" "$DIRTY_FILES" << 'EOF'
 set -euo pipefail
 
 LOCAL_COMMIT="${1:-unknown}"
 LOCAL_BRANCH="${2:-unknown}"
+DIRTY_COUNT="${3:-0}"
 
 cd /opt/life-mp/deploy
 
-# 1. Preflight Disk Space Check (require >= 4GB free)
+# A. Preflight Disk Space Check (require >= 4GB free)
 FREE_KB=$(df -k / | awk 'NR==2 {print $4}')
 if [ "$FREE_KB" -lt 4194304 ]; then
   echo "❌ Error: Less than 4GB disk space available on host. Aborting to protect host services." >&2
@@ -112,20 +178,32 @@ if [ "$FREE_KB" -lt 4194304 ]; then
 fi
 echo "✔ Disk space verified: $(df -h / | awk 'NR==2 {print $4}') free."
 
-# 2. Pre-deployment Backup of Database & Config
+# B. Fail-Closed Pre-deployment Backup (Safe Permissions: owned by user, not root)
 BACKUP_DIR="/var/backups/life-mp/$(date -u +%Y%m%dT%H%M%SZ)"
 sudo mkdir -p "$BACKUP_DIR"
+sudo chown -R "$USER:$USER" "$BACKUP_DIR"
+chmod 700 "$BACKUP_DIR"
+
 if [ -f .env.production ]; then
-  sudo cp .env.production "$BACKUP_DIR/.env.production.bak"
+  cp .env.production "$BACKUP_DIR/.env.production.bak"
 fi
 
 if sudo docker ps --format '{{.Names}}' | grep -q "^life-mp-postgres$"; then
-  echo "Creating pre-deployment database dump to $BACKUP_DIR..."
-  sudo docker exec life-mp-postgres pg_dump -U life_prod life_production > "$BACKUP_DIR/life_production.sql" 2>/dev/null || echo "Notice: Database dump skipped (fresh or uninitialized database)."
+  echo "Creating fail-closed pre-deployment database dump to $BACKUP_DIR/life_production.sql..."
+  set +e
+  DUMP_ERR=$(sudo docker exec life-mp-postgres pg_dump -U life_prod life_production > "$BACKUP_DIR/life_production.sql" 2>&1)
+  DUMP_RC=$?
+  set -e
+  if [ "$DUMP_RC" -ne 0 ]; then
+    echo "❌ Error: Pre-deployment pg_dump failed with exit code $DUMP_RC! Aborting to prevent data loss." >&2
+    echo "$DUMP_ERR" >&2
+    exit 1
+  fi
+  echo "✔ Database backup verified ($(wc -c < "$BACKUP_DIR/life_production.sql" | tr -d ' ') bytes)."
 fi
 echo "✔ Pre-deployment backup staged at $BACKUP_DIR."
 
-# 3. Idempotent Secret Generation: NEVER overwrite existing production credentials!
+# C. Idempotent Secret Generation: NEVER overwrite existing production credentials!
 if [ ! -f .env.production ]; then
   echo "Generating fresh cryptographically secure production secrets..."
   DB_PASS=$(openssl rand -hex 24)
@@ -278,6 +356,7 @@ cat << REL > /opt/life-mp/deploy/RELEASE_METADATA.json
   "deployedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "commit": "$LOCAL_COMMIT",
   "branch": "$LOCAL_BRANCH",
+  "worktreeClean": $([ "$DIRTY_COUNT" -eq 0 ] && echo "true" || echo "false"),
   "backupDir": "$BACKUP_DIR",
   "ports": {
     "storefront": 3100,

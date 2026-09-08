@@ -186,40 +186,56 @@ if [ -f "$CHOSEN_BACKUP/life_production.sql" ] && [ -s "$CHOSEN_BACKUP/life_prod
   echo "✔ PostgreSQL database restored successfully."
 fi
 
+# Common helper: Cryptographic Image Digest Verification (FAIL-CLOSED)
+verify_release_image_digests() {
+  local target_dir="$1"
+  local meta_file="$target_dir/deploy/RELEASE_METADATA.json"
+  if [ ! -f "$meta_file" ]; then
+    echo "❌ Error: Missing RELEASE_METADATA.json in $target_dir! Aborting." >&2
+    return 1
+  fi
+
+  local rel_id
+  rel_id=$(basename "$target_dir")
+  local comm_tag="life-mp-commerce:${rel_id}"
+  local store_tag="life-mp-storefront:${rel_id}"
+
+  local exp_comm_digest
+  exp_comm_digest=$(grep -A 5 '"imageDigests"' "$meta_file" | grep '"commerce"' | cut -d'"' -f4 || echo "")
+  local exp_store_digest
+  exp_store_digest=$(grep -A 5 '"imageDigests"' "$meta_file" | grep '"storefront"' | cut -d'"' -f4 || echo "")
+
+  if [ -z "$exp_comm_digest" ] || [ -z "$exp_store_digest" ]; then
+    echo "❌ Error: Missing required imageDigests in $meta_file! Aborting." >&2
+    return 1
+  fi
+
+  local act_comm_digest
+  act_comm_digest=$(sudo docker inspect --format='{{.Id}}' "$comm_tag" 2>/dev/null || echo "not_found")
+  local act_store_digest
+  act_store_digest=$(sudo docker inspect --format='{{.Id}}' "$store_tag" 2>/dev/null || echo "not_found")
+
+  if [ "$act_comm_digest" != "$exp_comm_digest" ]; then
+    echo "❌ Error: Commerce image digest mismatch for $rel_id! Expected $exp_comm_digest, got $act_comm_digest" >&2
+    return 1
+  fi
+
+  if [ "$act_store_digest" != "$exp_store_digest" ]; then
+    echo "❌ Error: Storefront image digest mismatch for $rel_id! Expected $exp_store_digest, got $act_store_digest" >&2
+    return 1
+  fi
+
+  echo "✔ Cryptographic image digests verified for $rel_id:" >&2
+  echo "   Commerce:   $exp_comm_digest" >&2
+  echo "   Storefront: $exp_store_digest" >&2
+  return 0
+}
+
 # D. Verify Exact Image Digests from target release metadata (FAIL-CLOSED)
-if [ ! -f "$TARGET_RELEASE/deploy/RELEASE_METADATA.json" ]; then
-  echo "❌ Error: Target release lacks RELEASE_METADATA.json! Cannot verify provenance. Aborting rollback." >&2
+if ! verify_release_image_digests "$TARGET_RELEASE"; then
+  echo "❌ Error: Rollback aborted due to image digest mismatch or missing metadata." >&2
   exit 1
 fi
-
-echo "Verifying local Docker image digests against target release metadata..."
-COMMERCE_TAG="life-mp-commerce:$(basename "$TARGET_RELEASE")"
-STOREFRONT_TAG="life-mp-storefront:$(basename "$TARGET_RELEASE")"
-
-EXPECTED_COMMERCE_DIGEST=$(grep -A 5 '"imageDigests"' "$TARGET_RELEASE/deploy/RELEASE_METADATA.json" | grep '"commerce"' | cut -d'"' -f4 || echo "")
-EXPECTED_STOREFRONT_DIGEST=$(grep -A 5 '"imageDigests"' "$TARGET_RELEASE/deploy/RELEASE_METADATA.json" | grep '"storefront"' | cut -d'"' -f4 || echo "")
-
-if [ -z "$EXPECTED_COMMERCE_DIGEST" ] || [ -z "$EXPECTED_STOREFRONT_DIGEST" ]; then
-  echo "❌ Error: Target release metadata is missing required imageDigests! Aborting rollback." >&2
-  exit 1
-fi
-
-ACTUAL_COMMERCE_DIGEST=$(sudo docker inspect --format='{{.Id}}' "$COMMERCE_TAG" 2>/dev/null || echo "not_found")
-ACTUAL_STOREFRONT_DIGEST=$(sudo docker inspect --format='{{.Id}}' "$STOREFRONT_TAG" 2>/dev/null || echo "not_found")
-
-if [ "$ACTUAL_COMMERCE_DIGEST" != "$EXPECTED_COMMERCE_DIGEST" ]; then
-  echo "❌ Error: Commerce image digest mismatch! Expected $EXPECTED_COMMERCE_DIGEST, got $ACTUAL_COMMERCE_DIGEST" >&2
-  exit 1
-fi
-
-if [ "$ACTUAL_STOREFRONT_DIGEST" != "$EXPECTED_STOREFRONT_DIGEST" ]; then
-  echo "❌ Error: Storefront image digest mismatch! Expected $EXPECTED_STOREFRONT_DIGEST, got $ACTUAL_STOREFRONT_DIGEST" >&2
-  exit 1
-fi
-
-echo "✔ Cryptographic image digests verified:"
-echo "   Commerce:   $EXPECTED_COMMERCE_DIGEST"
-echo "   Storefront: $EXPECTED_STOREFRONT_DIGEST"
 
 # E. Recreate containers using target release's compose & environment FIRST
 echo "Restarting application containers with target release images..."
@@ -505,6 +521,50 @@ echo "✔ Database migrations applied successfully."
 # Record previous active release before launching new containers
 OLD_CURRENT=$(readlink -f "$REMOTE_ROOT/current" 2>/dev/null || echo "")
 
+verify_release_image_digests() {
+  local target_dir="$1"
+  local meta_file="$target_dir/deploy/RELEASE_METADATA.json"
+  if [ ! -f "$meta_file" ]; then
+    echo "❌ Error: Missing RELEASE_METADATA.json in $target_dir! Aborting." >&2
+    return 1
+  fi
+
+  local rel_id
+  rel_id=$(basename "$target_dir")
+  local comm_tag="life-mp-commerce:${rel_id}"
+  local store_tag="life-mp-storefront:${rel_id}"
+
+  local exp_comm_digest
+  exp_comm_digest=$(grep -A 5 '"imageDigests"' "$meta_file" | grep '"commerce"' | cut -d'"' -f4 || echo "")
+  local exp_store_digest
+  exp_store_digest=$(grep -A 5 '"imageDigests"' "$meta_file" | grep '"storefront"' | cut -d'"' -f4 || echo "")
+
+  if [ -z "$exp_comm_digest" ] || [ -z "$exp_store_digest" ]; then
+    echo "❌ Error: Missing required imageDigests in $meta_file! Aborting." >&2
+    return 1
+  fi
+
+  local act_comm_digest
+  act_comm_digest=$(sudo docker inspect --format='{{.Id}}' "$comm_tag" 2>/dev/null || echo "not_found")
+  local act_store_digest
+  act_store_digest=$(sudo docker inspect --format='{{.Id}}' "$store_tag" 2>/dev/null || echo "not_found")
+
+  if [ "$act_comm_digest" != "$exp_comm_digest" ]; then
+    echo "❌ Error: Commerce image digest mismatch for $rel_id! Expected $exp_comm_digest, got $act_comm_digest" >&2
+    return 1
+  fi
+
+  if [ "$act_store_digest" != "$exp_store_digest" ]; then
+    echo "❌ Error: Storefront image digest mismatch for $rel_id! Expected $exp_store_digest, got $act_store_digest" >&2
+    return 1
+  fi
+
+  echo "✔ Cryptographic image digests verified for $rel_id:" >&2
+  echo "   Commerce:   $exp_comm_digest" >&2
+  echo "   Storefront: $exp_store_digest" >&2
+  return 0
+}
+
 rollback_containers_on_failure() {
   echo "⚠️ Deployment verification failed! Initiating automatic fail-closed container & database rollback..." >&2
 
@@ -518,8 +578,13 @@ rollback_containers_on_failure() {
     echo "✔ Database schema reverted successfully." >&2
   fi
 
-  # B. Revert containers to previous release
+  # B. Revert containers to previous release with verified image digests
   if [ -n "$OLD_CURRENT" ] && [ -d "$OLD_CURRENT/deploy" ]; then
+    echo "Verifying cryptographic provenance of previous release before restoration..." >&2
+    if ! verify_release_image_digests "$OLD_CURRENT"; then
+      echo "❌ CRITICAL: Previous release image digests do not match metadata! Cannot safely restore containers." >&2
+      exit 2
+    fi
     echo "Restoring containers to previous stable release: $OLD_CURRENT" >&2
     cd "$OLD_CURRENT/deploy"
     if ! sudo docker compose -p life-mp -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate commerce storefront; then

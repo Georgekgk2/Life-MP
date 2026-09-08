@@ -1,5 +1,6 @@
 import type { StorefrontCatalogCategory } from "@life/types";
 import Link from "next/link";
+import { CardImage } from "./card-image";
 
 type CategoryCardProps = Readonly<{
   category: StorefrontCatalogCategory;
@@ -8,27 +9,12 @@ type CategoryCardProps = Readonly<{
 export function CategoryCard({ category }: CategoryCardProps) {
   return (
     <article className="card category-card">
-      <div
-        className="card__visual category-card__visual"
-        style={{
-          position: "relative",
-          overflow: "hidden",
-          height: "180px",
-          backgroundColor: "var(--color-sand-200)",
-        }}
-      >
-        <img
-          src={`/images/categories/category-${category.slug}.webp`}
-          alt={category.name}
-          loading="lazy"
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            display: "block",
-          }}
+      <div className="card__visual category-card__visual">
+        <CardImage
+          src={category.imageSrc}
+          fallbackSrc="/images/categories/category-dim.webp"
+          alt={`Ілюстрація категорії «${category.name}»`}
         />
-        <span className="card__visual-label">{category.name}</span>
       </div>
       <div className="card__content">
         <p className="card__eyebrow">Категорія</p>

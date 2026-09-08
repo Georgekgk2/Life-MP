@@ -1,5 +1,6 @@
 import type { Person } from "@life/types";
 import Link from "next/link";
+import { CardImage } from "./card-image";
 
 type PersonCardProps = Readonly<{
   person: Person;
@@ -8,27 +9,12 @@ type PersonCardProps = Readonly<{
 export function PersonCard({ person }: PersonCardProps) {
   return (
     <article className="card person-card">
-      <div
-        className="card__visual person-card__visual"
-        style={{
-          position: "relative",
-          overflow: "hidden",
-          height: "220px",
-          backgroundColor: "var(--color-sand-200)",
-        }}
-      >
-        <img
-          src={`/images/people/person-${person.slug}.webp`}
-          alt={person.name}
-          loading="lazy"
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            display: "block",
-          }}
+      <div className="card__visual person-card__visual">
+        <CardImage
+          src={person.imageSrc}
+          fallbackSrc="/images/people/person-olena.webp"
+          alt={`Портрет учасника спільноти: ${person.name}`}
         />
-        <span className="card__visual-label">{person.name}</span>
       </div>
       <div className="card__content">
         <p className="card__eyebrow">{person.role}</p>

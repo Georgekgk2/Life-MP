@@ -20,9 +20,12 @@ test.describe("Catalog E2E & Visual Artifacts", () => {
     // 1. Homepage
     await page.goto("/");
     await expect(page.locator("h1")).toContainText(
-      "Місце, де історії людей поєднуються зі спільнотою",
+      "Речі з історією. Люди, яких хочеться підтримати.",
     );
     await expect(page.locator(".page-intro")).toContainText("Life-MP");
+    await expect(page.getByRole("status")).toContainText(
+      "Демонстраційний режим",
+    );
 
     // Capture homepage screenshot
     await page.screenshot({
@@ -75,6 +78,32 @@ test.describe("Catalog E2E & Visual Artifacts", () => {
     await page.keyboard.press("Enter");
     const mainContent = page.locator("#main-content");
     await expect(mainContent).toBeFocused();
+  });
+
+  test("cart traps focus, closes on Escape, and restores opener focus", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const addButton = page.getByRole("button", { name: /^Додати / }).first();
+    await expect(addButton).toBeVisible();
+    await addButton.click();
+
+    const dialog = page.getByRole("dialog", { name: "Кошик покупок" });
+    const closeButton = page.getByRole("button", { name: "Закрити кошик" });
+    const clearButton = page.getByRole("button", { name: "Очистити" });
+
+    await expect(dialog).toBeVisible();
+    await expect(closeButton).toBeFocused();
+    await expect(clearButton).toBeVisible();
+
+    await page.keyboard.press("Shift+Tab");
+    await expect(clearButton).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(closeButton).toBeFocused();
+
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(addButton).toBeFocused();
   });
 
   test("ensures no horizontal document overflow", async ({ page }) => {

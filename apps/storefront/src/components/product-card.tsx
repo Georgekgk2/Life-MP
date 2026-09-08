@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { StorefrontCatalogProduct } from "@life/types";
 import { SaveButton } from "./save-button";
 import { AddToCartButton } from "./add-to-cart-button";
+import { CardImage } from "./card-image";
 import { formatHryvnia } from "@/formatters";
 
 type ProductCardProps = Readonly<{
@@ -11,43 +12,21 @@ type ProductCardProps = Readonly<{
 export function ProductCard({ product }: ProductCardProps) {
   return (
     <article className="card product-card">
-      <div
-        className="card__visual product-card__visual"
-        style={{
-          position: "relative",
-          overflow: "hidden",
-          height: "220px",
-          backgroundColor: "var(--color-sand-200)",
-        }}
-      >
-        <img
-          src={`/images/products/${product.slug}.webp`}
-          alt={product.name}
-          loading="lazy"
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            display: "block",
-          }}
+      <div className="card__visual product-card__visual">
+        <CardImage
+          src={product.imageSrc}
+          fallbackSrc="/images/products/chashka-ranok.webp"
+          alt={`Фото виробу «${product.name}»`}
         />
-        <span className="card__visual-label">{product.name}</span>
       </div>
-      <div className="card__content">
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            gap: "0.5rem",
-          }}
-        >
+      <div className="card__content product-card__content">
+        <div className="product-card__topline">
           <p className="card__eyebrow">
             {product.provider?.name
               ? `Майстер: ${product.provider.name}`
               : "Виріб спільноти"}
           </p>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+          <div className="product-card__actions">
             <AddToCartButton product={product} size="sm" />
             <SaveButton product={product} size="sm" />
           </div>
@@ -61,26 +40,23 @@ export function ProductCard({ product }: ProductCardProps) {
           </Link>
         </h3>
         <p className="card__description">{product.description}</p>
-        <div className="card__meta">
+        <div className="card__meta product-card__meta">
           <data value={product.priceUah}>
             {formatHryvnia(product.priceUah)}
           </data>
-          <div
-            className="badge-group"
-            style={{ display: "flex", gap: "0.25rem", flexWrap: "wrap" }}
-          >
-            <span className="badge badge--demo">
-              {product.isSynthetic
-                ? "Синтетичні локальні дані"
-                : "Лише перегляд у демо"}
-            </span>
-            {product.organicProductBadge && (
-              <span
-                className="badge badge--organic"
-                style={{ background: "#fef7e0", color: "#b06000" }}
-              >
-                🌿 {product.organicProductBadge}
+          <div className="badge-group">
+            {product.verifiedVendorBadge && (
+              <span className="badge badge--verified">
+                {product.verifiedVendorBadge}
               </span>
+            )}
+            {product.organicProductBadge && (
+              <span className="badge badge--organic">
+                {product.organicProductBadge}
+              </span>
+            )}
+            {product.isSynthetic && (
+              <span className="badge badge--demo">Вітрина</span>
             )}
           </div>
         </div>

@@ -1,6 +1,7 @@
 export { AddToCartButton } from "./add-to-cart-button";
 export { ArtisanForm } from "./artisan-form";
 export { CartDrawer } from "./cart-drawer";
+export { CardImage } from "./card-image";
 export { CatalogBrowser } from "./catalog-browser";
 export { CategoryCard } from "./category-card";
 export { CheckoutSuccessView } from "./checkout-success-view";
@@ -9,7 +10,6 @@ export { CustomerProfileView } from "./customer-profile-view";
 export { CustomerOrdersPanel } from "./customer-orders-panel";
 export { EmptyState } from "./empty-state";
 export { EventCard } from "./event-card";
-export { InstallPwaPrompt } from "./install-pwa-prompt";
 export { ModerationDashboard } from "./moderation-dashboard";
 export { OrderTrackerView } from "./order-tracker-view";
 export { PersonCard } from "./person-card";

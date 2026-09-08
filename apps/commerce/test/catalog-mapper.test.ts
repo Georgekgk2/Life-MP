@@ -84,4 +84,51 @@ describe("публічний мапер каталогу", () => {
 
     expect(snapshot.products[0]?.priceUah).toBe(650);
   });
+
+  it("віддає thumbnail перед gallery і нормалізує пробіли", () => {
+    const snapshot = mapPublicCatalog(
+      [
+        {
+          id: "listing-thumbnail",
+          vendor_id: "vendor-1",
+          price_uah: 120,
+          product: {
+            handle: "product-thumbnail",
+            thumbnail: "  /images/products/thumbnail.webp  ",
+            images: [{ url: "/images/products/gallery.webp" }],
+          },
+        },
+      ],
+      new Map([["vendor-1", { handle: "vendor", name: "Виробник" }]]),
+    );
+
+    expect(snapshot.products[0]?.imageSrc).toBe(
+      "/images/products/thumbnail.webp",
+    );
+  });
+
+  it("пропускає порожні gallery entries і бере перший валідний URL", () => {
+    const snapshot = mapPublicCatalog(
+      [
+        {
+          id: "listing-gallery",
+          vendor_id: "vendor-1",
+          price_uah: 120,
+          product: {
+            handle: "product-gallery",
+            images: [
+              { url: "   " },
+              { alt: "без URL" },
+              { url: "  https://cdn.example.test/product.webp " },
+            ],
+          },
+        },
+      ],
+      new Map([["vendor-1", { handle: "vendor", name: "Виробник" }]]),
+    );
+
+    expect(snapshot.products[0]?.imageSrc).toBe(
+      "https://cdn.example.test/product.webp",
+    );
+  });
 });

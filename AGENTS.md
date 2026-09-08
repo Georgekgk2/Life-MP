@@ -206,3 +206,11 @@ make deploy-production      # Deploy to production (requires approval)
 - Runbooks: `docs/runbooks/`
 - Decisions: `docs/decisions/`
 - Product: `docs/product/`
+
+## Harnessctl & Execution Standards (2026-09-07)
+
+- **Recommended Launcher:**
+  `harnessctl run pi native --memory --feedback -- "task description"`
+- **Memory Layer:** `--memory` extracts compact wake-up and semantic context from MemPalace (`~/.mempalace/palace`) and injects it into the system prompt.
+- **Worktree Isolation:** Use `--worktree` for non-destructive isolated task execution. Dirty Guard locks uncommitted changes without deleting worktrees.
+- **Subagents:** Use Subagent Broker v2 (`subagent` tool) for parallel read-only exploration (`tasks: [...]`) with mandatory directory root in `sourcePaths`.

@@ -17,13 +17,17 @@ test.describe("Customer Profile & Preferences E2E", () => {
   test("navigates to profile, switches tabs, toggles notifications, and edits personal details", async ({
     page,
   }, testInfo) => {
-    // 1. Visit homepage and click Profile link in header
+    // 1. Visit homepage and open the responsive profile action
     await page.goto("/");
+    const menuButton = page.getByRole("button", { name: "Меню" });
+    if (await menuButton.isVisible()) {
+      await menuButton.click();
+    }
     const profileLink = page.getByRole("link", {
-      name: "Особистий кабінет покупця",
+      name: /Особистий кабінет/,
     });
     await expect(profileLink).toBeVisible();
-    await profileLink.click({ force: true });
+    await profileLink.click();
 
     // 2. Verify profile page loaded
     await expect(page).toHaveURL("/profile");

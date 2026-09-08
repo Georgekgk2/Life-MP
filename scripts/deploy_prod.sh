@@ -186,34 +186,40 @@ if [ -f "$CHOSEN_BACKUP/life_production.sql" ] && [ -s "$CHOSEN_BACKUP/life_prod
   echo "✔ PostgreSQL database restored successfully."
 fi
 
-# D. Verify Exact Image Digests from target release metadata
-if [ -f "$TARGET_RELEASE/deploy/RELEASE_METADATA.json" ]; then
-  echo "Verifying local Docker image digests against target release metadata..."
-  COMMERCE_TAG="life-mp-commerce:$(basename "$TARGET_RELEASE")"
-  STOREFRONT_TAG="life-mp-storefront:$(basename "$TARGET_RELEASE")"
-
-  # Extract expected digests
-  EXPECTED_COMMERCE_DIGEST=$(grep -A 5 '"imageDigests"' "$TARGET_RELEASE/deploy/RELEASE_METADATA.json" | grep '"commerce"' | cut -d'"' -f4 || echo "")
-  EXPECTED_STOREFRONT_DIGEST=$(grep -A 5 '"imageDigests"' "$TARGET_RELEASE/deploy/RELEASE_METADATA.json" | grep '"storefront"' | cut -d'"' -f4 || echo "")
-
-  if [ -n "$EXPECTED_COMMERCE_DIGEST" ]; then
-    ACTUAL_COMMERCE_DIGEST=$(sudo docker inspect --format='{{.Id}}' "$COMMERCE_TAG" 2>/dev/null || echo "not_found")
-    if [ "$ACTUAL_COMMERCE_DIGEST" != "$EXPECTED_COMMERCE_DIGEST" ]; then
-      echo "❌ Error: Commerce image digest mismatch! Expected $EXPECTED_COMMERCE_DIGEST, got $ACTUAL_COMMERCE_DIGEST" >&2
-      exit 1
-    fi
-    echo "✔ Commerce image digest verified: $EXPECTED_COMMERCE_DIGEST"
-  fi
-
-  if [ -n "$EXPECTED_STOREFRONT_DIGEST" ]; then
-    ACTUAL_STOREFRONT_DIGEST=$(sudo docker inspect --format='{{.Id}}' "$STOREFRONT_TAG" 2>/dev/null || echo "not_found")
-    if [ "$ACTUAL_STOREFRONT_DIGEST" != "$EXPECTED_STOREFRONT_DIGEST" ]; then
-      echo "❌ Error: Storefront image digest mismatch! Expected $EXPECTED_STOREFRONT_DIGEST, got $ACTUAL_STOREFRONT_DIGEST" >&2
-      exit 1
-    fi
-    echo "✔ Storefront image digest verified: $EXPECTED_STOREFRONT_DIGEST"
-  fi
+# D. Verify Exact Image Digests from target release metadata (FAIL-CLOSED)
+if [ ! -f "$TARGET_RELEASE/deploy/RELEASE_METADATA.json" ]; then
+  echo "❌ Error: Target release lacks RELEASE_METADATA.json! Cannot verify provenance. Aborting rollback." >&2
+  exit 1
 fi
+
+echo "Verifying local Docker image digests against target release metadata..."
+COMMERCE_TAG="life-mp-commerce:$(basename "$TARGET_RELEASE")"
+STOREFRONT_TAG="life-mp-storefront:$(basename "$TARGET_RELEASE")"
+
+EXPECTED_COMMERCE_DIGEST=$(grep -A 5 '"imageDigests"' "$TARGET_RELEASE/deploy/RELEASE_METADATA.json" | grep '"commerce"' | cut -d'"' -f4 || echo "")
+EXPECTED_STOREFRONT_DIGEST=$(grep -A 5 '"imageDigests"' "$TARGET_RELEASE/deploy/RELEASE_METADATA.json" | grep '"storefront"' | cut -d'"' -f4 || echo "")
+
+if [ -z "$EXPECTED_COMMERCE_DIGEST" ] || [ -z "$EXPECTED_STOREFRONT_DIGEST" ]; then
+  echo "❌ Error: Target release metadata is missing required imageDigests! Aborting rollback." >&2
+  exit 1
+fi
+
+ACTUAL_COMMERCE_DIGEST=$(sudo docker inspect --format='{{.Id}}' "$COMMERCE_TAG" 2>/dev/null || echo "not_found")
+ACTUAL_STOREFRONT_DIGEST=$(sudo docker inspect --format='{{.Id}}' "$STOREFRONT_TAG" 2>/dev/null || echo "not_found")
+
+if [ "$ACTUAL_COMMERCE_DIGEST" != "$EXPECTED_COMMERCE_DIGEST" ]; then
+  echo "❌ Error: Commerce image digest mismatch! Expected $EXPECTED_COMMERCE_DIGEST, got $ACTUAL_COMMERCE_DIGEST" >&2
+  exit 1
+fi
+
+if [ "$ACTUAL_STOREFRONT_DIGEST" != "$EXPECTED_STOREFRONT_DIGEST" ]; then
+  echo "❌ Error: Storefront image digest mismatch! Expected $EXPECTED_STOREFRONT_DIGEST, got $ACTUAL_STOREFRONT_DIGEST" >&2
+  exit 1
+fi
+
+echo "✔ Cryptographic image digests verified:"
+echo "   Commerce:   $EXPECTED_COMMERCE_DIGEST"
+echo "   Storefront: $EXPECTED_STOREFRONT_DIGEST"
 
 # E. Recreate containers using target release's compose & environment FIRST
 echo "Restarting application containers with target release images..."
@@ -325,11 +331,12 @@ rsync -avz \
   --exclude "!artifacts" \
   "$LOCAL_SRC/" "$VM_HOST:$RELEASE_DIR/"
 
-echo "✔ Codebase synchronized to $RELEASE_DIR."
+DEPLOY_SCRIPT_SHA256=$(shasum -a 256 "$0" | awk '{print $1}')
+echo "✔ Codebase synchronized to $RELEASE_DIR (Runner SHA256: ${DEPLOY_SCRIPT_SHA256:0:16}...)."
 
 # 8. Remote Execution: Fail-Closed Backup, Image Build, Migrations & Release Linking
 echo "=== [4/7] EXECUTING REMOTE PRE-DEPLOYMENT BACKUP & VERIFICATION ==="
-ssh -i "$SSH_KEY" -o StrictHostKeyChecking=accept-new "$VM_HOST" bash -s -- "$RELEASE_ID" "$LOCAL_COMMIT" "$LOCAL_BRANCH" "$DIRTY_FILES" "$DIFF_SHA" "$UNTRACKED_COUNT" << 'EOF'
+ssh -i "$SSH_KEY" -o StrictHostKeyChecking=accept-new "$VM_HOST" bash -s -- "$RELEASE_ID" "$LOCAL_COMMIT" "$LOCAL_BRANCH" "$DIRTY_FILES" "$DIFF_SHA" "$UNTRACKED_COUNT" "$DEPLOY_SCRIPT_SHA256" << 'EOF'
 set -euo pipefail
 
 RELEASE_ID="$1"
@@ -338,6 +345,7 @@ LOCAL_BRANCH="$3"
 DIRTY_COUNT="$4"
 DIFF_SHA="$5"
 UNTRACKED_COUNT="$6"
+DEPLOY_SCRIPT_SHA256="$7"
 
 REMOTE_ROOT="/opt/life-mp"
 RELEASE_DIR="$REMOTE_ROOT/releases/$RELEASE_ID"
@@ -498,7 +506,19 @@ echo "✔ Database migrations applied successfully."
 OLD_CURRENT=$(readlink -f "$REMOTE_ROOT/current" 2>/dev/null || echo "")
 
 rollback_containers_on_failure() {
-  echo "⚠️ Deployment verification failed! Initiating automatic fail-closed container rollback..." >&2
+  echo "⚠️ Deployment verification failed! Initiating automatic fail-closed container & database rollback..." >&2
+
+  # A. Restore pre-deployment database dump to revert any schema migrations
+  if [ -f "$BACKUP_DIR/life_production.sql" ] && [ -s "$BACKUP_DIR/life_production.sql" ]; then
+    echo "Reverting PostgreSQL schema from pre-deployment dump ($BACKUP_DIR/life_production.sql)..." >&2
+    if ! sudo docker exec -i life-mp-postgres psql -U life_prod -d life_production < "$BACKUP_DIR/life_production.sql"; then
+      echo "❌ CRITICAL: Database schema rollback failed!" >&2
+      exit 2
+    fi
+    echo "✔ Database schema reverted successfully." >&2
+  fi
+
+  # B. Revert containers to previous release
   if [ -n "$OLD_CURRENT" ] && [ -d "$OLD_CURRENT/deploy" ]; then
     echo "Restoring containers to previous stable release: $OLD_CURRENT" >&2
     cd "$OLD_CURRENT/deploy"
@@ -534,7 +554,7 @@ rollback_containers_on_failure() {
       exit 2
     fi
 
-    echo "✔ Containers successfully reverted to previous stable release and verified healthy." >&2
+    echo "✔ Containers and database successfully reverted to previous stable release and verified healthy." >&2
   else
     echo "Notice: No previous release found to rollback containers to." >&2
   fi
@@ -613,6 +633,7 @@ cat << REL > "$RELEASE_DIR/deploy/RELEASE_METADATA.json"
   "worktreeClean": $([ "$DIRTY_COUNT" -eq 0 ] && echo "true" || echo "false"),
   "uncommittedDiffSha": "$DIFF_SHA",
   "untrackedFilesCount": $UNTRACKED_COUNT,
+  "orchestrationScriptSha256": "$DEPLOY_SCRIPT_SHA256",
   "backupDir": "$BACKUP_DIR",
   "databaseBackupStatus": "$DB_BACKUP_STATUS",
   "imageTags": {

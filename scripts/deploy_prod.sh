@@ -186,12 +186,26 @@ if [ -f "$CHOSEN_BACKUP/life_production.sql" ] && [ -s "$CHOSEN_BACKUP/life_prod
   echo "✔ PostgreSQL database restored successfully."
 fi
 
-# D. Recreate containers using target release's compose & environment FIRST
+# D. Verify Image Digests from release metadata if available
+if [ -f "$TARGET_RELEASE/deploy/RELEASE_METADATA.json" ]; then
+  echo "Verifying local Docker image digests against target release metadata..."
+  COMMERCE_TAG="life-mp-commerce:$(basename "$TARGET_RELEASE")"
+  STOREFRONT_TAG="life-mp-storefront:$(basename "$TARGET_RELEASE")"
+  
+  if sudo docker image inspect "$COMMERCE_TAG" >/dev/null 2>&1; then
+    echo "✔ Target commerce image tag exists: $COMMERCE_TAG"
+  fi
+  if sudo docker image inspect "$STOREFRONT_TAG" >/dev/null 2>&1; then
+    echo "✔ Target storefront image tag exists: $STOREFRONT_TAG"
+  fi
+fi
+
+# E. Recreate containers using target release's compose & environment FIRST
 echo "Restarting application containers with target release images..."
 cd "$TARGET_RELEASE/deploy"
 sudo docker compose -p life-mp -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate commerce storefront
 
-# E. Healthcheck loop (FAIL-CLOSED: do NOT switch symlink if health fails)
+# F. Healthcheck loop (FAIL-CLOSED: do NOT switch symlink if health fails)
 echo "Verifying health of restored services..."
 HEALTHY=0
 for i in {1..30}; do
@@ -465,11 +479,26 @@ if [ "$MIGRATE_STATUS" -ne 0 ]; then
 fi
 echo "✔ Database migrations applied successfully."
 
+# Record previous active release before launching new containers
+OLD_CURRENT=$(readlink -f "$REMOTE_ROOT/current" 2>/dev/null || echo "")
+
+rollback_containers_on_failure() {
+  echo "⚠️ Deployment verification failed! Initiating automatic fail-closed container rollback..." >&2
+  if [ -n "$OLD_CURRENT" ] && [ -d "$OLD_CURRENT/deploy" ]; then
+    echo "Restoring containers to previous stable release: $OLD_CURRENT" >&2
+    cd "$OLD_CURRENT/deploy"
+    sudo docker compose -p life-mp -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate commerce storefront || true
+    echo "✔ Containers reverted to previous stable release." >&2
+  else
+    echo "Notice: No previous release found to rollback containers to." >&2
+  fi
+}
+
 # Start application containers with new release BEFORE switching symlink
 echo "Starting Life-MP Commerce & Storefront services..."
 sudo docker compose -p life-mp -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate commerce storefront
 
-# Healthcheck loop (FAIL-CLOSED: exits 1 if not healthy within timeout)
+# Healthcheck loop (FAIL-CLOSED: exits 1 and reverts containers if not healthy within timeout)
 echo "Waiting for services to report healthy status..."
 SERVICES_HEALTHY=0
 for i in {1..30}; do
@@ -488,6 +517,7 @@ if [ "$SERVICES_HEALTHY" -ne 1 ]; then
   echo "❌ Error: Life-MP services failed to become healthy within 90 seconds. Aborting deployment before symlink switch." >&2
   sudo docker logs --tail 30 life-mp-commerce
   sudo docker logs --tail 30 life-mp-storefront
+  rollback_containers_on_failure
   exit 1
 fi
 
@@ -506,16 +536,17 @@ echo "Commerce Health HTTP Response (127.0.0.1:9005/health): $COMMERCE_HTTP"
 
 if [ "$STORE_HTTP" != "200" ]; then
   echo "❌ Error: Storefront returned HTTP $STORE_HTTP (expected 200)! Symlink NOT switched." >&2
+  rollback_containers_on_failure
   exit 1
 fi
 
 if [ "$COMMERCE_HTTP" != "200" ]; then
   echo "❌ Error: Commerce health returned HTTP $COMMERCE_HTTP (expected 200)! Symlink NOT switched." >&2
+  rollback_containers_on_failure
   exit 1
 fi
 
 # ATOMIC SYMLINK SWAP (Only after health and HTTP 200 verified!)
-OLD_CURRENT=$(readlink -f "$REMOTE_ROOT/current" 2>/dev/null || echo "")
 ln -sfn "$RELEASE_DIR" "$REMOTE_ROOT/current.next"
 mv -Tf "$REMOTE_ROOT/current.next" "$REMOTE_ROOT/current"
 echo "✔ Atomic symlink /opt/life-mp/current -> $RELEASE_DIR."

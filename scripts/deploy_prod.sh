@@ -186,17 +186,32 @@ if [ -f "$CHOSEN_BACKUP/life_production.sql" ] && [ -s "$CHOSEN_BACKUP/life_prod
   echo "✔ PostgreSQL database restored successfully."
 fi
 
-# D. Verify Image Digests from release metadata if available
+# D. Verify Exact Image Digests from target release metadata
 if [ -f "$TARGET_RELEASE/deploy/RELEASE_METADATA.json" ]; then
   echo "Verifying local Docker image digests against target release metadata..."
   COMMERCE_TAG="life-mp-commerce:$(basename "$TARGET_RELEASE")"
   STOREFRONT_TAG="life-mp-storefront:$(basename "$TARGET_RELEASE")"
-  
-  if sudo docker image inspect "$COMMERCE_TAG" >/dev/null 2>&1; then
-    echo "✔ Target commerce image tag exists: $COMMERCE_TAG"
+
+  # Extract expected digests
+  EXPECTED_COMMERCE_DIGEST=$(grep -A 5 '"imageDigests"' "$TARGET_RELEASE/deploy/RELEASE_METADATA.json" | grep '"commerce"' | cut -d'"' -f4 || echo "")
+  EXPECTED_STOREFRONT_DIGEST=$(grep -A 5 '"imageDigests"' "$TARGET_RELEASE/deploy/RELEASE_METADATA.json" | grep '"storefront"' | cut -d'"' -f4 || echo "")
+
+  if [ -n "$EXPECTED_COMMERCE_DIGEST" ]; then
+    ACTUAL_COMMERCE_DIGEST=$(sudo docker inspect --format='{{.Id}}' "$COMMERCE_TAG" 2>/dev/null || echo "not_found")
+    if [ "$ACTUAL_COMMERCE_DIGEST" != "$EXPECTED_COMMERCE_DIGEST" ]; then
+      echo "❌ Error: Commerce image digest mismatch! Expected $EXPECTED_COMMERCE_DIGEST, got $ACTUAL_COMMERCE_DIGEST" >&2
+      exit 1
+    fi
+    echo "✔ Commerce image digest verified: $EXPECTED_COMMERCE_DIGEST"
   fi
-  if sudo docker image inspect "$STOREFRONT_TAG" >/dev/null 2>&1; then
-    echo "✔ Target storefront image tag exists: $STOREFRONT_TAG"
+
+  if [ -n "$EXPECTED_STOREFRONT_DIGEST" ]; then
+    ACTUAL_STOREFRONT_DIGEST=$(sudo docker inspect --format='{{.Id}}' "$STOREFRONT_TAG" 2>/dev/null || echo "not_found")
+    if [ "$ACTUAL_STOREFRONT_DIGEST" != "$EXPECTED_STOREFRONT_DIGEST" ]; then
+      echo "❌ Error: Storefront image digest mismatch! Expected $EXPECTED_STOREFRONT_DIGEST, got $ACTUAL_STOREFRONT_DIGEST" >&2
+      exit 1
+    fi
+    echo "✔ Storefront image digest verified: $EXPECTED_STOREFRONT_DIGEST"
   fi
 fi
 
@@ -487,8 +502,39 @@ rollback_containers_on_failure() {
   if [ -n "$OLD_CURRENT" ] && [ -d "$OLD_CURRENT/deploy" ]; then
     echo "Restoring containers to previous stable release: $OLD_CURRENT" >&2
     cd "$OLD_CURRENT/deploy"
-    sudo docker compose -p life-mp -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate commerce storefront || true
-    echo "✔ Containers reverted to previous stable release." >&2
+    if ! sudo docker compose -p life-mp -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate commerce storefront; then
+      echo "❌ CRITICAL: Automatic container rollback command failed!" >&2
+      exit 2
+    fi
+
+    # Verify reverted containers reach healthy state (FAIL-CLOSED)
+    REVERT_HEALTHY=0
+    for r in {1..20}; do
+      RC_STATUS=$(sudo docker inspect --format='{{.State.Health.Status}}' life-mp-commerce 2>/dev/null || echo "starting")
+      RS_STATUS=$(sudo docker inspect --format='{{.State.Health.Status}}' life-mp-storefront 2>/dev/null || echo "starting")
+      if [ "$RC_STATUS" = "healthy" ] && [ "$RS_STATUS" = "healthy" ]; then
+        REVERT_HEALTHY=1
+        break
+      fi
+      sleep 2
+    done
+
+    if [ "$REVERT_HEALTHY" -ne 1 ]; then
+      echo "❌ CRITICAL: Reverted containers failed to become healthy within 40 seconds!" >&2
+      sudo docker logs --tail 20 life-mp-commerce
+      sudo docker logs --tail 20 life-mp-storefront
+      exit 2
+    fi
+
+    # Verify loopback HTTP responses on reverted containers
+    R_STORE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3100/)
+    R_COMMERCE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:9005/health)
+    if [ "$R_STORE" != "200" ] || [ "$R_COMMERCE" != "200" ]; then
+      echo "❌ CRITICAL: Reverted containers failed HTTP 200 checks (Storefront=$R_STORE, Commerce=$R_COMMERCE)!" >&2
+      exit 2
+    fi
+
+    echo "✔ Containers successfully reverted to previous stable release and verified healthy." >&2
   else
     echo "Notice: No previous release found to rollback containers to." >&2
   fi

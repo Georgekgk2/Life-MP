@@ -11,11 +11,13 @@
 # 3. Dedicated Namespaces: Containers (life-mp-*), Network (life-mp-net), Volumes (life-mp-*).
 # 4. Strict Resource Limits: Bounded memory caps (~2.0GB total across 4 containers).
 # 5. Version-Aware Release Management: Releases deployed to /opt/life-mp/releases/<release-id>
-#    with immutable image tags (life-mp-commerce:<release-id>, life-mp-storefront:<release-id>).
-# 6. Cryptographically Verified Backups: /var/backups/life-mp/<release-id>/ with CHECKSUMS.sha256
-#    and BACKUP_COMPLETE sentinel marker.
-# 7. Release-Aware Rollback: Restores exact previous code, compose file, image tags, config & DB.
-# 8. Fail-Closed Integrity: Strict healthcheck loops, HTTP 200 assertions, zero-loss migrations.
+#    with immutable image tags (life-mp-commerce:<release-id>, life-mp-storefront:<release-id>)
+#    and recorded image digests.
+# 6. Cryptographically Verified Backups: /var/backups/life-mp/<release-id>/ with CHECKSUMS.sha256,
+#    verified pg_dump footer, and BACKUP_COMPLETE / BACKUP_COMPLETE_WITH_DB sentinels.
+# 7. Atomic Safe Rollback: Tests health BEFORE performing atomic symlink swap (mv -Tf),
+#    fail-closed HTTP 200 assertions, and updates PREVIOUS_RELEASE pair deterministically.
+# 8. Fail-Closed Integrity: Zero-loss migrations, strict healthcheck loops, dirty-tree protection.
 # =============================================================================
 
 set -euo pipefail
@@ -121,7 +123,7 @@ SPECIFIED_TARGET="${1:-}"
 BACKUP_PARENT="/var/backups/life-mp"
 REMOTE_ROOT="/opt/life-mp"
 
-# Find verified backup
+# A. Find verified backup
 CHOSEN_BACKUP=""
 if [ -n "$SPECIFIED_TARGET" ] && [ -d "$BACKUP_PARENT/$SPECIFIED_TARGET" ]; then
   if [ -f "$BACKUP_PARENT/$SPECIFIED_TARGET/BACKUP_COMPLETE" ]; then
@@ -150,7 +152,7 @@ fi
 echo "✔ Verified backup identified: $CHOSEN_BACKUP"
 (cd "$CHOSEN_BACKUP" && sha256sum -c CHECKSUMS.sha256)
 
-# Identify target release directory
+# B. Identify target release directory
 TARGET_RELEASE=""
 if [ -f "$REMOTE_ROOT/PREVIOUS_RELEASE" ]; then
   PREV_REL_NAME=$(cat "$REMOTE_ROOT/PREVIOUS_RELEASE")
@@ -171,33 +173,31 @@ if [ -z "$TARGET_RELEASE" ]; then
 fi
 
 if [ -z "$TARGET_RELEASE" ] || [ ! -d "$TARGET_RELEASE" ]; then
-  echo "❌ Error: Previous release directory not found under $REMOTE_ROOT/releases!" >&2
+  echo "❌ Error: Target release directory not found under $REMOTE_ROOT/releases!" >&2
   exit 1
 fi
 
 echo "✔ Rollback target release directory: $TARGET_RELEASE"
 
-# Restore Database Dump if present in backup
+# C. Restore Database Dump if present in verified backup
 if [ -f "$CHOSEN_BACKUP/life_production.sql" ] && [ -s "$CHOSEN_BACKUP/life_production.sql" ]; then
   echo "Restoring PostgreSQL database from $CHOSEN_BACKUP/life_production.sql..."
   sudo docker exec -i life-mp-postgres psql -U life_prod -d life_production < "$CHOSEN_BACKUP/life_production.sql"
   echo "✔ PostgreSQL database restored successfully."
 fi
 
-# Switch Atomic Current Link
-ln -sfn "$TARGET_RELEASE" "$REMOTE_ROOT/current"
-echo "✔ Symlink /opt/life-mp/current updated to $TARGET_RELEASE."
-
-# Restore containers with previous release's exact images and compose definition
-cd "$REMOTE_ROOT/current/deploy"
+# D. Recreate containers using target release's compose & environment FIRST
+echo "Restarting application containers with target release images..."
+cd "$TARGET_RELEASE/deploy"
 sudo docker compose -p life-mp -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate commerce storefront
 
-# Healthcheck loop
+# E. Healthcheck loop (FAIL-CLOSED: do NOT switch symlink if health fails)
 echo "Verifying health of restored services..."
 HEALTHY=0
-for i in {1..20}; do
+for i in {1..30}; do
   C_STATUS=$(sudo docker inspect --format='{{.State.Health.Status}}' life-mp-commerce 2>/dev/null || echo "starting")
   S_STATUS=$(sudo docker inspect --format='{{.State.Health.Status}}' life-mp-storefront 2>/dev/null || echo "starting")
+  echo "  Probe [$i/30]: commerce=$C_STATUS | storefront=$S_STATUS"
   if [ "$C_STATUS" = "healthy" ] && [ "$S_STATUS" = "healthy" ]; then
     HEALTHY=1
     break
@@ -206,13 +206,36 @@ for i in {1..20}; do
 done
 
 if [ "$HEALTHY" -ne 1 ]; then
-  echo "❌ Error: Restored services failed to reach healthy status!" >&2
+  echo "❌ Error: Restored services failed to reach healthy status! Aborting symlink switch." >&2
+  sudo docker logs --tail 20 life-mp-commerce
+  sudo docker logs --tail 20 life-mp-storefront
   exit 1
 fi
 
-echo "Storefront HTTP Check (127.0.0.1:3100): $(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3100/)"
-echo "Commerce Health Check (127.0.0.1:9005/health): $(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:9005/health)"
-echo "✔ Rollback verified cleanly via loopback probes."
+# F. Fail-Closed HTTP 200 assertions
+STORE_RC=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3100/)
+COMMERCE_RC=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:9005/health)
+
+echo "Storefront HTTP Check (127.0.0.1:3100): $STORE_RC"
+echo "Commerce Health Check (127.0.0.1:9005/health): $COMMERCE_RC"
+
+if [ "$STORE_RC" != "200" ] || [ "$COMMERCE_RC" != "200" ]; then
+  echo "❌ Error: Restored services failed HTTP 200 checks (Storefront=$STORE_RC, Commerce=$COMMERCE_RC)!" >&2
+  exit 1
+fi
+echo "✔ Restored services verified healthy with HTTP 200."
+
+# G. Atomic Symlink Swap: current.next -> current via mv -Tf
+OLD_CURRENT=$(readlink -f "$REMOTE_ROOT/current" 2>/dev/null || echo "")
+ln -sfn "$TARGET_RELEASE" "$REMOTE_ROOT/current.next"
+mv -Tf "$REMOTE_ROOT/current.next" "$REMOTE_ROOT/current"
+echo "✔ Symlink /opt/life-mp/current atomically updated to $TARGET_RELEASE."
+
+# H. Update PREVIOUS_RELEASE
+if [ -n "$OLD_CURRENT" ] && [ -d "$OLD_CURRENT" ]; then
+  basename "$OLD_CURRENT" > "$REMOTE_ROOT/PREVIOUS_RELEASE"
+  echo "✔ Previous release tracked as: $(cat "$REMOTE_ROOT/PREVIOUS_RELEASE")"
+fi
 ROLLBACK_EOF
   echo "================================================================================"
   echo "  🎉 ATOMIC ROLLBACK COMPLETED SUCCESSFULLY                                     "
@@ -347,6 +370,7 @@ echo "STOREFRONT_IMAGE=life-mp-storefront:${RELEASE_ID}" >> "$RELEASE_DIR/deploy
 echo "Creating pre-deployment backup under $BACKUP_DIR..."
 cp "$SHARED_ENV" "$BACKUP_DIR/.env.production.bak"
 
+DB_BACKUP_STATUS="absent_fresh_install"
 if sudo docker ps --format '{{.Names}}' | grep -q "^life-mp-postgres$"; then
   echo "Executing pg_dump of life_production database..."
   set +e
@@ -363,15 +387,23 @@ if sudo docker ps --format '{{.Names}}' | grep -q "^life-mp-postgres$"; then
     echo "❌ Error: Database dump file is empty!" >&2
     exit 1
   fi
-  echo "✔ Database dump successfully created ($(wc -c < "$BACKUP_DIR/life_production.sql" | tr -d ' ') bytes)."
+  if ! tail -n 25 "$BACKUP_DIR/life_production.sql" | grep -q "PostgreSQL database dump complete"; then
+    echo "❌ Error: Database dump file lacks complete footer marker!" >&2
+    exit 1
+  fi
+  echo "✔ Database dump successfully created and verified ($(wc -c < "$BACKUP_DIR/life_production.sql" | tr -d ' ') bytes)."
+  echo "BACKUP_WITH_DB" > "$BACKUP_DIR/BACKUP_COMPLETE_WITH_DB"
+  DB_BACKUP_STATUS="completed_verified"
+else
+  echo "BACKUP_FRESH" > "$BACKUP_DIR/BACKUP_COMPLETE_FRESH"
 fi
 
 # Generate SHA256 checksums and seal with sentinel marker
 (cd "$BACKUP_DIR" && sha256sum * > CHECKSUMS.sha256)
 echo "BACKUP_VERIFIED" > "$BACKUP_DIR/BACKUP_COMPLETE"
-echo "✔ Backup cryptographically sealed and verified with BACKUP_COMPLETE marker."
+echo "✔ Backup cryptographically sealed and verified with BACKUP_COMPLETE marker ($DB_BACKUP_STATUS)."
 
-echo -e "\n=== [5/7] BUILDING DOCKER IMAGES WITH IMMUTABLE TAGS ==="
+echo -e "\n=== [5/7] BUILDING DOCKER IMAGES WITH IMMUTABLE TAGS & CAPTURING DIGESTS ==="
 cd "$RELEASE_DIR"
 
 # Build backend and storefront sequentially with release-specific immutable tags
@@ -386,7 +418,11 @@ sudo docker build \
   -t "life-mp-storefront:production" \
   -f deploy/Dockerfile.storefront .
 
-echo "✔ Docker images built and tagged with immutable release identifier $RELEASE_ID."
+COMMERCE_DIGEST=$(sudo docker inspect --format='{{.Id}}' "life-mp-commerce:${RELEASE_ID}")
+STOREFRONT_DIGEST=$(sudo docker inspect --format='{{.Id}}' "life-mp-storefront:${RELEASE_ID}")
+echo "✔ Docker images built:"
+echo "   Commerce:   ${RELEASE_ID} ($COMMERCE_DIGEST)"
+echo "   Storefront: ${RELEASE_ID} ($STOREFRONT_DIGEST)"
 
 echo -e "\n=== [6/7] STARTING INFRASTRUCTURE & EXECUTING MIGRATIONS ==="
 cd "$RELEASE_DIR/deploy"
@@ -429,17 +465,7 @@ if [ "$MIGRATE_STATUS" -ne 0 ]; then
 fi
 echo "✔ Database migrations applied successfully."
 
-# Record previous active release before switching symlink
-if [ -L "$REMOTE_ROOT/current" ]; then
-  CURRENT_PREV=$(basename "$(readlink "$REMOTE_ROOT/current")")
-  echo "$CURRENT_PREV" > "$REMOTE_ROOT/PREVIOUS_RELEASE"
-fi
-
-# Switch atomic symlink to new release
-ln -sfn "$RELEASE_DIR" "$REMOTE_ROOT/current"
-echo "✔ Atomic symlink /opt/life-mp/current -> $RELEASE_DIR."
-
-# Start application containers with new release
+# Start application containers with new release BEFORE switching symlink
 echo "Starting Life-MP Commerce & Storefront services..."
 sudo docker compose -p life-mp -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate commerce storefront
 
@@ -459,7 +485,7 @@ for i in {1..30}; do
 done
 
 if [ "$SERVICES_HEALTHY" -ne 1 ]; then
-  echo "❌ Error: Life-MP services failed to become healthy within 90 seconds. Aborting deployment." >&2
+  echo "❌ Error: Life-MP services failed to become healthy within 90 seconds. Aborting deployment before symlink switch." >&2
   sudo docker logs --tail 30 life-mp-commerce
   sudo docker logs --tail 30 life-mp-storefront
   exit 1
@@ -479,13 +505,25 @@ echo "Storefront HTTP Response (127.0.0.1:3100): $STORE_HTTP"
 echo "Commerce Health HTTP Response (127.0.0.1:9005/health): $COMMERCE_HTTP"
 
 if [ "$STORE_HTTP" != "200" ]; then
-  echo "❌ Error: Storefront returned HTTP $STORE_HTTP (expected 200)!" >&2
+  echo "❌ Error: Storefront returned HTTP $STORE_HTTP (expected 200)! Symlink NOT switched." >&2
   exit 1
 fi
 
 if [ "$COMMERCE_HTTP" != "200" ]; then
-  echo "❌ Error: Commerce health returned HTTP $COMMERCE_HTTP (expected 200)!" >&2
+  echo "❌ Error: Commerce health returned HTTP $COMMERCE_HTTP (expected 200)! Symlink NOT switched." >&2
   exit 1
+fi
+
+# ATOMIC SYMLINK SWAP (Only after health and HTTP 200 verified!)
+OLD_CURRENT=$(readlink -f "$REMOTE_ROOT/current" 2>/dev/null || echo "")
+ln -sfn "$RELEASE_DIR" "$REMOTE_ROOT/current.next"
+mv -Tf "$REMOTE_ROOT/current.next" "$REMOTE_ROOT/current"
+echo "✔ Atomic symlink /opt/life-mp/current -> $RELEASE_DIR."
+
+# Track previous release
+if [ -n "$OLD_CURRENT" ] && [ -d "$OLD_CURRENT" ] && [ "$OLD_CURRENT" != "$RELEASE_DIR" ]; then
+  basename "$OLD_CURRENT" > "$REMOTE_ROOT/PREVIOUS_RELEASE"
+  echo "✔ Previous release tracked as: $(cat "$REMOTE_ROOT/PREVIOUS_RELEASE")"
 fi
 
 # Write Release Metadata
@@ -499,9 +537,14 @@ cat << REL > "$RELEASE_DIR/deploy/RELEASE_METADATA.json"
   "uncommittedDiffSha": "$DIFF_SHA",
   "untrackedFilesCount": $UNTRACKED_COUNT,
   "backupDir": "$BACKUP_DIR",
+  "databaseBackupStatus": "$DB_BACKUP_STATUS",
   "imageTags": {
     "commerce": "life-mp-commerce:${RELEASE_ID}",
     "storefront": "life-mp-storefront:${RELEASE_ID}"
+  },
+  "imageDigests": {
+    "commerce": "$COMMERCE_DIGEST",
+    "storefront": "$STOREFRONT_DIGEST"
   },
   "ports": {
     "storefront": 3100,

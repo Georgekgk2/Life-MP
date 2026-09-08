@@ -1,32 +1,32 @@
 # =============================================================================
-# UNAPPROVED TEMPLATE — DO NOT DEPLOY (Phase P0 Containment)
-# Life-MP Production Docker Compose Template
+# Life-MP Production Docker Compose Stack (Isolated Shared-Host Profile)
 # =============================================================================
-# УВАГА: цей файл є шаблоном конфігурації. Будь-яке розгортання заборонено
-# політикою безпеки (Phase P0 Containment) до проходження всіх воріт готовності.
+# Conforms to Zero-Public-Port & Shared-Server Isolation Policy:
+# 1. No public 80/443 bindings (ingress handled via Cloudflare Tunnel / Shared Proxy).
+# 2. Strict loopback bindings for app services (127.0.0.1:3100 and 127.0.0.1:9005).
+# 3. Fully private database and cache (no host port exposure).
+# 4. Strict memory limits per container (total footprint <= 2GB RAM).
+# 5. Prefixed container, network, and volume namespaces (life-mp-*).
 # =============================================================================
 
 services:
   # ---------------------------------------------------------------------------
-  # PostgreSQL
+  # PostgreSQL 16 (Private Storage)
   # ---------------------------------------------------------------------------
   postgres:
     image: postgres:16-alpine
-    container_name: life-postgres
+    container_name: life-mp-postgres
+    command: ["postgres", "-c", "max_connections=150", "-c", "shared_buffers=128MB"]
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-life_production}
+      POSTGRES_USER: ${POSTGRES_USER:-life_prod}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD_REQUIRED}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     networks:
-      - life-net
+      - life-mp-net
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready --username=${POSTGRES_USER} --dbname=${POSTGRES_DB}",
-        ]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-life_prod} -d ${POSTGRES_DB:-life_production}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -38,11 +38,11 @@ services:
           memory: 512M
 
   # ---------------------------------------------------------------------------
-  # Redis
+  # Redis 7 (Private Cache & Session Store)
   # ---------------------------------------------------------------------------
   redis:
     image: redis:7-alpine
-    container_name: life-redis
+    container_name: life-mp-redis
     command:
       [
         "redis-server",
@@ -56,7 +56,7 @@ services:
     volumes:
       - redis-data:/data
     networks:
-      - life-net
+      - life-mp-net
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -70,32 +70,35 @@ services:
           memory: 192M
 
   # ---------------------------------------------------------------------------
-  # Commerce (Medusa v2)
+  # Commerce Engine (Medusa v2 Headless Backend)
   # ---------------------------------------------------------------------------
   commerce:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.commerce
-    image: ${COMMERCE_IMAGE:?COMMERCE_IMAGE_REQUIRED}
-    container_name: life-commerce
+    image: ${COMMERCE_IMAGE:-life-mp-commerce:production}
+    container_name: life-mp-commerce
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      TS_NODE_TRANSPILE_ONLY: "true"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-life_prod}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-life_production}?sslmode=disable
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET}
-      COOKIE_SECRET: ${COOKIE_SECRET}
-      STORE_CORS: ${STORE_CORS}
-      ADMIN_CORS: ${ADMIN_CORS}
-      AUTH_CORS: ${AUTH_CORS}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET_REQUIRED}
+      COOKIE_SECRET: ${COOKIE_SECRET:?COOKIE_SECRET_REQUIRED}
+      STORE_CORS: ${STORE_CORS:-https://life-mp.pp.ua}
+      ADMIN_CORS: ${ADMIN_CORS:-https://life-mp.pp.ua}
+      AUTH_CORS: ${AUTH_CORS:-https://life-mp.pp.ua}
       PORT: "9000"
       HOSTNAME: "0.0.0.0"
+    ports:
+      - "127.0.0.1:${HOST_COMMERCE_PORT:-9005}:9000"
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     networks:
-      - life-net
+      - life-mp-net
     healthcheck:
       test:
         [
@@ -115,7 +118,7 @@ services:
           memory: 768M
 
   # ---------------------------------------------------------------------------
-  # Storefront (Next.js)
+  # Storefront (Next.js 15 PWA Frontend)
   # ---------------------------------------------------------------------------
   storefront:
     build:
@@ -123,23 +126,24 @@ services:
       dockerfile: deploy/Dockerfile.storefront
       args:
         NEXT_PUBLIC_MEDUSA_API_URL: ${NEXT_PUBLIC_MEDUSA_API_URL:-/api}
-    image: ${STOREFRONT_IMAGE:?STOREFRONT_IMAGE_REQUIRED}
-    container_name: life-storefront
+    image: ${STOREFRONT_IMAGE:-life-mp-storefront:production}
+    container_name: life-mp-storefront
     environment:
       NODE_ENV: production
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
       MEDUSA_API_URL: http://commerce:9000
-      # Reserved for an approved Medusa catalog/review source; production guards stay fail-closed.
       MEDUSA_BACKEND_URL: http://commerce:9000
-      NEXT_PUBLIC_MEDUSA_API_URL: ${NEXT_PUBLIC_MEDUSA_API_URL:-/api}
+      NEXT_PUBLIC_MEDUSA_API_URL: ${NEXT_PUBLIC_MEDUSA_API_URL:-https://life-mp.pp.ua/api}
       CATALOG_SOURCE: medusa
       ALLOW_SYNTHETIC_CATALOG: "false"
+    ports:
+      - "127.0.0.1:${HOST_STOREFRONT_PORT:-3100}:3000"
     depends_on:
       commerce:
         condition: service_healthy
     networks:
-      - life-net
+      - life-mp-net
     healthcheck:
       test:
         [
@@ -158,48 +162,13 @@ services:
         limits:
           memory: 512M
 
-  # ---------------------------------------------------------------------------
-  # Caddy (Reverse Proxy + TLS)
-  # ---------------------------------------------------------------------------
-  caddy:
-    image: caddy:2-alpine
-    container_name: life-caddy
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
-    depends_on:
-      - storefront
-      - commerce
-    networks:
-      - life-net
-    healthcheck:
-      test: ["CMD-SHELL", "caddy version || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-
 volumes:
   postgres-data:
-    name: life-postgres-data
+    name: life-mp-postgres-data
   redis-data:
-    name: life-redis-data
-  caddy-data:
-    name: life-caddy-data
-  caddy-config:
-    name: life-caddy-config
+    name: life-mp-redis-data
 
 networks:
-  life-net:
-    name: life-net
+  life-mp-net:
+    name: life-mp-net
     driver: bridge

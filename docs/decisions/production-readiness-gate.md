@@ -38,7 +38,7 @@
 | Область                              | Статус                       | Обмеження доказу                                                           |
 | ------------------------------------ | ---------------------------- | -------------------------------------------------------------------------- |
 | Monorepo quality scripts             | Частково підтверджено        | Локальний результат не замінює GitHub CI для конкретного commit.           |
-| Catalog/provider/moderation          | Частково підтверджено        | Покриває local/test Medusa і synthetic fixtures, не commercial onboarding. |
+| Catalog/provider/moderation          | Частково підтверджено        | Покриває local/test Medusa, synthetic fixtures та public-demo, не commercial onboarding. |
 | Tenant/customer isolation            | Частково підтверджено        | Потрібні свіжі HTTP/E2E докази та незалежний review.                       |
 | Synthetic order/review boundary      | Частково підтверджено        | `ALLOW_SYNTHETIC_*` та `NODE_ENV` guards не є live integration.            |
 | Payment/fiscalization/carrier/payout | Не реалізовано для live      | Жодні sandbox types або adapters не є бойовим провайдером.                 |

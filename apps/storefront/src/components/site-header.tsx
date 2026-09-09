@@ -25,6 +25,7 @@ export function SiteHeader() {
   const [mounted, setMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showProfileNotice, setShowProfileNotice] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -83,14 +84,16 @@ export function SiteHeader() {
               ))}
             </ul>
             <div className="site-navigation__mobile-actions">
-              <Link
+              <button
+                type="button"
                 className="button button--secondary"
-                href="/profile"
-                prefetch={false}
-                onClick={closeMenu}
+                onClick={() => {
+                  closeMenu();
+                  setShowProfileNotice(true);
+                }}
               >
                 Особистий кабінет
-              </Link>
+              </button>
               <Link
                 className="button button--primary"
                 href="/join-as-artisan"
@@ -142,15 +145,15 @@ export function SiteHeader() {
                 </span>
               )}
             </button>
-            <Link
-              href="/profile"
-              prefetch={false}
+            <button
+              type="button"
               className="site-header__action site-header__profile-link"
-              aria-label="Особистий кабінет покупця"
+              aria-label="Особистий кабінет покупця (у розробці)"
+              onClick={() => setShowProfileNotice((prev) => !prev)}
             >
               <span aria-hidden="true">◯</span>
               <span className="site-header__action-label">Профіль</span>
-            </Link>
+            </button>
             <Link
               href="/join-as-artisan"
               className="button button--primary button--sm site-header__artisan-btn"
@@ -172,6 +175,41 @@ export function SiteHeader() {
           </div>
         </div>
       </header>
+
+      {showProfileNotice && (
+        <aside
+          className="notice notice--warning"
+          role="status"
+          style={{
+            margin: "0.5rem auto",
+            maxWidth: "var(--page-max-width)",
+            position: "relative",
+          }}
+        >
+          <h2 className="notice__title">Особистий кабінет у розробці</h2>
+          <p>
+            У демонстраційній версії Life-MP функціонал особистого кабінету,
+            авторизація та збереження даних покупця вимкнені.
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowProfileNotice(false)}
+            aria-label="Закрити повідомлення"
+            style={{
+              position: "absolute",
+              right: "1rem",
+              top: "0.5rem",
+              background: "none",
+              border: "none",
+              fontSize: "1.25rem",
+              cursor: "pointer",
+              color: "inherit",
+            }}
+          >
+            ✕
+          </button>
+        </aside>
+      )}
       <SearchAutocompleteModal
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}

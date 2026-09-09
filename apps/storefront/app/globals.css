@@ -1374,7 +1374,6 @@
   }
 
   .page-section--accent h2,
-  .page-section--accent p,
   .page-section--accent .section-heading__eyebrow,
   .page-section--accent .section-heading__description,
   .page-section--accent .section-heading__action {
@@ -1608,7 +1607,6 @@
   .page-section--accent .partner-card .card__description {
     color: var(--color-ink-subtle);
   }
-
   .button,
   button.button,
   a.button {

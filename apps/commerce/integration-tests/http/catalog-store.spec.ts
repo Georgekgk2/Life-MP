@@ -146,6 +146,7 @@ medusaIntegrationTestRunner({
           "name",
           "description",
           "priceUah",
+          "imageSrc",
           "provider",
           "isSynthetic",
           "verifiedVendorBadge",

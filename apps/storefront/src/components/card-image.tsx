@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 type CardImageProps = Readonly<{
   src?: string | undefined;
-  fallbackSrc: string;
+  fallbackSrc?: string | undefined;
   alt: string;
   loading?: "lazy" | "eager";
 }>;
@@ -13,18 +13,19 @@ export function CardImage({
   src,
   fallbackSrc,
   alt,
-  loading = "eager",
+  loading = "lazy",
 }: CardImageProps) {
   const initialSrc = src || fallbackSrc;
   const [currentSrc, setCurrentSrc] = useState(initialSrc);
-  const [hasError, setHasError] = useState(false);
+  const [hasError, setHasError] = useState(!initialSrc);
 
   useEffect(() => {
-    setCurrentSrc(initialSrc);
-    setHasError(false);
-  }, [initialSrc]);
+    const nextSrc = src || fallbackSrc;
+    setCurrentSrc(nextSrc);
+    setHasError(!nextSrc);
+  }, [src, fallbackSrc]);
 
-  if (hasError) {
+  if (!currentSrc || hasError) {
     return (
       <div
         className="card__image-fallback"
@@ -47,7 +48,7 @@ export function CardImage({
       loading={loading}
       decoding="async"
       onError={() => {
-        if (currentSrc !== fallbackSrc) {
+        if (fallbackSrc && currentSrc !== fallbackSrc) {
           setCurrentSrc(fallbackSrc);
         } else {
           setHasError(true);

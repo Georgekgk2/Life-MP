@@ -12,14 +12,10 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: life-mp-ci-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
 jobs:
   verify:
     name: Verify
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'life-mp-heavy' || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
@@ -57,7 +53,7 @@ jobs:
 
   catalog-provider-integration:
     name: Catalog Provider Integration
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'life-mp-heavy' || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 15
 
     services:
@@ -124,7 +120,7 @@ jobs:
 
   catalog-provider-migrations:
     name: Catalog Provider Migrations
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'life-mp-heavy' || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 15
 
     services:
@@ -191,7 +187,7 @@ jobs:
 
   storefront-e2e:
     name: Storefront E2E
-    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'life-mp-heavy' || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:

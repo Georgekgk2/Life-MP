@@ -55,9 +55,11 @@ export function ProductCard({ product }: ProductCardProps) {
                 {product.organicProductBadge}
               </span>
             )}
-            {product.isSynthetic && (
-              <span className="badge badge--demo">Вітрина</span>
-            )}
+            <span className="badge badge--demo">
+              {product.isSynthetic
+                ? "Синтетичні локальні дані"
+                : "Лише перегляд у демо"}
+            </span>
           </div>
         </div>
       </div>

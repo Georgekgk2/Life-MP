@@ -39,10 +39,22 @@ test.describe("Catalog E2E & Visual Artifacts", () => {
     await expect(page.getByText("Оплатити")).not.toBeVisible();
     await expect(page.getByText("Оформити замовлення")).not.toBeVisible();
 
+    // Verify public-demo catalog showcase loads cleanly without warning banner
+    await expect(
+      page.getByText("Каталог тимчасово недоступний"),
+    ).not.toBeVisible();
+    await expect(
+      page.getByText("Вітрина тимчасово недоступна"),
+    ).not.toBeVisible();
+
     // 2. Catalog Page
     await page.goto("/catalog");
     await expect(page.locator("h1")).toContainText("Тематичні добірки");
     await expect(page.getByText("Купити")).not.toBeVisible();
+    await expect(
+      page.getByText("Каталог тимчасово недоступний"),
+    ).not.toBeVisible();
+    await expect(page.locator(".category-card")).toHaveCount(6);
 
     // Capture catalog screenshot
     await page.screenshot({

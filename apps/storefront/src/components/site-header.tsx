@@ -84,14 +84,16 @@ export function SiteHeader() {
               ))}
             </ul>
             <div className="site-navigation__mobile-actions">
-              <Link
+              <button
+                type="button"
                 className="button button--secondary"
-                href="/profile"
-                prefetch={false}
-                onClick={closeMenu}
+                onClick={() => {
+                  closeMenu();
+                  setShowProfileNotice(true);
+                }}
               >
                 Особистий кабінет
-              </Link>
+              </button>
               <Link
                 className="button button--primary"
                 href="/join-as-artisan"

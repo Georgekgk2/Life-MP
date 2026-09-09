@@ -14,4 +14,25 @@ test.describe("Customer Profile Route Security & Containment E2E", () => {
       "Особистий кабінет покупця",
     );
   });
+
+  test("mobile menu profile action displays in-development notice without navigating to /profile", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const menuToggle = page.locator(".site-header__menu-toggle");
+    if (await menuToggle.isVisible()) {
+      await menuToggle.click();
+    }
+
+    const mobileProfileBtn = page.getByRole("button", {
+      name: "Особистий кабінет",
+    });
+    if (await mobileProfileBtn.isVisible()) {
+      await mobileProfileBtn.click();
+      expect(page.url()).not.toContain("/profile");
+      await expect(
+        page.getByRole("heading", { name: "Особистий кабінет у розробці" }),
+      ).toBeVisible();
+    }
+  });
 });

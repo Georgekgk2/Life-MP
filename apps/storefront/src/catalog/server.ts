@@ -20,7 +20,8 @@ export async function getCatalogSnapshot(): Promise<CatalogReadResult> {
   const nodeEnvironment = process.env["NODE_ENV"];
   const runtimeEnvironment = process.env["LIFE_RUNTIME_ENV"] || nodeEnvironment;
   const isTestRuntime = runtimeEnvironment === "test";
-  const isPublicDemoRuntime = runtimeEnvironment === "public-demo";
+  const isPublicDemoRuntime =
+    nodeEnvironment === "production" && runtimeEnvironment === "public-demo";
   const isDevelopmentRuntime =
     runtimeEnvironment === "development" && nodeEnvironment !== "production";
   const isProduction =
@@ -85,7 +86,8 @@ export async function getCatalogSnapshot(): Promise<CatalogReadResult> {
   // test runs; the production fallback stays unavailable.
   if (
     isProduction ||
-    (source === "medusa" && (!isLocalOrTest || !allowSyntheticCatalog))
+    !isLocalOrTest ||
+    (source === "medusa" && !allowSyntheticCatalog)
   ) {
     return {
       kind: "unavailable",

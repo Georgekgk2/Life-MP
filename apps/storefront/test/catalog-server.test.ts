@@ -311,5 +311,59 @@ describe("storefront src/catalog/server.ts", () => {
       });
       expect(fetchMock).not.toHaveBeenCalled();
     });
+
+    it("does not activate public-demo branch when NODE_ENV=development", async () => {
+      process.env = {
+        ...process.env,
+        NODE_ENV: "development",
+        LIFE_RUNTIME_ENV: "public-demo",
+        CATALOG_SOURCE: "fixtures",
+        ALLOW_PUBLIC_DEMO_CATALOG: "true",
+      };
+      delete process.env["ALLOW_SYNTHETIC_CATALOG"];
+
+      const result = await getCatalogSnapshot();
+      expect(result).toEqual({
+        kind: "unavailable",
+        source: "medusa",
+        reason: "missing_configuration",
+      });
+    });
+
+    it("does not activate public-demo branch when NODE_ENV=test", async () => {
+      process.env = {
+        ...process.env,
+        NODE_ENV: "test",
+        LIFE_RUNTIME_ENV: "public-demo",
+        CATALOG_SOURCE: "fixtures",
+        ALLOW_PUBLIC_DEMO_CATALOG: "true",
+      };
+      delete process.env["ALLOW_SYNTHETIC_CATALOG"];
+
+      const result = await getCatalogSnapshot();
+      expect(result).toEqual({
+        kind: "unavailable",
+        source: "medusa",
+        reason: "missing_configuration",
+      });
+    });
+
+    it("does not activate public-demo branch when NODE_ENV is unset", async () => {
+      process.env = {
+        ...process.env,
+        LIFE_RUNTIME_ENV: "public-demo",
+        CATALOG_SOURCE: "fixtures",
+        ALLOW_PUBLIC_DEMO_CATALOG: "true",
+      };
+      delete (process.env as Record<string, string | undefined>)["NODE_ENV"];
+      delete process.env["ALLOW_SYNTHETIC_CATALOG"];
+
+      const result = await getCatalogSnapshot();
+      expect(result).toEqual({
+        kind: "unavailable",
+        source: "medusa",
+        reason: "missing_configuration",
+      });
+    });
   });
 });

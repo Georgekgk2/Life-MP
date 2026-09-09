@@ -28,10 +28,11 @@ export default defineConfig({
     reuseExistingServer: false,
     env: {
       NODE_ENV: "production",
-      LIFE_RUNTIME_ENV: "test",
+      LIFE_RUNTIME_ENV: "public-demo",
       PORT: "3100",
       HOSTNAME: "127.0.0.1",
       CATALOG_SOURCE: "fixtures",
+      ALLOW_PUBLIC_DEMO_CATALOG: "true",
       ALLOW_SYNTHETIC_CATALOG: "true",
       LIFE_E2E: "true",
     },

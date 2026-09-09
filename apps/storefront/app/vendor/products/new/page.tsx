@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import { SectionHeading, VendorProductForm } from "@/components";
 
 export const metadata: Metadata = {
@@ -8,7 +10,13 @@ export const metadata: Metadata = {
     "Форма додавання нового крафтового виробу для перевірених майстерень маркетплейсу Life-MP.",
 };
 
-export default function NewVendorProductPage() {
+export default async function NewVendorProductPage() {
+  const cookieStore = await cookies();
+  const authSession = cookieStore.get("life_mp_auth_session")?.value;
+  if (!authSession) {
+    notFound();
+  }
+
   return (
     <div className="page-shell page-section page-section--spacious">
       {/* Breadcrumbs */}

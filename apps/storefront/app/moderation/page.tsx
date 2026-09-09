@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import { ModerationDashboard, SectionHeading } from "@/components";
 
 export const metadata: Metadata = {
@@ -7,7 +9,13 @@ export const metadata: Metadata = {
     "Панель модерації та верифікації заявок майстерень до каталогу маркетплейсу Life-MP.",
 };
 
-export default function ModerationPage() {
+export default async function ModerationPage() {
+  const cookieStore = await cookies();
+  const authSession = cookieStore.get("life_mp_auth_session")?.value;
+  if (!authSession) {
+    notFound();
+  }
+
   return (
     <div className="page-shell page-section page-section--spacious">
       <SectionHeading

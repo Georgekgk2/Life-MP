@@ -38,9 +38,9 @@ export type ProfileContextValue = Readonly<{
 const STORAGE_KEY = "life_mp_customer_profile_v1";
 
 const defaultProfile: CustomerProfileData = {
-  name: "Олена Мельник",
-  email: "olena.melnyk@example.ua",
-  phone: "+380 67 890 12 34",
+  name: "Демо Користувач",
+  email: "demo-customer@example.internal",
+  phone: "+380 00 000 00 00",
   city: "Київ",
 };
 

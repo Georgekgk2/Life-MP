@@ -52,9 +52,9 @@ const initialDemoApplications: readonly ArtisanApplicationRecord[] = [
     category: "pottery",
     description:
       "Авторська гончарна кераміка ручної роботи з карпатської глини. Використовуємо техніку молочіння та натуральні ангоби.",
-    email: "oksana@hlynasvitlo.ua",
-    phone: "+380 67 123 45 67",
-    portfolioUrl: "https://instagram.com/hlyna_svitlo",
+    email: "synthetic-artisan-01@example.internal",
+    phone: "+380 00 000 00 01",
+    portfolioUrl: "https://example.internal/portfolio1",
     status: "pending",
     createdAt: "2026-08-19T10:15:00.000Z",
   },
@@ -65,9 +65,9 @@ const initialDemoApplications: readonly ArtisanApplicationRecord[] = [
     category: "home",
     description:
       "Екологічний дерев'яний декор, авторські свічники та посуд із сухостійного поліського дуба та ясеня.",
-    email: "yaroslav@polissia-craft.ua",
-    phone: "+380 50 987 65 43",
-    portfolioUrl: "https://instagram.com/polissia_craft",
+    email: "synthetic-artisan-02@example.internal",
+    phone: "+380 00 000 00 02",
+    portfolioUrl: "https://example.internal/portfolio2",
     status: "under_review",
     reviewerNotes:
       "Ознайомлюємося зі зразками обробки дерева та сертифікатами безпеки.",
@@ -82,9 +82,9 @@ const initialDemoApplications: readonly ArtisanApplicationRecord[] = [
     category: "textile",
     description:
       "Традиційні домоткані рушники, наволочки та серветки з українського льону з автентичними орнаментами Волині.",
-    email: "maria@berehynia-linen.ua",
-    phone: "+380 63 333 22 11",
-    portfolioUrl: "https://berehynia-craft.ua",
+    email: "synthetic-artisan-03@example.internal",
+    phone: "+380 00 000 00 03",
+    portfolioUrl: "https://example.internal/portfolio3",
     status: "approved",
     reviewerNotes:
       "Повністю відповідає стандартам локальності та автентичності. Схвалено до каталогу.",
@@ -99,8 +99,8 @@ const initialDemoApplications: readonly ArtisanApplicationRecord[] = [
     category: "gastronomy",
     description:
       "Дикороси, високогірний карпатський чай та натуральний акацієвий мед без цукру та домішок.",
-    email: "andriy@karpaty-herbs.ua",
-    phone: "+380 97 555 44 33",
+    email: "synthetic-artisan-04@example.internal",
+    phone: "+380 00 000 00 04",
     portfolioUrl: null,
     status: "approved",
     reviewerNotes: "Зразки меду перевірено, склад 100% натуральний.",

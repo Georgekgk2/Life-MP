@@ -53,7 +53,7 @@ describe("Sandbox Multi-Vendor Order Engine (Phase 4C)", () => {
     expect(olenaChild.platformCommissionUah).toBe(80); // 10%
     expect(olenaChild.vendorPayoutUah).toBe(720); // 90%
     expect(olenaChild.status).toBe("pending");
-    expect(olenaChild.trackingNumber).toMatch(/^2045\d{10}$/);
+    expect(olenaChild.trackingNumber).toMatch(/^DEMO-NP-\d{10}$/);
 
     // Berehynia child order
     const berehyniaChild = childOrders.find(

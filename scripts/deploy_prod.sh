@@ -15,9 +15,9 @@
 #    and recorded image digests.
 # 6. Cryptographically Verified Backups: /var/backups/life-mp/<release-id>/ with CHECKSUMS.sha256,
 #    verified pg_dump footer, and BACKUP_COMPLETE / BACKUP_COMPLETE_WITH_DB sentinels.
-# 7. Atomic Safe Rollback: Tests health BEFORE performing atomic symlink swap (mv -Tf),
-#    fail-closed HTTP 200 assertions, and updates PREVIOUS_RELEASE pair deterministically.
-# 8. Fail-Closed Integrity: Zero-loss migrations, strict healthcheck loops, dirty-tree protection.
+# 7. Safe Container Rollback: Tests health BEFORE performing symlink swap (mv -Tf),
+#    reverts container images only to prevent DB data loss.
+# 8. Fail-Closed Integrity: strict healthcheck loops, dirty-tree protection, explicit credential scopes.
 # =============================================================================
 
 set -euo pipefail
@@ -60,7 +60,7 @@ echo "  Target: $VM_HOST | Domain: https://$DOMAIN                              
 if [ "$DRY_RUN" -eq 1 ]; then
   echo "  Mode: DRY RUN (Inspections and config syntax checks only)                  "
 elif [ "$ROLLBACK" -eq 1 ]; then
-  echo "  Mode: ATOMIC ROLLBACK (Code, images, DB, and config rollback)              "
+  echo "  Mode: CONTAINER ROLLBACK (Verified container images and config rollback; DB untouched)"
 fi
 echo "================================================================================"
 

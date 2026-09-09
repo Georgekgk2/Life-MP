@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { CatalogBrowser, CategoryCard, SectionHeading } from "@/components";
 import { getCatalogSnapshot } from "@/catalog/server";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Тематичні добірки",
   description:

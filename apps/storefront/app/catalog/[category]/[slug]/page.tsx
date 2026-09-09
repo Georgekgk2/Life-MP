@@ -42,10 +42,9 @@ export async function generateMetadata({
   const catalogResult = await getCatalogSnapshot();
 
   if (catalogResult.kind === "unavailable") {
-    return {
-      title: "Каталог недоступний",
-      description: "Сервіс каталогу тимчасово недоступний.",
-    };
+    throw new Error(
+      "CATALOG_UNAVAILABLE: Medusa catalog service is unreachable or not configured",
+    );
   }
 
   const product = catalogResult.snapshot.products.find(
@@ -72,19 +71,8 @@ export default async function ProductDetailPage({
   const catalogResult = await getCatalogSnapshot();
 
   if (catalogResult.kind === "unavailable") {
-    return (
-      <div className="page-shell page-section">
-        <SectionHeading
-          eyebrow="Помилка каталогу"
-          title="Каталог тимчасово недоступний"
-          description="Сервіс каталогу тимчасово недоступний. Будь ласка, спробуйте пізніше."
-        />
-        <div style={{ marginTop: "2rem" }}>
-          <Link href="/catalog" className="button button-primary">
-            Повернутися до каталогу
-          </Link>
-        </div>
-      </div>
+    throw new Error(
+      "CATALOG_UNAVAILABLE: Medusa catalog service is unreachable or not configured",
     );
   }
 

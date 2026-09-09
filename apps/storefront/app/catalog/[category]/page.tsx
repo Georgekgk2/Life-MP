@@ -29,9 +29,9 @@ export async function generateMetadata({
   const catalogResult = await getCatalogSnapshot();
 
   if (catalogResult.kind === "unavailable") {
-    return {
-      title: "Каталог тимчасово недоступний",
-    };
+    throw new Error(
+      "CATALOG_UNAVAILABLE: Medusa catalog service is unreachable or not configured",
+    );
   }
 
   const category = catalogResult.snapshot.categories.find(
@@ -53,18 +53,8 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   const catalogResult = await getCatalogSnapshot();
 
   if (catalogResult.kind === "unavailable") {
-    return (
-      <section className="page-section page-section--spacious">
-        <div className="page-shell">
-          <aside className="notice notice--warning">
-            <h2 className="notice__title">Каталог тимчасово недоступний</h2>
-            <p>
-              Не вдалося завантажити актуальні дані каталогу з сервісу Medusa.
-              Будь ласка, перевірте з'єднання або спробуйте пізніше.
-            </p>
-          </aside>
-        </div>
-      </section>
+    throw new Error(
+      "CATALOG_UNAVAILABLE: Medusa catalog service is unreachable or not configured",
     );
   }
 

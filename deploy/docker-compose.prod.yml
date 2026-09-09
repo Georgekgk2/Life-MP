@@ -35,7 +35,14 @@ services:
     deploy:
       resources:
         limits:
+          cpus: "1.0"
           memory: 512M
+          pids: 100
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ---------------------------------------------------------------------------
   # Redis 7 (Private Cache & Session Store)
@@ -67,7 +74,14 @@ services:
     deploy:
       resources:
         limits:
+          cpus: "1.0"
           memory: 192M
+          pids: 100
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ---------------------------------------------------------------------------
   # Commerce Engine (Medusa v2 Headless Backend)
@@ -115,7 +129,14 @@ services:
     deploy:
       resources:
         limits:
+          cpus: "1.0"
           memory: 768M
+          pids: 150
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ---------------------------------------------------------------------------
   # Storefront (Next.js 15 PWA Frontend)
@@ -160,7 +181,14 @@ services:
     deploy:
       resources:
         limits:
+          cpus: "1.0"
           memory: 512M
+          pids: 150
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   postgres-data:

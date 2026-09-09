@@ -24,13 +24,16 @@ set -euo pipefail
 
 # --- Configuration ---
 VM_HOST="${LIFE_MP_PROD_HOST:-medgemma-user@34.139.21.224}"
-SSH_KEY="${LIFE_MP_SSH_KEY:-/Users/george/Projects/Jorvis/artifacts/Server/vm_key}"
+SSH_KEY="${LIFE_MP_SSH_KEY:-$HOME/.ssh/life_mp_vm_key}"
+if [ ! -f "$SSH_KEY" ] && [ -f "/Users/george/Projects/Jorvis/artifacts/Server/vm_key" ]; then
+  # Fallback compatibility during migration to dedicated key
+  SSH_KEY="/Users/george/Projects/Jorvis/artifacts/Server/vm_key"
+fi
 LOCAL_SRC="/Users/george/Projects/Life-MP"
 REMOTE_ROOT="/opt/life-mp"
 DOMAIN="life-mp.pp.ua"
 
 DRY_RUN=0
-ALLOW_DIRTY=0
 ROLLBACK=0
 ROLLBACK_TARGET=""
 
@@ -38,10 +41,6 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run)
       DRY_RUN=1
-      shift
-      ;;
-    --allow-dirty)
-      ALLOW_DIRTY=1
       shift
       ;;
     --rollback)
@@ -97,10 +96,10 @@ if [ "$DIRTY_FILES" -ne 0 ]; then
   UNTRACKED_COUNT=$(git -C "$LOCAL_SRC" ls-files --others --exclude-standard | wc -l | tr -d ' ')
 fi
 
-if [ "$DIRTY_FILES" -ne 0 ] && [ "$ALLOW_DIRTY" -eq 0 ] && [ "$ROLLBACK" -eq 0 ]; then
+if [ "$DIRTY_FILES" -ne 0 ] && [ "$ROLLBACK" -eq 0 ]; then
   echo "❌ Error: Local working tree has $DIRTY_FILES uncommitted changes or untracked files." >&2
   echo "   Deploying from dirty tree creates mismatch with Git commit SHA metadata ($LOCAL_COMMIT)." >&2
-  echo "   Commit your changes first, or pass --allow-dirty if intentionally deploying uncommitted changes." >&2
+  echo "   Please commit or stash changes before deploying to maintain reproducible release history." >&2
   git -C "$LOCAL_SRC" status --short >&2
   exit 1
 fi
@@ -459,13 +458,17 @@ echo "✔ Backup cryptographically sealed and verified with BACKUP_COMPLETE mark
 echo -e "\n=== [5/7] BUILDING DOCKER IMAGES WITH IMMUTABLE TAGS & CAPTURING DIGESTS ==="
 cd "$RELEASE_DIR"
 
-# Build backend and storefront sequentially with release-specific immutable tags
-sudo docker build \
+# Build backend and storefront sequentially with low CPU priority and memory capping to protect host services (Jorvis)
+echo "Building commerce image (resource-capped, low priority)..."
+sudo nice -n 19 docker build \
+  --memory=1536m \
   -t "life-mp-commerce:${RELEASE_ID}" \
   -t "life-mp-commerce:production" \
   -f deploy/Dockerfile.commerce .
 
-sudo docker build \
+echo "Building storefront image (resource-capped, low priority)..."
+sudo nice -n 19 docker build \
+  --memory=1536m \
   --build-arg NEXT_PUBLIC_MEDUSA_API_URL=https://life-mp.pp.ua/api \
   -t "life-mp-storefront:${RELEASE_ID}" \
   -t "life-mp-storefront:production" \

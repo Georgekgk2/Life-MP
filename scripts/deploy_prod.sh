@@ -64,14 +64,11 @@ elif [ "$ROLLBACK" -eq 1 ]; then
 fi
 echo "================================================================================"
 
-# 1. Local Preflights: SSH Key
+# 1. Local Preflights: SSH Key (Fail-closed: explicit key required)
 if [ ! -f "$SSH_KEY" ]; then
-  if [ -f "$HOME/.ssh/id_rsa" ]; then
-    SSH_KEY="$HOME/.ssh/id_rsa"
-  else
-    echo "❌ Error: SSH Key not found at $SSH_KEY" >&2
-    exit 1
-  fi
+  echo "❌ Error: Required Life-MP SSH Key not found at: $SSH_KEY" >&2
+  echo "   Please set LIFE_MP_SSH_KEY or place your deployment key at ~/.ssh/life_mp_vm_key" >&2
+  exit 1
 fi
 
 # Ensure SSH key permissions are 600 without unnecessary mutation
@@ -174,11 +171,11 @@ fi
 
 echo "✔ Rollback target release directory: $TARGET_RELEASE"
 
-# C. Restore Database Dump if present in verified backup
-if [ -f "$CHOSEN_BACKUP/life_production.sql" ] && [ -s "$CHOSEN_BACKUP/life_production.sql" ]; then
-  echo "Restoring PostgreSQL database from $CHOSEN_BACKUP/life_production.sql..."
-  sudo docker exec -i life-mp-postgres psql -U life_prod -d life_production < "$CHOSEN_BACKUP/life_production.sql"
-  echo "✔ PostgreSQL database restored successfully."
+# C. Database Safety Invariant: release rollback reverts containers and configuration only.
+# Database restoration is strictly a separately authorized disaster recovery procedure to prevent data loss.
+if [ -f "$CHOSEN_BACKUP/life_production.sql" ]; then
+  echo "ℹ Notice: Pre-deployment database dump preserved at $CHOSEN_BACKUP/life_production.sql"
+  echo "   Release rollback restores container images/configs only. Database restoration is not automated."
 fi
 
 # Common helper: Cryptographic Image Digest Verification (FAIL-CLOSED)

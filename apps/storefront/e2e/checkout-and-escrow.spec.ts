@@ -48,14 +48,14 @@ test.describe("Multi-Vendor Cart & Checkout Draft Containment (Phase 4D)", () =>
       fullPage: true,
     });
 
-    // Fill required customer details
-    await page.locator("#fullName").fill("Олена Мельник");
-    await page.locator("#phone").fill("+380 67 123 45 67");
-    await page.locator("#email").fill("olena.melnyk@example.ua");
-    await page.locator("#city").fill("Київ");
+    // Fill required customer details using non-routable synthetic test data
+    await page.locator("#fullName").fill("Тестовий Покупець");
+    await page.locator("#phone").fill("+380 00 000 00 00");
+    await page.locator("#email").fill("buyer@example.internal");
+    await page.locator("#city").fill("Тестове Місто");
     await page
       .locator("#novaPoshtaBranch")
-      .fill("Відділення №42 (вул. Саксаганського, 102)");
+      .fill("Відділення №0 (Тестова адреса)");
 
     // 6. Submit Checkout Form as a non-authoritative draft
     const submitDraftBtn = page.locator(
@@ -78,7 +78,7 @@ test.describe("Multi-Vendor Cart & Checkout Draft Containment (Phase 4D)", () =>
     await expect(
       page.getByRole("heading", { name: "Дякуємо! Ваше замовлення прийнято" }),
     ).not.toBeVisible();
-    await expect(page.locator("body")).not.toContainText("Олена Мельник");
+    await expect(page.locator("body")).not.toContainText("Тестовий Покупець");
     await expect(page.locator("body")).not.toContainText(
       "Відстежувати посилки в реальному часі",
     );

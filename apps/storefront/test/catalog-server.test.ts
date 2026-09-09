@@ -273,6 +273,23 @@ describe("storefront src/catalog/server.ts", () => {
       });
     });
 
+    it("fails closed in public-demo when CATALOG_SOURCE is unset/defaulted without explicit configuration", async () => {
+      process.env = {
+        ...process.env,
+        NODE_ENV: "production",
+        LIFE_RUNTIME_ENV: "public-demo",
+        ALLOW_PUBLIC_DEMO_CATALOG: "true",
+      };
+      delete process.env["CATALOG_SOURCE"];
+
+      const result = await getCatalogSnapshot();
+      expect(result).toEqual({
+        kind: "unavailable",
+        source: "medusa",
+        reason: "missing_configuration",
+      });
+    });
+
     it("does not call Medusa backend in public-demo mode", async () => {
       const fetchMock = vi.fn();
       vi.stubGlobal("fetch", fetchMock);

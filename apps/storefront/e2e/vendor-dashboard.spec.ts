@@ -15,4 +15,24 @@ test.describe("Vendor Dashboard Route Security & Containment E2E", () => {
       page.getByText(/tax_identifier|iban|комісі|виплат/i),
     ).toHaveCount(0);
   });
+
+  test("fails closed with 404 Not Found on /vendor/dashboard even when forged vendor cookies are present", async ({
+    page,
+    context,
+  }) => {
+    await context.addCookies([
+      {
+        name: "life_mp_auth_session",
+        value: "forged-vendor-session",
+        domain: "127.0.0.1",
+        path: "/",
+      },
+    ]);
+
+    const res = await page.goto("/vendor/dashboard");
+    expect(res?.status()).toBe(404);
+
+    await expect(page.locator("h1")).toHaveCount(0);
+    await expect(page.locator("#vendor-selector")).toHaveCount(0);
+  });
 });

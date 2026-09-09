@@ -33,7 +33,7 @@ export default defineConfig({
       HOSTNAME: "127.0.0.1",
       CATALOG_SOURCE: "fixtures",
       ALLOW_PUBLIC_DEMO_CATALOG: "true",
-      ALLOW_SYNTHETIC_CATALOG: "true",
+      ALLOW_SYNTHETIC_CATALOG: "false",
       LIFE_E2E: "true",
     },
   },

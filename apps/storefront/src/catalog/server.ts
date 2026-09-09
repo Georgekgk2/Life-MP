@@ -13,7 +13,8 @@ export type CatalogReadResult =
     }>;
 
 export async function getCatalogSnapshot(): Promise<CatalogReadResult> {
-  const source = process.env["CATALOG_SOURCE"] || "fixtures";
+  const configuredSource = process.env["CATALOG_SOURCE"];
+  const source = configuredSource || "fixtures";
   // Next standalone builds inline NODE_ENV as production. Keep the build in
   // production mode while allowing the E2E server to declare its app runtime
   // explicitly as test without opening the real production catalog path.
@@ -34,13 +35,14 @@ export async function getCatalogSnapshot(): Promise<CatalogReadResult> {
 
   // Dedicated non-commercial public-demo showcase mode:
   // Strict non-commercial demonstration mode: only when ALL conditions are met:
-  // 1. LIFE_RUNTIME_ENV === "public-demo"
-  // 2. CATALOG_SOURCE === "fixtures"
-  // 3. ALLOW_PUBLIC_DEMO_CATALOG === "true"
+  // 1. nodeEnvironment === "production"
+  // 2. LIFE_RUNTIME_ENV === "public-demo"
+  // 3. configuredSource === "fixtures" (must be explicitly configured, no silent fallback)
+  // 4. ALLOW_PUBLIC_DEMO_CATALOG === "true"
   // In this mode, static synthetic fixtures are served with isSynthetic: true and demo-only.
   // Medusa backend is never called; commercial catalog fallback stays unavailable.
   if (isPublicDemoRuntime) {
-    if (source !== "fixtures" || !allowPublicDemoCatalog) {
+    if (configuredSource !== "fixtures" || !allowPublicDemoCatalog) {
       return {
         kind: "unavailable",
         source: "medusa",

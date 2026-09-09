@@ -11,7 +11,9 @@ import { tmpdir } from "node:os";
 import {
   scanDeploymentContainment,
   MANDATORY_POLICY_GATES,
-  PERMITTED_SCRIPTS,
+  PERMITTED_SCRIPT_PATHS,
+  getPermittedScripts,
+  isPermittedScript,
 } from "../src/deployment-containment.js";
 
 // Independent literal specification of expected mandatory gates (decoupled from production constant)
@@ -23,6 +25,18 @@ const EXPECTED_POLICY_GATES = [
   "allow_live_payment_gateway",
   "allow_live_shipping_api",
   "allow_live_fiscalization",
+] as const;
+
+// Independent literal specification of expected permitted scripts (decoupled from production constant)
+const EXPECTED_PERMITTED_SCRIPTS = [
+  "scripts/check-docs.mjs",
+  "scripts/generate-marketplace-images.mjs",
+  "scripts/generate-pwa-icons.mjs",
+  "scripts/test-fresh-state-repro.sh",
+  "scripts/verify-deployment-containment.mjs",
+  "scripts/with-commerce-migration-test-env.sh",
+  "scripts/with-commerce-test-env.sh",
+  "scripts/with-local-commerce-env.sh",
 ] as const;
 
 function createValidPolicyGates(): Record<string, boolean> {
@@ -492,9 +506,24 @@ describe("packages/config deployment-containment scanner", () => {
     }
   });
 
-  it("enforces that PERMITTED_SCRIPTS is an immutable frozen ReadonlySet", () => {
-    expect(Object.isFrozen(PERMITTED_SCRIPTS)).toBe(true);
-    expect(PERMITTED_SCRIPTS.size).toBe(8);
+  it("enforces that permitted script paths cannot be mutated at runtime", () => {
+    const list = getPermittedScripts();
+    expect(list).toEqual(EXPECTED_PERMITTED_SCRIPTS);
+    expect(PERMITTED_SCRIPT_PATHS).toEqual(EXPECTED_PERMITTED_SCRIPTS);
+    expect(list.length).toBe(8);
+
+    // Verify non-membership for unapproved script
+    expect(isPermittedScript("scripts/evil.mjs")).toBe(false);
+
+    // Verify that mutating the returned list does not affect internal lookup
+    (list as string[]).push("scripts/evil.mjs");
+    expect(isPermittedScript("scripts/evil.mjs")).toBe(false);
+    expect(getPermittedScripts().length).toBe(8);
+
+    // Verify no mutable Set is exported (no add/delete/clear on returned list)
+    expect("add" in getPermittedScripts()).toBe(false);
+    expect("delete" in getPermittedScripts()).toBe(false);
+    expect("clear" in getPermittedScripts()).toBe(false);
   });
 
   it("fails closed when scripts path itself is a symbolic link (root directory symlink bypass)", () => {

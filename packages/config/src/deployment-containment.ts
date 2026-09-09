@@ -25,6 +25,17 @@ export type DeploymentPolicyFile = Readonly<{
   gates: Record<string, boolean>;
 }>;
 
+/**
+ * SECURITY NOTICE & BOUNDARY SPECIFICATION:
+ * This deployment containment scanner is a repository-local static defense-in-depth preflight control.
+ * It verifies repository invariants, files, and scripts against Phase P0 containment policy constraints.
+ * It DOES NOT constitute an autonomous security boundary or sovereign authorization.
+ * Sovereign containment and authorization rely upon:
+ * 1. Protected branch enforcement (disallowing unreviewed merges);
+ * 2. Independent peer review and explicit operator authorization (reviewDecision);
+ * 3. Isolated, trusted CI runners (GitHub-hosted ubuntu-latest).
+ */
+
 export const MANDATORY_POLICY_GATES = [
   "allow_remote_deployment",
   "allow_ssh_execution",
@@ -35,18 +46,29 @@ export const MANDATORY_POLICY_GATES = [
   "allow_live_fiscalization",
 ] as const;
 
-export const PERMITTED_SCRIPTS: ReadonlySet<string> = Object.freeze(
-  new Set([
-    "scripts/check-docs.mjs",
-    "scripts/generate-marketplace-images.mjs",
-    "scripts/generate-pwa-icons.mjs",
-    "scripts/test-fresh-state-repro.sh",
-    "scripts/verify-deployment-containment.mjs",
-    "scripts/with-commerce-migration-test-env.sh",
-    "scripts/with-commerce-test-env.sh",
-    "scripts/with-local-commerce-env.sh",
-  ]),
+export const PERMITTED_SCRIPT_PATHS = [
+  "scripts/check-docs.mjs",
+  "scripts/generate-marketplace-images.mjs",
+  "scripts/generate-pwa-icons.mjs",
+  "scripts/test-fresh-state-repro.sh",
+  "scripts/verify-deployment-containment.mjs",
+  "scripts/with-commerce-migration-test-env.sh",
+  "scripts/with-commerce-test-env.sh",
+  "scripts/with-local-commerce-env.sh",
+] as const;
+
+// Private module-scoped set for fast O(1) lookups; not exported to prevent runtime prototype/slot mutations
+const PERMITTED_SCRIPTS_LOOKUP: ReadonlySet<string> = new Set<string>(
+  PERMITTED_SCRIPT_PATHS,
 );
+
+export function isPermittedScript(relPath: string): boolean {
+  return PERMITTED_SCRIPTS_LOOKUP.has(relPath);
+}
+
+export function getPermittedScripts(): readonly string[] {
+  return [...PERMITTED_SCRIPT_PATHS];
+}
 
 export const FORBIDDEN_REMOTE_COMMAND_PATTERNS = [
   /\b(ssh|rsync|scp|sftp)(\.exe)?\b/i,
@@ -322,7 +344,7 @@ export function scanDeploymentContainment(
               const lowerName = entry.name.toLowerCase();
 
               // Check against permitted local scripts allowlist
-              if (!PERMITTED_SCRIPTS.has(relPath)) {
+              if (!isPermittedScript(relPath)) {
                 violations.push({
                   rule: "P0-UNAUTHORIZED-SCRIPT",
                   path: relPath,

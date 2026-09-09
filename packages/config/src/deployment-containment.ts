@@ -42,7 +42,7 @@ export type DeploymentPolicyFile = Readonly<{
  * (e.g. external generative APIs in generate-marketplace-images.mjs) or local child processes.
  */
 
-export const MANDATORY_POLICY_GATES = [
+export const MANDATORY_POLICY_GATES: readonly string[] = Object.freeze([
   "allow_remote_deployment",
   "allow_ssh_execution",
   "allow_ghcr_image_push",
@@ -50,7 +50,7 @@ export const MANDATORY_POLICY_GATES = [
   "allow_live_payment_gateway",
   "allow_live_shipping_api",
   "allow_live_fiscalization",
-] as const;
+]);
 
 export const PERMITTED_SCRIPT_PATHS: readonly string[] = Object.freeze([
   "scripts/check-docs.mjs",
@@ -76,20 +76,21 @@ export function getPermittedScripts(): readonly string[] {
   return [...PERMITTED_SCRIPT_PATHS];
 }
 
-export const FORBIDDEN_REMOTE_COMMAND_PATTERNS = [
-  /\b(ssh|rsync|scp|sftp)(\.exe)?\b/i,
-  /\bdocker\s+(-H|--host|--context)\b/i,
-  /\bdocker\s+context\b/i,
-  /\b(execFile|execFileSync|spawn|spawnSync)\s*\(\s*["'](ssh|rsync|scp|sftp|docker)["']/i,
-  /\b(exec|execSync)\s*\(\s*["'`][^"'`]*\b(ssh|rsync|scp|sftp|docker)\b/i,
-] as const;
+export const FORBIDDEN_REMOTE_COMMAND_PATTERNS: readonly RegExp[] =
+  Object.freeze([
+    /\b(ssh|rsync|scp|sftp)(\.exe)?\b/i,
+    /\bdocker\s+(-H|--host|--context)\b/i,
+    /\bdocker\s+context\b/i,
+    /\b(execFile|execFileSync|spawn|spawnSync)\s*\(\s*["'](ssh|rsync|scp|sftp|docker)["']/i,
+    /\b(exec|execSync)\s*\(\s*["'`][^"'`]*\b(ssh|rsync|scp|sftp|docker)\b/i,
+  ]);
 
-export const FORBIDDEN_SCRIPT_FILENAMES = [
+export const FORBIDDEN_SCRIPT_FILENAMES: readonly string[] = Object.freeze([
   "deploy_prod.sh",
   "remote-setup.sh",
   "rollback.sh",
   "deploy-colocated-prod.sh",
-] as const;
+]);
 
 export function scanDeploymentContainment(
   rootDir: string,

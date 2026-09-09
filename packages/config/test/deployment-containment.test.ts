@@ -12,6 +12,8 @@ import {
   scanDeploymentContainment,
   MANDATORY_POLICY_GATES,
   PERMITTED_SCRIPT_PATHS,
+  FORBIDDEN_REMOTE_COMMAND_PATTERNS,
+  FORBIDDEN_SCRIPT_FILENAMES,
   getPermittedScripts,
   isPermittedScript,
 } from "../src/deployment-containment.js";
@@ -465,11 +467,72 @@ describe("packages/config deployment-containment scanner", () => {
     }
   });
 
-  it("enforces that production scanner mandatory gates exactly match expected specification", () => {
+  it("enforces that MANDATORY_POLICY_GATES is runtime frozen and resistant to mutation", () => {
+    expect(Object.isFrozen(MANDATORY_POLICY_GATES)).toBe(true);
     expect([...MANDATORY_POLICY_GATES].sort()).toEqual(
       [...EXPECTED_POLICY_GATES].sort(),
     );
     expect(MANDATORY_POLICY_GATES.length).toBe(7);
+
+    expect(() => {
+      (MANDATORY_POLICY_GATES as unknown as string[]).pop();
+    }).toThrow();
+
+    expect(() => {
+      (MANDATORY_POLICY_GATES as unknown as string[]).push("allow_new_gate");
+    }).toThrow();
+
+    expect(() => {
+      (MANDATORY_POLICY_GATES as unknown as string[])[0] = "mutated_gate";
+    }).toThrow();
+
+    expect(() => {
+      (MANDATORY_POLICY_GATES as unknown as { length: number }).length = 0;
+    }).toThrow();
+  });
+
+  it("enforces that FORBIDDEN_REMOTE_COMMAND_PATTERNS is runtime frozen and resistant to mutation", () => {
+    expect(Object.isFrozen(FORBIDDEN_REMOTE_COMMAND_PATTERNS)).toBe(true);
+    expect(FORBIDDEN_REMOTE_COMMAND_PATTERNS.length).toBeGreaterThan(0);
+
+    expect(() => {
+      (FORBIDDEN_REMOTE_COMMAND_PATTERNS as unknown as RegExp[]).pop();
+    }).toThrow();
+
+    expect(() => {
+      (FORBIDDEN_REMOTE_COMMAND_PATTERNS as unknown as RegExp[]).push(/evil/);
+    }).toThrow();
+
+    expect(() => {
+      (FORBIDDEN_REMOTE_COMMAND_PATTERNS as unknown as RegExp[])[0] = /noop/;
+    }).toThrow();
+
+    expect(() => {
+      (
+        FORBIDDEN_REMOTE_COMMAND_PATTERNS as unknown as { length: number }
+      ).length = 0;
+    }).toThrow();
+  });
+
+  it("enforces that FORBIDDEN_SCRIPT_FILENAMES is runtime frozen and resistant to mutation", () => {
+    expect(Object.isFrozen(FORBIDDEN_SCRIPT_FILENAMES)).toBe(true);
+    expect(FORBIDDEN_SCRIPT_FILENAMES.length).toBeGreaterThan(0);
+
+    expect(() => {
+      (FORBIDDEN_SCRIPT_FILENAMES as unknown as string[]).pop();
+    }).toThrow();
+
+    expect(() => {
+      (FORBIDDEN_SCRIPT_FILENAMES as unknown as string[]).push("evil.sh");
+    }).toThrow();
+
+    expect(() => {
+      (FORBIDDEN_SCRIPT_FILENAMES as unknown as string[])[0] = "noop.sh";
+    }).toThrow();
+
+    expect(() => {
+      (FORBIDDEN_SCRIPT_FILENAMES as unknown as { length: number }).length = 0;
+    }).toThrow();
   });
 
   it("fails closed when any symlink is created in scripts directory (permitted name or unauthorized)", () => {

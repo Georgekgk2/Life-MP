@@ -25,10 +25,6 @@ set -euo pipefail
 # --- Configuration ---
 VM_HOST="${LIFE_MP_PROD_HOST:-medgemma-user@34.139.21.224}"
 SSH_KEY="${LIFE_MP_SSH_KEY:-$HOME/.ssh/life_mp_vm_key}"
-if [ ! -f "$SSH_KEY" ] && [ -f "/Users/george/Projects/Jorvis/artifacts/Server/vm_key" ]; then
-  # Fallback compatibility during migration to dedicated key
-  SSH_KEY="/Users/george/Projects/Jorvis/artifacts/Server/vm_key"
-fi
 LOCAL_SRC="/Users/george/Projects/Life-MP"
 REMOTE_ROOT="/opt/life-mp"
 DOMAIN="life-mp.pp.ua"
@@ -569,19 +565,14 @@ verify_release_image_digests() {
 }
 
 rollback_containers_on_failure() {
-  echo "⚠️ Deployment verification failed! Initiating automatic fail-closed container & database rollback..." >&2
+  echo "⚠️ Deployment verification failed! Initiating automatic fail-closed container rollback..." >&2
 
-  # A. Restore pre-deployment database dump to revert any schema migrations
-  if [ -f "$BACKUP_DIR/life_production.sql" ] && [ -s "$BACKUP_DIR/life_production.sql" ]; then
-    echo "Reverting PostgreSQL schema from pre-deployment dump ($BACKUP_DIR/life_production.sql)..." >&2
-    if ! sudo docker exec -i life-mp-postgres psql -U life_prod -d life_production < "$BACKUP_DIR/life_production.sql"; then
-      echo "❌ CRITICAL: Database schema rollback failed!" >&2
-      exit 2
-    fi
-    echo "✔ Database schema reverted successfully." >&2
-  fi
+  # Note: Database restoration is strictly NOT executed automatically to prevent irreversible data loss.
+  # Pre-deployment backup remains safely stored at $BACKUP_DIR/life_production.sql for explicit manual recovery if required.
+  echo "ℹ Notice: Pre-deployment database dump preserved at $BACKUP_DIR/life_production.sql" >&2
+  echo "   Automatic rollback reverts container images/configs only; database restoration requires explicit operator authorization." >&2
 
-  # B. Revert containers to previous release with verified image digests
+  # Revert containers to previous release with verified image digests
   if [ -n "$OLD_CURRENT" ] && [ -d "$OLD_CURRENT/deploy" ]; then
     echo "Verifying cryptographic provenance of previous release before restoration..." >&2
     if ! verify_release_image_digests "$OLD_CURRENT"; then

@@ -1,23 +1,22 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// Internal and administrative routes that require explicit authentication.
-// In demo/prototype mode without verified server-side auth, anonymous access is blocked (404).
-const PROTECTED_ROUTES = ["/moderation", "/vendor", "/profile"];
+// Internal administrative and draft vendor/profile routes.
+// In the current public demonstration deployment, these surfaces are fully closed
+// to all public traffic (fail-closed unconditional 404 regardless of cookies or headers).
+const DISABLED_PUBLIC_ROUTES = ["/moderation", "/vendor", "/profile"];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  const isProtected = PROTECTED_ROUTES.some(
+  const isDisabled = DISABLED_PUBLIC_ROUTES.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`),
   );
 
-  if (isProtected) {
-    const authSession = request.cookies.get("life_mp_auth_session")?.value;
-    if (!authSession) {
-      // Fail-closed: Return 404 Not Found to prevent discovery and access by anonymous visitors
-      return new NextResponse(null, { status: 404 });
-    }
+  if (isDisabled) {
+    // Fail-closed: unconditional 404 to prevent discovery, access,
+    // or forged-cookie bypassing of internal surfaces.
+    return new NextResponse(null, { status: 404 });
   }
 
   return NextResponse.next();

@@ -35,7 +35,8 @@ RUN pnpm --filter @life/config build
 
 # --- Stage 3: Production runtime ---
 FROM node:22-alpine AS runner
-RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx /root/.cache
+RUN apk upgrade --no-cache && \
+    rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx /root/.cache
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 medusa
 WORKDIR /app

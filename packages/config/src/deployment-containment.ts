@@ -29,12 +29,23 @@ export const MANDATORY_POLICY_GATES = [
   "allow_live_fiscalization",
 ] as const;
 
-export const FORBIDDEN_REMOTE_SCRIPT_PATTERNS = [
-  /\bssh\s+/i,
-  /\brsync\s+/i,
-  /\bscp\s+/i,
-  /\bdocker\s+(-H|--host)\b/i,
-  /\bdocker\s+context\s+use\b/i,
+export const PERMITTED_SCRIPTS = new Set([
+  "scripts/check-docs.mjs",
+  "scripts/generate-marketplace-images.mjs",
+  "scripts/generate-pwa-icons.mjs",
+  "scripts/test-fresh-state-repro.sh",
+  "scripts/verify-deployment-containment.mjs",
+  "scripts/with-commerce-migration-test-env.sh",
+  "scripts/with-commerce-test-env.sh",
+  "scripts/with-local-commerce-env.sh",
+]);
+
+export const FORBIDDEN_REMOTE_COMMAND_PATTERNS = [
+  /\b(ssh|rsync|scp|sftp)(\.exe)?\b/i,
+  /\bdocker\s+(-H|--host|--context)\b/i,
+  /\bdocker\s+context\b/i,
+  /\b(execFile|execFileSync|spawn|spawnSync)\s*\(\s*["'](ssh|rsync|scp|sftp|docker)["']/i,
+  /\b(exec|execSync)\s*\(\s*["'`][^"'`]*\b(ssh|rsync|scp|sftp|docker)\b/i,
 ] as const;
 
 export const FORBIDDEN_SCRIPT_FILENAMES = [
@@ -199,15 +210,24 @@ export function scanDeploymentContainment(
         } else if (entry.isFile()) {
           const lowerName = entry.name.toLowerCase();
 
-          // Check filename patterns
+          // Check against permitted local scripts allowlist
+          if (!PERMITTED_SCRIPTS.has(relPath)) {
+            violations.push({
+              rule: "P0-UNAUTHORIZED-SCRIPT",
+              path: relPath,
+              message: `Unauthorized script "${relPath}" detected in scripts directory. In contained state, only approved local verification helpers are permitted.`,
+            });
+          }
+
+          // Check filename patterns for explicit deployment/remote intent
           const isForbiddenFilename =
             (FORBIDDEN_SCRIPT_FILENAMES as readonly string[]).includes(
               entry.name,
             ) ||
-            lowerName.startsWith("deploy_") ||
-            (lowerName.startsWith("deploy-") && lowerName.endsWith(".sh")) ||
-            (lowerName.startsWith("remote-") && lowerName.endsWith(".sh")) ||
-            (lowerName.startsWith("rollback") && lowerName.endsWith(".sh"));
+            lowerName.startsWith("deploy") ||
+            lowerName.startsWith("remote") ||
+            lowerName.startsWith("rollback") ||
+            lowerName.startsWith("release");
 
           if (isForbiddenFilename) {
             violations.push({
@@ -218,32 +238,24 @@ export function scanDeploymentContainment(
           }
 
           // Check script content for remote execution commands
-          if (
-            entry.name.endsWith(".sh") ||
-            entry.name.endsWith(".bash") ||
-            entry.name.endsWith(".mjs") ||
-            entry.name.endsWith(".js") ||
-            entry.name.endsWith(".ts")
-          ) {
-            try {
-              const content = readFileSync(fullPath, "utf-8");
-              for (const pattern of FORBIDDEN_REMOTE_SCRIPT_PATTERNS) {
-                if (pattern.test(content)) {
-                  violations.push({
-                    rule: "P0-NO-REMOTE-COMMANDS",
-                    path: relPath,
-                    message: `Forbidden remote execution command pattern (${pattern.toString()}) detected in "${relPath}".`,
-                  });
-                  break;
-                }
+          try {
+            const content = readFileSync(fullPath, "utf-8");
+            for (const pattern of FORBIDDEN_REMOTE_COMMAND_PATTERNS) {
+              if (pattern.test(content)) {
+                violations.push({
+                  rule: "P0-NO-REMOTE-COMMANDS",
+                  path: relPath,
+                  message: `Forbidden remote execution command pattern (${pattern.toString()}) detected in "${relPath}".`,
+                });
+                break;
               }
-            } catch (err) {
-              violations.push({
-                rule: "P0-SCRIPT-READ-ERROR",
-                path: relPath,
-                message: `Failed to read script file "${relPath}": ${String(err)}`,
-              });
             }
+          } catch (err) {
+            violations.push({
+              rule: "P0-SCRIPT-READ-ERROR",
+              path: relPath,
+              message: `Failed to read script file "${relPath}": ${String(err)}`,
+            });
           }
         }
       }

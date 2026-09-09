@@ -318,4 +318,118 @@ describe("packages/config deployment-containment scanner", () => {
       rmSync(tempDir, { recursive: true, force: true });
     }
   });
+
+  it("fails when any deploy filename variant exists (deploy.sh, deployfoo.sh, deployment.sh, deploy-prod.bash)", () => {
+    for (const forbiddenName of [
+      "deploy.sh",
+      "deployfoo.sh",
+      "deployment.sh",
+      "deploy-prod.bash",
+      "release.sh",
+      "rollback-v2.sh",
+    ]) {
+      const tempDir = mkdtempSync(
+        join(
+          tmpdir(),
+          `life-containment-fail-${forbiddenName.replace(/[^a-z0-9]/g, "")}-`,
+        ),
+      );
+      try {
+        mkdirSync(join(tempDir, "infra"), { recursive: true });
+        writeFileSync(
+          join(tempDir, "infra", "deployment-policy.json"),
+          JSON.stringify({
+            status: "CONTAINED",
+            gates: createValidPolicyGates(),
+          }),
+        );
+
+        mkdirSync(join(tempDir, "scripts"), { recursive: true });
+        writeFileSync(
+          join(tempDir, "scripts", forbiddenName),
+          "#!/bin/bash\necho 'forbidden'\n",
+        );
+
+        const result = scanDeploymentContainment(tempDir);
+        expect(result.valid).toBe(false);
+        expect(
+          result.violations.some(
+            (v) =>
+              v.rule === "P0-NO-REMOTE-SCRIPTS" ||
+              v.rule === "P0-UNAUTHORIZED-SCRIPT",
+          ),
+        ).toBe(true);
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("fails when unauthorized non-shell script extensions exist in scripts directory (tool.py, tool.zsh)", () => {
+    for (const [scriptName, content] of [
+      ["tool.py", "import subprocess\nsubprocess.run(['ssh', 'host'])\n"],
+      ["tool.zsh", "#!/bin/zsh\nssh medgemma-user@host uptime\n"],
+    ]) {
+      const tempDir = mkdtempSync(join(tmpdir(), "life-containment-fail-ext-"));
+      try {
+        mkdirSync(join(tempDir, "infra"), { recursive: true });
+        writeFileSync(
+          join(tempDir, "infra", "deployment-policy.json"),
+          JSON.stringify({
+            status: "CONTAINED",
+            gates: createValidPolicyGates(),
+          }),
+        );
+
+        mkdirSync(join(tempDir, "scripts"), { recursive: true });
+        writeFileSync(join(tempDir, "scripts", scriptName), content);
+
+        const result = scanDeploymentContainment(tempDir);
+        expect(result.valid).toBe(false);
+        expect(
+          result.violations.some((v) => v.rule === "P0-UNAUTHORIZED-SCRIPT"),
+        ).toBe(true);
+        expect(
+          result.violations.some((v) => v.rule === "P0-NO-REMOTE-COMMANDS"),
+        ).toBe(true);
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("fails when advanced remote patterns exist (docker --context, Node execFile/spawn ssh/rsync)", () => {
+    for (const [scriptName, content] of [
+      [
+        "check-docs.mjs",
+        'import { execFile } from "node:child_process";\nexecFile("ssh", ["host"]);\n',
+      ],
+      ["verify-deployment-containment.mjs", "docker --context prod ps\n"],
+    ]) {
+      const tempDir = mkdtempSync(
+        join(tmpdir(), "life-containment-fail-advpattern-"),
+      );
+      try {
+        mkdirSync(join(tempDir, "infra"), { recursive: true });
+        writeFileSync(
+          join(tempDir, "infra", "deployment-policy.json"),
+          JSON.stringify({
+            status: "CONTAINED",
+            gates: createValidPolicyGates(),
+          }),
+        );
+
+        mkdirSync(join(tempDir, "scripts"), { recursive: true });
+        writeFileSync(join(tempDir, "scripts", scriptName), content);
+
+        const result = scanDeploymentContainment(tempDir);
+        expect(result.valid).toBe(false);
+        expect(
+          result.violations.some((v) => v.rule === "P0-NO-REMOTE-COMMANDS"),
+        ).toBe(true);
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
 });

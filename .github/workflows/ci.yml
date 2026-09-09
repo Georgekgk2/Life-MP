@@ -34,6 +34,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build config package for containment preflight
+        run: pnpm --filter @life/config build
+
+      - name: Verify deployment containment (Fail-Closed Preflight)
+        run: node scripts/verify-deployment-containment.mjs
+
       - name: Check documentation
         run: pnpm docs:check
       - name: Lint
@@ -41,9 +47,6 @@ jobs:
 
       - name: Build
         run: pnpm build
-
-      - name: Verify deployment containment
-        run: node scripts/verify-deployment-containment.mjs
 
       - name: Typecheck
         run: pnpm typecheck
@@ -53,6 +56,7 @@ jobs:
 
   catalog-provider-integration:
     name: Catalog Provider Integration
+    needs: [verify]
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -120,6 +124,7 @@ jobs:
 
   catalog-provider-migrations:
     name: Catalog Provider Migrations
+    needs: [verify]
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -187,6 +192,7 @@ jobs:
 
   storefront-e2e:
     name: Storefront E2E
+    needs: [verify]
     runs-on: ubuntu-latest
     timeout-minutes: 15
 

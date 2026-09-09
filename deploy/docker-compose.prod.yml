@@ -156,7 +156,9 @@ services:
       MEDUSA_API_URL: http://commerce:9000
       MEDUSA_BACKEND_URL: http://commerce:9000
       NEXT_PUBLIC_MEDUSA_API_URL: ${NEXT_PUBLIC_MEDUSA_API_URL:-https://life-mp.pp.ua/api}
-      CATALOG_SOURCE: medusa
+      LIFE_RUNTIME_ENV: public-demo
+      CATALOG_SOURCE: fixtures
+      ALLOW_PUBLIC_DEMO_CATALOG: "true"
       ALLOW_SYNTHETIC_CATALOG: "false"
     ports:
       - "127.0.0.1:${HOST_STOREFRONT_PORT:-3100}:3000"

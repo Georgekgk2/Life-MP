@@ -20,12 +20,65 @@ export async function getCatalogSnapshot(): Promise<CatalogReadResult> {
   const nodeEnvironment = process.env["NODE_ENV"];
   const runtimeEnvironment = process.env["LIFE_RUNTIME_ENV"] || nodeEnvironment;
   const isTestRuntime = runtimeEnvironment === "test";
+  const isPublicDemoRuntime = runtimeEnvironment === "public-demo";
   const isDevelopmentRuntime =
     runtimeEnvironment === "development" && nodeEnvironment !== "production";
-  const isProduction = nodeEnvironment === "production" && !isTestRuntime;
+  const isProduction =
+    nodeEnvironment === "production" && !isTestRuntime && !isPublicDemoRuntime;
   const isLocalOrTest = isDevelopmentRuntime || isTestRuntime;
   const allowSyntheticCatalog =
     process.env["ALLOW_SYNTHETIC_CATALOG"] === "true";
+  const allowPublicDemoCatalog =
+    process.env["ALLOW_PUBLIC_DEMO_CATALOG"] === "true";
+
+  // Dedicated non-commercial public-demo showcase mode:
+  // Strict non-commercial demonstration mode: only when ALL conditions are met:
+  // 1. LIFE_RUNTIME_ENV === "public-demo"
+  // 2. CATALOG_SOURCE === "fixtures"
+  // 3. ALLOW_PUBLIC_DEMO_CATALOG === "true"
+  // In this mode, static synthetic fixtures are served with isSynthetic: true and demo-only.
+  // Medusa backend is never called; commercial catalog fallback stays unavailable.
+  if (isPublicDemoRuntime) {
+    if (source !== "fixtures" || !allowPublicDemoCatalog) {
+      return {
+        kind: "unavailable",
+        source: "medusa",
+        reason: "missing_configuration",
+      };
+    }
+
+    const categories = fixtureCategories.map((c) => ({
+      id: c.id,
+      slug: c.slug,
+      name: c.name,
+      description: c.description,
+      imageSrc: c.imageSrc,
+    }));
+
+    const products = fixtureProducts.map((p) => ({
+      id: p.id,
+      slug: p.slug,
+      categorySlug: p.categorySlug,
+      name: p.name,
+      description: p.description,
+      priceUah: p.priceUah,
+      imageSrc: p.imageSrc,
+      provider: {
+        handle: "demo-provider",
+        name: "Локальний майстер",
+      },
+      isSynthetic: true,
+    }));
+
+    return {
+      kind: "ready",
+      snapshot: {
+        source: "fixtures",
+        categories,
+        products,
+      },
+    };
+  }
 
   // Production must never silently serve fixtures or a non-commercial Medusa
   // catalog. Synthetic catalog access is restricted to explicit development/

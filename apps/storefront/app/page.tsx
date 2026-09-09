@@ -12,6 +12,8 @@ import {
 import { charityProjects, events, partners, people, stories } from "@/fixtures";
 import { getCatalogSnapshot } from "@/catalog/server";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Life-MP — демонстраційна вітрина спільноти",
   description:

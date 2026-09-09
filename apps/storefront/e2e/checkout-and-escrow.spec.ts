@@ -48,6 +48,15 @@ test.describe("Multi-Vendor Cart & Checkout Draft Containment (Phase 4D)", () =>
       fullPage: true,
     });
 
+    // Fill required customer details
+    await page.locator("#fullName").fill("Олена Мельник");
+    await page.locator("#phone").fill("+380 67 123 45 67");
+    await page.locator("#email").fill("olena.melnyk@example.ua");
+    await page.locator("#city").fill("Київ");
+    await page
+      .locator("#novaPoshtaBranch")
+      .fill("Відділення №42 (вул. Саксаганського, 102)");
+
     // 6. Submit Checkout Form as a non-authoritative draft
     const submitDraftBtn = page.locator(
       'button:has-text("Переглянути стан чернетки")',

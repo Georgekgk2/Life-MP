@@ -18,14 +18,12 @@ export async function getCatalogSnapshot(): Promise<CatalogReadResult> {
   // production mode while allowing the E2E server to declare its app runtime
   // explicitly as test without opening the real production catalog path.
   const nodeEnvironment = process.env["NODE_ENV"];
-  const runtimeEnvironment =
-    process.env["LIFE_RUNTIME_ENV"] || nodeEnvironment;
+  const runtimeEnvironment = process.env["LIFE_RUNTIME_ENV"] || nodeEnvironment;
   const isTestRuntime = runtimeEnvironment === "test";
   const isDevelopmentRuntime =
     runtimeEnvironment === "development" && nodeEnvironment !== "production";
   const isProduction = nodeEnvironment === "production" && !isTestRuntime;
   const isLocalOrTest = isDevelopmentRuntime || isTestRuntime;
-  const isExplicitE2e = process.env["LIFE_E2E"] === "true";
   const allowSyntheticCatalog =
     process.env["ALLOW_SYNTHETIC_CATALOG"] === "true";
 
@@ -33,9 +31,8 @@ export async function getCatalogSnapshot(): Promise<CatalogReadResult> {
   // catalog. Synthetic catalog access is restricted to explicit development/
   // test runs; the production fallback stays unavailable.
   if (
-    (isProduction && !isExplicitE2e) ||
-    (source === "medusa" &&
-      (!(isLocalOrTest || isExplicitE2e) || !allowSyntheticCatalog))
+    isProduction ||
+    (source === "medusa" && (!isLocalOrTest || !allowSyntheticCatalog))
   ) {
     return {
       kind: "unavailable",

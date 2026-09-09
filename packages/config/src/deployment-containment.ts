@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 
 export type DeploymentContainmentViolation = Readonly<{
@@ -205,9 +205,39 @@ export function scanDeploymentContainment(
           .substring(rootDir.length + 1)
           .replace(/\\/g, "/");
 
+        if (entry.isSymbolicLink()) {
+          violations.push({
+            rule: "P0-FORBIDDEN-SYMLINK",
+            path: relPath,
+            message: `Symbolic link "${relPath}" detected in scripts directory. Symbolic links are strictly forbidden in contained state to prevent path traversal and allowlist bypass.`,
+          });
+          continue;
+        }
+
         if (entry.isDirectory()) {
           scanDir(fullPath);
         } else if (entry.isFile()) {
+          // Verify canonical path to prevent path traversal
+          try {
+            const canonicalPath = realpathSync(fullPath);
+            const normalizedScriptsDir = realpathSync(scriptsDir);
+            if (!canonicalPath.startsWith(normalizedScriptsDir)) {
+              violations.push({
+                rule: "P0-PATH-TRAVERSAL",
+                path: relPath,
+                message: `Path traversal detected: "${relPath}" resolves outside of scripts directory to "${canonicalPath}".`,
+              });
+              continue;
+            }
+          } catch (err) {
+            violations.push({
+              rule: "P0-CANONICAL-PATH-ERROR",
+              path: relPath,
+              message: `Failed to resolve canonical path for "${relPath}": ${String(err)}`,
+            });
+            continue;
+          }
+
           const lowerName = entry.name.toLowerCase();
 
           // Check against permitted local scripts allowlist
@@ -257,6 +287,12 @@ export function scanDeploymentContainment(
               message: `Failed to read script file "${relPath}": ${String(err)}`,
             });
           }
+        } else {
+          violations.push({
+            rule: "P0-NON-REGULAR-FILE",
+            path: relPath,
+            message: `Non-regular file entry "${relPath}" detected in scripts directory. Only standard regular files are permitted.`,
+          });
         }
       }
     };

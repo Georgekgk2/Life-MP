@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  rmSync,
+  symlinkSync,
+} from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -7,9 +13,20 @@ import {
   MANDATORY_POLICY_GATES,
 } from "../src/deployment-containment.js";
 
+// Independent literal specification of expected mandatory gates (decoupled from production constant)
+const EXPECTED_POLICY_GATES = [
+  "allow_remote_deployment",
+  "allow_ssh_execution",
+  "allow_ghcr_image_push",
+  "allow_production_dns_tls",
+  "allow_live_payment_gateway",
+  "allow_live_shipping_api",
+  "allow_live_fiscalization",
+] as const;
+
 function createValidPolicyGates(): Record<string, boolean> {
   const gates: Record<string, boolean> = {};
-  for (const gate of MANDATORY_POLICY_GATES) {
+  for (const gate of EXPECTED_POLICY_GATES) {
     gates[gate] = false;
   }
   return gates;
@@ -426,6 +443,47 @@ describe("packages/config deployment-containment scanner", () => {
         expect(result.valid).toBe(false);
         expect(
           result.violations.some((v) => v.rule === "P0-NO-REMOTE-COMMANDS"),
+        ).toBe(true);
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("enforces that production scanner mandatory gates exactly match expected specification", () => {
+    expect([...MANDATORY_POLICY_GATES].sort()).toEqual(
+      [...EXPECTED_POLICY_GATES].sort(),
+    );
+    expect(MANDATORY_POLICY_GATES.length).toBe(7);
+  });
+
+  it("fails closed when any symlink is created in scripts directory (permitted name or unauthorized)", () => {
+    for (const symlinkName of ["check-docs.mjs", "deploy-symlink.sh"]) {
+      const tempDir = mkdtempSync(
+        join(tmpdir(), "life-containment-fail-symlink-"),
+      );
+      try {
+        mkdirSync(join(tempDir, "infra"), { recursive: true });
+        writeFileSync(
+          join(tempDir, "infra", "deployment-policy.json"),
+          JSON.stringify({
+            status: "CONTAINED",
+            gates: createValidPolicyGates(),
+          }),
+        );
+
+        mkdirSync(join(tempDir, "scripts"), { recursive: true });
+        // Create an outside target script with remote commands
+        const outsideScript = join(tempDir, "outside-remote.sh");
+        writeFileSync(outsideScript, "#!/bin/bash\nssh host uptime\n");
+
+        // Symlink from scripts/ into outside target
+        symlinkSync(outsideScript, join(tempDir, "scripts", symlinkName));
+
+        const result = scanDeploymentContainment(tempDir);
+        expect(result.valid).toBe(false);
+        expect(
+          result.violations.some((v) => v.rule === "P0-FORBIDDEN-SYMLINK"),
         ).toBe(true);
       } finally {
         rmSync(tempDir, { recursive: true, force: true });

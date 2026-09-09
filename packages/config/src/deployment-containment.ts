@@ -19,6 +19,31 @@ export type DeploymentPolicyFile = Readonly<{
   gates: Record<string, boolean>;
 }>;
 
+export const MANDATORY_POLICY_GATES = [
+  "allow_remote_deployment",
+  "allow_ssh_execution",
+  "allow_ghcr_image_push",
+  "allow_production_dns_tls",
+  "allow_live_payment_gateway",
+  "allow_live_shipping_api",
+  "allow_live_fiscalization",
+] as const;
+
+export const FORBIDDEN_REMOTE_SCRIPT_PATTERNS = [
+  /\bssh\s+/i,
+  /\brsync\s+/i,
+  /\bscp\s+/i,
+  /\bdocker\s+(-H|--host)\b/i,
+  /\bdocker\s+context\s+use\b/i,
+] as const;
+
+export const FORBIDDEN_SCRIPT_FILENAMES = [
+  "deploy_prod.sh",
+  "remote-setup.sh",
+  "rollback.sh",
+  "deploy-colocated-prod.sh",
+] as const;
+
 export function scanDeploymentContainment(
   rootDir: string,
 ): DeploymentContainmentResult {
@@ -51,6 +76,18 @@ export function scanDeploymentContainment(
           message: "Gates object is missing or invalid in deployment policy.",
         });
       } else {
+        // Enforce mandatory policy gates schema
+        for (const mandatoryGate of MANDATORY_POLICY_GATES) {
+          if (!(mandatoryGate in parsed.gates)) {
+            violations.push({
+              rule: "P0-GATE-MISSING",
+              path: "infra/deployment-policy.json",
+              message: `Mandatory gate "${mandatoryGate}" is missing from deployment policy.`,
+            });
+          }
+        }
+
+        // Enforce all gates must be locked (false)
         for (const [gateName, gateValue] of Object.entries(parsed.gates)) {
           if (gateValue !== false) {
             violations.push({
@@ -146,23 +183,72 @@ export function scanDeploymentContainment(
     }
   }
 
-  // 4. Scan scripts/deploy for forbidden remote execution scripts
-  const scriptsDeployDir = join(rootDir, "scripts", "deploy");
-  if (existsSync(scriptsDeployDir)) {
-    const scriptFiles = readdirSync(scriptsDeployDir);
-    for (const file of scriptFiles) {
-      if (
-        file === "remote-setup.sh" ||
-        file === "rollback.sh" ||
-        file === "deploy-colocated-prod.sh"
-      ) {
-        violations.push({
-          rule: "P0-NO-REMOTE-SCRIPTS",
-          path: `scripts/deploy/${file}`,
-          message: `Forbidden remote execution script scripts/deploy/${file} must not exist.`,
-        });
+  // 4. Scan scripts directory and subdirectories for forbidden remote deployment scripts or remote commands
+  const scriptsDir = join(rootDir, "scripts");
+  if (existsSync(scriptsDir)) {
+    const scanDir = (dir: string) => {
+      const entries = readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = join(dir, entry.name);
+        const relPath = fullPath
+          .substring(rootDir.length + 1)
+          .replace(/\\/g, "/");
+
+        if (entry.isDirectory()) {
+          scanDir(fullPath);
+        } else if (entry.isFile()) {
+          const lowerName = entry.name.toLowerCase();
+
+          // Check filename patterns
+          const isForbiddenFilename =
+            (FORBIDDEN_SCRIPT_FILENAMES as readonly string[]).includes(
+              entry.name,
+            ) ||
+            lowerName.startsWith("deploy_") ||
+            (lowerName.startsWith("deploy-") && lowerName.endsWith(".sh")) ||
+            (lowerName.startsWith("remote-") && lowerName.endsWith(".sh")) ||
+            (lowerName.startsWith("rollback") && lowerName.endsWith(".sh"));
+
+          if (isForbiddenFilename) {
+            violations.push({
+              rule: "P0-NO-REMOTE-SCRIPTS",
+              path: relPath,
+              message: `Forbidden remote execution script "${relPath}" must not exist in contained state.`,
+            });
+          }
+
+          // Check script content for remote execution commands
+          if (
+            entry.name.endsWith(".sh") ||
+            entry.name.endsWith(".bash") ||
+            entry.name.endsWith(".mjs") ||
+            entry.name.endsWith(".js") ||
+            entry.name.endsWith(".ts")
+          ) {
+            try {
+              const content = readFileSync(fullPath, "utf-8");
+              for (const pattern of FORBIDDEN_REMOTE_SCRIPT_PATTERNS) {
+                if (pattern.test(content)) {
+                  violations.push({
+                    rule: "P0-NO-REMOTE-COMMANDS",
+                    path: relPath,
+                    message: `Forbidden remote execution command pattern (${pattern.toString()}) detected in "${relPath}".`,
+                  });
+                  break;
+                }
+              }
+            } catch (err) {
+              violations.push({
+                rule: "P0-SCRIPT-READ-ERROR",
+                path: relPath,
+                message: `Failed to read script file "${relPath}": ${String(err)}`,
+              });
+            }
+          }
+        }
       }
-    }
+    };
+    scanDir(scriptsDir);
   }
 
   return {

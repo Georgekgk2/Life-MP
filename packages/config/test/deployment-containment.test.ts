@@ -2,7 +2,18 @@ import { describe, expect, it } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { scanDeploymentContainment } from "../src/deployment-containment.js";
+import {
+  scanDeploymentContainment,
+  MANDATORY_POLICY_GATES,
+} from "../src/deployment-containment.js";
+
+function createValidPolicyGates(): Record<string, boolean> {
+  const gates: Record<string, boolean> = {};
+  for (const gate of MANDATORY_POLICY_GATES) {
+    gates[gate] = false;
+  }
+  return gates;
+}
 
 describe("packages/config deployment-containment scanner", () => {
   it("passes when deployment policy is strictly contained and no deploy surfaces exist", () => {
@@ -15,10 +26,7 @@ describe("packages/config deployment-containment scanner", () => {
           version: "1.0.0",
           policy_name: "Test Policy",
           status: "CONTAINED",
-          gates: {
-            allow_remote_deployment: false,
-            allow_ssh_execution: false,
-          },
+          gates: createValidPolicyGates(),
         }),
       );
 
@@ -31,6 +39,12 @@ describe("packages/config deployment-containment scanner", () => {
       writeFileSync(
         join(tempDir, "Makefile"),
         "deploy-staging:\n\t@echo 'disabled'; exit 1\n",
+      );
+
+      mkdirSync(join(tempDir, "scripts"), { recursive: true });
+      writeFileSync(
+        join(tempDir, "scripts", "check-docs.mjs"),
+        "// local docs verification helper\nconsole.log('ok');\n",
       );
 
       const result = scanDeploymentContainment(tempDir);
@@ -56,8 +70,10 @@ describe("packages/config deployment-containment scanner", () => {
     }
   });
 
-  it("fails when any gate in deployment-policy is true", () => {
-    const tempDir = mkdtempSync(join(tmpdir(), "life-containment-fail-gate-"));
+  it("fails when gates object is empty (mandatory schema check)", () => {
+    const tempDir = mkdtempSync(
+      join(tmpdir(), "life-containment-fail-emptygates-"),
+    );
     try {
       mkdirSync(join(tempDir, "infra"), { recursive: true });
       writeFileSync(
@@ -65,9 +81,65 @@ describe("packages/config deployment-containment scanner", () => {
         JSON.stringify({
           version: "1.0.0",
           status: "CONTAINED",
-          gates: {
-            allow_remote_deployment: true,
-          },
+          gates: {},
+        }),
+      );
+
+      const result = scanDeploymentContainment(tempDir);
+      expect(result.valid).toBe(false);
+      expect(result.violations.some((v) => v.rule === "P0-GATE-MISSING")).toBe(
+        true,
+      );
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails when any mandatory gate is missing from deployment policy", () => {
+    const tempDir = mkdtempSync(
+      join(tmpdir(), "life-containment-fail-missinggate-"),
+    );
+    try {
+      mkdirSync(join(tempDir, "infra"), { recursive: true });
+      const partialGates = createValidPolicyGates();
+      delete partialGates["allow_ssh_execution"];
+
+      writeFileSync(
+        join(tempDir, "infra", "deployment-policy.json"),
+        JSON.stringify({
+          version: "1.0.0",
+          status: "CONTAINED",
+          gates: partialGates,
+        }),
+      );
+
+      const result = scanDeploymentContainment(tempDir);
+      expect(result.valid).toBe(false);
+      expect(
+        result.violations.some(
+          (v) =>
+            v.rule === "P0-GATE-MISSING" &&
+            v.message.includes("allow_ssh_execution"),
+        ),
+      ).toBe(true);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails when any gate in deployment-policy is true", () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "life-containment-fail-gate-"));
+    try {
+      mkdirSync(join(tempDir, "infra"), { recursive: true });
+      const activeGates = createValidPolicyGates();
+      activeGates["allow_remote_deployment"] = true;
+
+      writeFileSync(
+        join(tempDir, "infra", "deployment-policy.json"),
+        JSON.stringify({
+          version: "1.0.0",
+          status: "CONTAINED",
+          gates: activeGates,
         }),
       );
 
@@ -91,7 +163,7 @@ describe("packages/config deployment-containment scanner", () => {
         join(tempDir, "infra", "deployment-policy.json"),
         JSON.stringify({
           status: "CONTAINED",
-          gates: { allow_remote_deployment: false },
+          gates: createValidPolicyGates(),
         }),
       );
 
@@ -121,7 +193,7 @@ describe("packages/config deployment-containment scanner", () => {
         join(tempDir, "infra", "deployment-policy.json"),
         JSON.stringify({
           status: "CONTAINED",
-          gates: { allow_remote_deployment: false },
+          gates: createValidPolicyGates(),
         }),
       );
 
@@ -153,9 +225,9 @@ describe("packages/config deployment-containment scanner", () => {
     }
   });
 
-  it("fails when forbidden scripts exist in scripts/deploy", () => {
+  it("fails when root scripts/deploy_prod.sh exists in repository", () => {
     const tempDir = mkdtempSync(
-      join(tmpdir(), "life-containment-fail-scripts-"),
+      join(tmpdir(), "life-containment-fail-deployprod-"),
     );
     try {
       mkdirSync(join(tempDir, "infra"), { recursive: true });
@@ -163,7 +235,71 @@ describe("packages/config deployment-containment scanner", () => {
         join(tempDir, "infra", "deployment-policy.json"),
         JSON.stringify({
           status: "CONTAINED",
-          gates: { allow_remote_deployment: false },
+          gates: createValidPolicyGates(),
+        }),
+      );
+
+      mkdirSync(join(tempDir, "scripts"), { recursive: true });
+      writeFileSync(
+        join(tempDir, "scripts", "deploy_prod.sh"),
+        "#!/bin/bash\necho 'deploying'\n",
+      );
+
+      const result = scanDeploymentContainment(tempDir);
+      expect(result.valid).toBe(false);
+      expect(
+        result.violations.some(
+          (v) =>
+            v.rule === "P0-NO-REMOTE-SCRIPTS" &&
+            v.path === "scripts/deploy_prod.sh",
+        ),
+      ).toBe(true);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails when script files contain remote execution commands (ssh, rsync, scp, docker -H)", () => {
+    const tempDir = mkdtempSync(
+      join(tmpdir(), "life-containment-fail-commands-"),
+    );
+    try {
+      mkdirSync(join(tempDir, "infra"), { recursive: true });
+      writeFileSync(
+        join(tempDir, "infra", "deployment-policy.json"),
+        JSON.stringify({
+          status: "CONTAINED",
+          gates: createValidPolicyGates(),
+        }),
+      );
+
+      mkdirSync(join(tempDir, "scripts"), { recursive: true });
+      writeFileSync(
+        join(tempDir, "scripts", "sync-runner.sh"),
+        "#!/bin/bash\nssh -i key medgemma-user@host 'uptime'\nrsync -avz ./ host:/opt/life-mp/\n",
+      );
+
+      const result = scanDeploymentContainment(tempDir);
+      expect(result.valid).toBe(false);
+      expect(
+        result.violations.some((v) => v.rule === "P0-NO-REMOTE-COMMANDS"),
+      ).toBe(true);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails when forbidden scripts exist in scripts/deploy subdirectory", () => {
+    const tempDir = mkdtempSync(
+      join(tmpdir(), "life-containment-fail-subdir-"),
+    );
+    try {
+      mkdirSync(join(tempDir, "infra"), { recursive: true });
+      writeFileSync(
+        join(tempDir, "infra", "deployment-policy.json"),
+        JSON.stringify({
+          status: "CONTAINED",
+          gates: createValidPolicyGates(),
         }),
       );
 

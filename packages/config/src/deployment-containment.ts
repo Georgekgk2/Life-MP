@@ -76,13 +76,20 @@ export function getPermittedScripts(): readonly string[] {
   return [...PERMITTED_SCRIPT_PATHS];
 }
 
-export const FORBIDDEN_REMOTE_COMMAND_PATTERNS: readonly RegExp[] =
+const freezePattern = (pattern: RegExp): Readonly<RegExp> =>
+  Object.freeze(pattern);
+
+export const FORBIDDEN_REMOTE_COMMAND_PATTERNS: readonly Readonly<RegExp>[] =
   Object.freeze([
-    /\b(ssh|rsync|scp|sftp)(\.exe)?\b/i,
-    /\bdocker\s+(-H|--host|--context)\b/i,
-    /\bdocker\s+context\b/i,
-    /\b(execFile|execFileSync|spawn|spawnSync)\s*\(\s*["'](ssh|rsync|scp|sftp|docker)["']/i,
-    /\b(exec|execSync)\s*\(\s*["'`][^"'`]*\b(ssh|rsync|scp|sftp|docker)\b/i,
+    freezePattern(/\b(ssh|rsync|scp|sftp)(\.exe)?\b/i),
+    freezePattern(/\bdocker\s+(-H|--host|--context)\b/i),
+    freezePattern(/\bdocker\s+context\b/i),
+    freezePattern(
+      /\b(execFile|execFileSync|spawn|spawnSync)\s*\(\s*["'](ssh|rsync|scp|sftp|docker)["']/i,
+    ),
+    freezePattern(
+      /\b(exec|execSync)\s*\(\s*["'`][^"'`]*\b(ssh|rsync|scp|sftp|docker)\b/i,
+    ),
   ]);
 
 export const FORBIDDEN_SCRIPT_FILENAMES: readonly string[] = Object.freeze([

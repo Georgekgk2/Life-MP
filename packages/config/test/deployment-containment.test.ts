@@ -512,6 +512,25 @@ describe("packages/config deployment-containment scanner", () => {
         FORBIDDEN_REMOTE_COMMAND_PATTERNS as unknown as { length: number }
       ).length = 0;
     }).toThrow();
+
+    // Deep freeze enforcement: every single RegExp pattern must be frozen
+    for (const pattern of FORBIDDEN_REMOTE_COMMAND_PATTERNS) {
+      expect(Object.isFrozen(pattern)).toBe(true);
+
+      // Attempting to monkey-patch .test must throw
+      expect(() => {
+        (pattern as unknown as { test: () => boolean }).test = () => false;
+      }).toThrow();
+
+      // Attempting to mutate lastIndex must throw
+      expect(() => {
+        (pattern as unknown as { lastIndex: number }).lastIndex = 5;
+      }).toThrow();
+    }
+
+    // Verify pattern functionality remains intact
+    const sshPattern = FORBIDDEN_REMOTE_COMMAND_PATTERNS[0];
+    expect(sshPattern.test("ssh host uptime")).toBe(true);
   });
 
   it("enforces that FORBIDDEN_SCRIPT_FILENAMES is runtime frozen and resistant to mutation", () => {

@@ -1,4 +1,10 @@
-import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+} from "node:fs";
 import { join } from "node:path";
 
 export type DeploymentContainmentViolation = Readonly<{
@@ -29,16 +35,18 @@ export const MANDATORY_POLICY_GATES = [
   "allow_live_fiscalization",
 ] as const;
 
-export const PERMITTED_SCRIPTS = new Set([
-  "scripts/check-docs.mjs",
-  "scripts/generate-marketplace-images.mjs",
-  "scripts/generate-pwa-icons.mjs",
-  "scripts/test-fresh-state-repro.sh",
-  "scripts/verify-deployment-containment.mjs",
-  "scripts/with-commerce-migration-test-env.sh",
-  "scripts/with-commerce-test-env.sh",
-  "scripts/with-local-commerce-env.sh",
-]);
+export const PERMITTED_SCRIPTS: ReadonlySet<string> = Object.freeze(
+  new Set([
+    "scripts/check-docs.mjs",
+    "scripts/generate-marketplace-images.mjs",
+    "scripts/generate-pwa-icons.mjs",
+    "scripts/test-fresh-state-repro.sh",
+    "scripts/verify-deployment-containment.mjs",
+    "scripts/with-commerce-migration-test-env.sh",
+    "scripts/with-commerce-test-env.sh",
+    "scripts/with-local-commerce-env.sh",
+  ]),
+);
 
 export const FORBIDDEN_REMOTE_COMMAND_PATTERNS = [
   /\b(ssh|rsync|scp|sftp)(\.exe)?\b/i,
@@ -196,107 +204,182 @@ export function scanDeploymentContainment(
 
   // 4. Scan scripts directory and subdirectories for forbidden remote deployment scripts or remote commands
   const scriptsDir = join(rootDir, "scripts");
-  if (existsSync(scriptsDir)) {
-    const scanDir = (dir: string) => {
-      const entries = readdirSync(dir, { withFileTypes: true });
-      for (const entry of entries) {
-        const fullPath = join(dir, entry.name);
-        const relPath = fullPath
-          .substring(rootDir.length + 1)
-          .replace(/\\/g, "/");
+  let scriptsStat;
+  try {
+    scriptsStat = lstatSync(scriptsDir);
+  } catch (err: unknown) {
+    if (
+      typeof err === "object" &&
+      err !== null &&
+      "code" in err &&
+      err.code !== "ENOENT"
+    ) {
+      violations.push({
+        rule: "P0-CANONICAL-PATH-ERROR",
+        path: "scripts",
+        message: `Failed to stat scripts path: ${String(err)}`,
+      });
+    }
+  }
 
-        if (entry.isSymbolicLink()) {
+  if (scriptsStat) {
+    if (scriptsStat.isSymbolicLink()) {
+      violations.push({
+        rule: "P0-FORBIDDEN-SYMLINK",
+        path: "scripts",
+        message: `The scripts path "scripts" is a symbolic link. Symbolic links are strictly forbidden for the scripts root to prevent directory traversal and allowlist bypass.`,
+      });
+    } else if (!scriptsStat.isDirectory()) {
+      violations.push({
+        rule: "P0-NON-REGULAR-FILE",
+        path: "scripts",
+        message: `The scripts path "scripts" is not a directory. In contained state, scripts must be a standard directory.`,
+      });
+    } else {
+      let canScanScriptsDir = true;
+      try {
+        const canonicalScriptsDir = realpathSync(scriptsDir);
+        const canonicalRootDir = realpathSync(rootDir);
+        const expectedScriptsDir = join(canonicalRootDir, "scripts");
+        if (canonicalScriptsDir !== expectedScriptsDir) {
           violations.push({
-            rule: "P0-FORBIDDEN-SYMLINK",
-            path: relPath,
-            message: `Symbolic link "${relPath}" detected in scripts directory. Symbolic links are strictly forbidden in contained state to prevent path traversal and allowlist bypass.`,
+            rule: "P0-PATH-TRAVERSAL",
+            path: "scripts",
+            message: `The scripts directory canonical path "${canonicalScriptsDir}" does not match expected path "${expectedScriptsDir}".`,
           });
-          continue;
+          canScanScriptsDir = false;
         }
+      } catch (err) {
+        violations.push({
+          rule: "P0-CANONICAL-PATH-ERROR",
+          path: "scripts",
+          message: `Failed to resolve canonical path for scripts directory: ${String(err)}`,
+        });
+        canScanScriptsDir = false;
+      }
 
-        if (entry.isDirectory()) {
-          scanDir(fullPath);
-        } else if (entry.isFile()) {
-          // Verify canonical path to prevent path traversal
-          try {
-            const canonicalPath = realpathSync(fullPath);
-            const normalizedScriptsDir = realpathSync(scriptsDir);
-            if (!canonicalPath.startsWith(normalizedScriptsDir)) {
+      if (canScanScriptsDir) {
+        const scanDir = (dir: string) => {
+          const entries = readdirSync(dir, { withFileTypes: true });
+          for (const entry of entries) {
+            const fullPath = join(dir, entry.name);
+            const relPath = fullPath
+              .substring(rootDir.length + 1)
+              .replace(/\\/g, "/");
+
+            if (entry.isSymbolicLink()) {
               violations.push({
-                rule: "P0-PATH-TRAVERSAL",
+                rule: "P0-FORBIDDEN-SYMLINK",
                 path: relPath,
-                message: `Path traversal detected: "${relPath}" resolves outside of scripts directory to "${canonicalPath}".`,
+                message: `Symbolic link "${relPath}" detected in scripts directory. Symbolic links are strictly forbidden in contained state to prevent path traversal and allowlist bypass.`,
               });
               continue;
             }
-          } catch (err) {
-            violations.push({
-              rule: "P0-CANONICAL-PATH-ERROR",
-              path: relPath,
-              message: `Failed to resolve canonical path for "${relPath}": ${String(err)}`,
-            });
-            continue;
-          }
 
-          const lowerName = entry.name.toLowerCase();
-
-          // Check against permitted local scripts allowlist
-          if (!PERMITTED_SCRIPTS.has(relPath)) {
-            violations.push({
-              rule: "P0-UNAUTHORIZED-SCRIPT",
-              path: relPath,
-              message: `Unauthorized script "${relPath}" detected in scripts directory. In contained state, only approved local verification helpers are permitted.`,
-            });
-          }
-
-          // Check filename patterns for explicit deployment/remote intent
-          const isForbiddenFilename =
-            (FORBIDDEN_SCRIPT_FILENAMES as readonly string[]).includes(
-              entry.name,
-            ) ||
-            lowerName.startsWith("deploy") ||
-            lowerName.startsWith("remote") ||
-            lowerName.startsWith("rollback") ||
-            lowerName.startsWith("release");
-
-          if (isForbiddenFilename) {
-            violations.push({
-              rule: "P0-NO-REMOTE-SCRIPTS",
-              path: relPath,
-              message: `Forbidden remote execution script "${relPath}" must not exist in contained state.`,
-            });
-          }
-
-          // Check script content for remote execution commands
-          try {
-            const content = readFileSync(fullPath, "utf-8");
-            for (const pattern of FORBIDDEN_REMOTE_COMMAND_PATTERNS) {
-              if (pattern.test(content)) {
+            if (entry.isDirectory()) {
+              try {
+                const canonicalSubDir = realpathSync(fullPath);
+                const normalizedScriptsDir = realpathSync(scriptsDir);
+                if (!canonicalSubDir.startsWith(normalizedScriptsDir + "/")) {
+                  violations.push({
+                    rule: "P0-PATH-TRAVERSAL",
+                    path: relPath,
+                    message: `Path traversal detected: subdirectory "${relPath}" resolves outside of scripts directory to "${canonicalSubDir}".`,
+                  });
+                  continue;
+                }
+              } catch (err) {
                 violations.push({
-                  rule: "P0-NO-REMOTE-COMMANDS",
+                  rule: "P0-CANONICAL-PATH-ERROR",
                   path: relPath,
-                  message: `Forbidden remote execution command pattern (${pattern.toString()}) detected in "${relPath}".`,
+                  message: `Failed to resolve canonical path for subdirectory "${relPath}": ${String(err)}`,
                 });
-                break;
+                continue;
               }
+              scanDir(fullPath);
+            } else if (entry.isFile()) {
+              // Verify canonical path to prevent path traversal
+              try {
+                const canonicalPath = realpathSync(fullPath);
+                const normalizedScriptsDir = realpathSync(scriptsDir);
+                if (!canonicalPath.startsWith(normalizedScriptsDir)) {
+                  violations.push({
+                    rule: "P0-PATH-TRAVERSAL",
+                    path: relPath,
+                    message: `Path traversal detected: "${relPath}" resolves outside of scripts directory to "${canonicalPath}".`,
+                  });
+                  continue;
+                }
+              } catch (err) {
+                violations.push({
+                  rule: "P0-CANONICAL-PATH-ERROR",
+                  path: relPath,
+                  message: `Failed to resolve canonical path for "${relPath}": ${String(err)}`,
+                });
+                continue;
+              }
+
+              const lowerName = entry.name.toLowerCase();
+
+              // Check against permitted local scripts allowlist
+              if (!PERMITTED_SCRIPTS.has(relPath)) {
+                violations.push({
+                  rule: "P0-UNAUTHORIZED-SCRIPT",
+                  path: relPath,
+                  message: `Unauthorized script "${relPath}" detected in scripts directory. In contained state, only approved local verification helpers are permitted.`,
+                });
+              }
+
+              // Check filename patterns for explicit deployment/remote intent
+              const isForbiddenFilename =
+                (FORBIDDEN_SCRIPT_FILENAMES as readonly string[]).includes(
+                  entry.name,
+                ) ||
+                lowerName.startsWith("deploy") ||
+                lowerName.startsWith("remote") ||
+                lowerName.startsWith("rollback") ||
+                lowerName.startsWith("release");
+
+              if (isForbiddenFilename) {
+                violations.push({
+                  rule: "P0-NO-REMOTE-SCRIPTS",
+                  path: relPath,
+                  message: `Forbidden remote execution script "${relPath}" must not exist in contained state.`,
+                });
+              }
+
+              // Check script content for remote execution commands
+              try {
+                const content = readFileSync(fullPath, "utf-8");
+                for (const pattern of FORBIDDEN_REMOTE_COMMAND_PATTERNS) {
+                  if (pattern.test(content)) {
+                    violations.push({
+                      rule: "P0-NO-REMOTE-COMMANDS",
+                      path: relPath,
+                      message: `Forbidden remote execution command pattern (${pattern.toString()}) detected in "${relPath}".`,
+                    });
+                    break;
+                  }
+                }
+              } catch (err) {
+                violations.push({
+                  rule: "P0-SCRIPT-READ-ERROR",
+                  path: relPath,
+                  message: `Failed to read script file "${relPath}": ${String(err)}`,
+                });
+              }
+            } else {
+              violations.push({
+                rule: "P0-NON-REGULAR-FILE",
+                path: relPath,
+                message: `Non-regular file entry "${relPath}" detected in scripts directory. Only standard regular files are permitted.`,
+              });
             }
-          } catch (err) {
-            violations.push({
-              rule: "P0-SCRIPT-READ-ERROR",
-              path: relPath,
-              message: `Failed to read script file "${relPath}": ${String(err)}`,
-            });
           }
-        } else {
-          violations.push({
-            rule: "P0-NON-REGULAR-FILE",
-            path: relPath,
-            message: `Non-regular file entry "${relPath}" detected in scripts directory. Only standard regular files are permitted.`,
-          });
-        }
+        };
+        scanDir(scriptsDir);
       }
-    };
-    scanDir(scriptsDir);
+    }
   }
 
   return {

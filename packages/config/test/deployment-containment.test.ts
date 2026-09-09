@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import {
   scanDeploymentContainment,
   MANDATORY_POLICY_GATES,
+  PERMITTED_SCRIPTS,
 } from "../src/deployment-containment.js";
 
 // Independent literal specification of expected mandatory gates (decoupled from production constant)
@@ -488,6 +489,115 @@ describe("packages/config deployment-containment scanner", () => {
       } finally {
         rmSync(tempDir, { recursive: true, force: true });
       }
+    }
+  });
+
+  it("enforces that PERMITTED_SCRIPTS is an immutable frozen ReadonlySet", () => {
+    expect(Object.isFrozen(PERMITTED_SCRIPTS)).toBe(true);
+    expect(PERMITTED_SCRIPTS.size).toBe(8);
+  });
+
+  it("fails closed when scripts path itself is a symbolic link (root directory symlink bypass)", () => {
+    const tempDir = mkdtempSync(
+      join(tmpdir(), "life-containment-fail-root-symlink-"),
+    );
+    try {
+      mkdirSync(join(tempDir, "infra"), { recursive: true });
+      writeFileSync(
+        join(tempDir, "infra", "deployment-policy.json"),
+        JSON.stringify({
+          status: "CONTAINED",
+          gates: createValidPolicyGates(),
+        }),
+      );
+
+      // Create external scripts directory with an allowlisted filename
+      const externalScriptsDir = join(tempDir, "external-scripts");
+      mkdirSync(externalScriptsDir, { recursive: true });
+      writeFileSync(
+        join(externalScriptsDir, "check-docs.mjs"),
+        "#!/usr/bin/env node\nconsole.log('benign');\n",
+      );
+
+      // Symlink scripts/ -> external-scripts
+      symlinkSync(externalScriptsDir, join(tempDir, "scripts"));
+
+      const result = scanDeploymentContainment(tempDir);
+      expect(result.valid).toBe(false);
+      expect(
+        result.violations.some(
+          (v) => v.rule === "P0-FORBIDDEN-SYMLINK" && v.path === "scripts",
+        ),
+      ).toBe(true);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails closed when scripts entry is a regular file instead of a directory", () => {
+    const tempDir = mkdtempSync(
+      join(tmpdir(), "life-containment-fail-file-root-"),
+    );
+    try {
+      mkdirSync(join(tempDir, "infra"), { recursive: true });
+      writeFileSync(
+        join(tempDir, "infra", "deployment-policy.json"),
+        JSON.stringify({
+          status: "CONTAINED",
+          gates: createValidPolicyGates(),
+        }),
+      );
+
+      // Create a file named "scripts" instead of a directory
+      writeFileSync(join(tempDir, "scripts"), "#!/bin/bash\nexit 0\n");
+
+      const result = scanDeploymentContainment(tempDir);
+      expect(result.valid).toBe(false);
+      expect(
+        result.violations.some(
+          (v) => v.rule === "P0-NON-REGULAR-FILE" && v.path === "scripts",
+        ),
+      ).toBe(true);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails closed when a subdirectory inside scripts is a symbolic link", () => {
+    const tempDir = mkdtempSync(
+      join(tmpdir(), "life-containment-fail-sub-symlink-"),
+    );
+    try {
+      mkdirSync(join(tempDir, "infra"), { recursive: true });
+      writeFileSync(
+        join(tempDir, "infra", "deployment-policy.json"),
+        JSON.stringify({
+          status: "CONTAINED",
+          gates: createValidPolicyGates(),
+        }),
+      );
+
+      mkdirSync(join(tempDir, "scripts"), { recursive: true });
+
+      const externalSubDir = join(tempDir, "external-sub");
+      mkdirSync(externalSubDir, { recursive: true });
+      writeFileSync(
+        join(externalSubDir, "nested.sh"),
+        "#!/bin/bash\necho test\n",
+      );
+
+      // Symlink scripts/sub -> external-sub
+      symlinkSync(externalSubDir, join(tempDir, "scripts", "sub"));
+
+      const result = scanDeploymentContainment(tempDir);
+      expect(result.valid).toBe(false);
+      expect(
+        result.violations.some(
+          (v) => v.rule === "P0-FORBIDDEN-SYMLINK" && v.path === "scripts/sub",
+        ),
+      ).toBe(true);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
     }
   });
 });

@@ -506,16 +506,34 @@ describe("packages/config deployment-containment scanner", () => {
     }
   });
 
-  it("enforces that permitted script paths cannot be mutated at runtime", () => {
+  it("enforces that permitted script paths are runtime frozen and cannot be mutated", () => {
+    expect(Object.isFrozen(PERMITTED_SCRIPT_PATHS)).toBe(true);
+    expect(PERMITTED_SCRIPT_PATHS).toEqual(EXPECTED_PERMITTED_SCRIPTS);
+    expect(PERMITTED_SCRIPT_PATHS.length).toBe(8);
+
+    // Direct mutation attempts on PERMITTED_SCRIPT_PATHS must throw in strict mode
+    expect(() => {
+      (PERMITTED_SCRIPT_PATHS as unknown as string[]).push("scripts/evil.mjs");
+    }).toThrow();
+
+    expect(() => {
+      (PERMITTED_SCRIPT_PATHS as unknown as string[])[0] = "scripts/evil.mjs";
+    }).toThrow();
+
+    expect(() => {
+      (PERMITTED_SCRIPT_PATHS as unknown as { length: number }).length = 0;
+    }).toThrow();
+
+    // Verify lookup helper remains unmutated
+    expect(isPermittedScript("scripts/evil.mjs")).toBe(false);
+    expect(isPermittedScript("scripts/check-docs.mjs")).toBe(true);
+
+    // Verify getPermittedScripts() returns exact expected paths
     const list = getPermittedScripts();
     expect(list).toEqual(EXPECTED_PERMITTED_SCRIPTS);
-    expect(PERMITTED_SCRIPT_PATHS).toEqual(EXPECTED_PERMITTED_SCRIPTS);
     expect(list.length).toBe(8);
 
-    // Verify non-membership for unapproved script
-    expect(isPermittedScript("scripts/evil.mjs")).toBe(false);
-
-    // Verify that mutating the returned list does not affect internal lookup
+    // Mutating the returned array copy does not affect internal lookup
     (list as string[]).push("scripts/evil.mjs");
     expect(isPermittedScript("scripts/evil.mjs")).toBe(false);
     expect(getPermittedScripts().length).toBe(8);

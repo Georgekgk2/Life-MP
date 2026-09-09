@@ -34,6 +34,12 @@ export type DeploymentPolicyFile = Readonly<{
  * 1. Protected branch enforcement (disallowing unreviewed merges);
  * 2. Independent peer review and explicit operator authorization (reviewDecision);
  * 3. Isolated, trusted CI runners (GitHub-hosted ubuntu-latest).
+ *
+ * NOTE ON ALLOWLISTED SCRIPTS:
+ * The allowlist of approved repository scripts (`PERMITTED_SCRIPT_PATHS`) permits approved script paths
+ * in the repository to pass the containment gate. It enforces containment against remote deployment
+ * commands (SSH, rsync, Docker contexts), but does not isolate arbitrary outbound network calls
+ * (e.g. external generative APIs in generate-marketplace-images.mjs) or local child processes.
  */
 
 export const MANDATORY_POLICY_GATES = [
@@ -46,7 +52,7 @@ export const MANDATORY_POLICY_GATES = [
   "allow_live_fiscalization",
 ] as const;
 
-export const PERMITTED_SCRIPT_PATHS = [
+export const PERMITTED_SCRIPT_PATHS: readonly string[] = Object.freeze([
   "scripts/check-docs.mjs",
   "scripts/generate-marketplace-images.mjs",
   "scripts/generate-pwa-icons.mjs",
@@ -55,7 +61,7 @@ export const PERMITTED_SCRIPT_PATHS = [
   "scripts/with-commerce-migration-test-env.sh",
   "scripts/with-commerce-test-env.sh",
   "scripts/with-local-commerce-env.sh",
-] as const;
+]);
 
 // Private module-scoped set for fast O(1) lookups; not exported to prevent runtime prototype/slot mutations
 const PERMITTED_SCRIPTS_LOOKUP: ReadonlySet<string> = new Set<string>(
@@ -348,7 +354,7 @@ export function scanDeploymentContainment(
                 violations.push({
                   rule: "P0-UNAUTHORIZED-SCRIPT",
                   path: relPath,
-                  message: `Unauthorized script "${relPath}" detected in scripts directory. In contained state, only approved local verification helpers are permitted.`,
+                  message: `Unauthorized script "${relPath}" detected in scripts directory. In contained state, only approved repository scripts are permitted.`,
                 });
               }
 

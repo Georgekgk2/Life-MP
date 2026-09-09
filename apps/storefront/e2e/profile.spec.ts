@@ -1,120 +1,17 @@
 import { test, expect } from "@playwright/test";
-import path from "node:path";
-import fs from "node:fs";
 
-const screenshotsDir = path.resolve(
-  process.cwd(),
-  "../../artifacts/screenshots",
-);
-
-test.beforeAll(() => {
-  if (!fs.existsSync(screenshotsDir)) {
-    fs.mkdirSync(screenshotsDir, { recursive: true });
-  }
-});
-
-test.describe("Customer Profile & Preferences E2E", () => {
-  test("navigates to profile, switches tabs, toggles notifications, and edits personal details", async ({
+test.describe("Customer Profile Route Security & Containment E2E", () => {
+  test("fails closed with 404 Not Found in demonstration mode", async ({
     page,
-  }, testInfo) => {
-    // 1. Visit homepage and open the responsive profile action
-    await page.goto("/");
-    const menuButton = page.getByRole("button", { name: "Меню" });
-    if (await menuButton.isVisible()) {
-      await menuButton.click();
-    }
-    const profileLink = page.getByRole("link", {
-      name: /Особистий кабінет/,
-    });
-    await expect(profileLink).toBeVisible();
-    await profileLink.click();
+  }) => {
+    // 1. Attempt to visit customer profile directly
+    const res = await page.goto("/profile");
+    expect(res?.status()).toBe(404);
 
-    // 2. Verify profile page loaded
-    await expect(page).toHaveURL("/profile");
-    await expect(page.locator("h1")).toContainText("Особистий кабінет покупця");
-
-    // 3. Verify user overview card
-    await expect(page.getByText("Олена Мельник")).toBeVisible();
-    await expect(page.getByText("Поціновувач крафту")).toBeVisible();
-
-    // 4. Capture screenshot of default saved items tab
-    await page.screenshot({
-      caret: "initial",
-      path: path.join(
-        screenshotsDir,
-        `profile-saved-${testInfo.project.name}.png`,
-      ),
-      fullPage: true,
-    });
-
-    // 5. Verify order history is a server-backed, fail-closed tab.
-    const ordersTabBtn = page.getByRole("button", {
-      name: /Мої замовлення/i,
-    });
-    await expect(ordersTabBtn).toBeVisible();
-    await ordersTabBtn.click({ force: true });
-    await expect(
-      page.getByRole("heading", { name: "Моя серверна історія замовлень" }),
-    ).toBeVisible();
-    await expect(
-      page.getByText(/sandbox-режимі|облікового запису покупця/i),
-    ).toBeVisible();
-
-    // 6. Switch to Favorite Workshops tab
-    const workshopsTabBtn = page.getByRole("button", {
-      name: /Улюблені майстерні/i,
-    });
-    await expect(workshopsTabBtn).toBeVisible();
-    await workshopsTabBtn.click({ force: true });
-
-    await expect(page.getByText("Майстерня «Глина та Світло»")).toBeVisible();
-    await expect(page.getByText("Лляне Ткацтво «Берегиня»")).toBeVisible();
-
-    // 7. Switch to Notifications tab and toggle preferences
-    const notifsTabBtn = page.getByRole("button", { name: /Сповіщення/i });
-    await expect(notifsTabBtn).toBeVisible();
-    await notifsTabBtn.click({ force: true });
-
-    await expect(page.getByText("Налаштування сповіщень")).toBeVisible();
-    await expect(page.getByText("Нові крафтові вироби")).toBeVisible();
-
-    // Capture screenshot of notifications tab
-    await page.screenshot({
-      caret: "initial",
-      path: path.join(
-        screenshotsDir,
-        `profile-notifications-${testInfo.project.name}.png`,
-      ),
-      fullPage: true,
-    });
-
-    // 8. Switch to Personal Details tab and edit profile
-    const detailsTabBtn = page.getByRole("button", { name: /Особисті дані/i });
-    await expect(detailsTabBtn).toBeVisible();
-    await detailsTabBtn.click({ force: true });
-
-    await expect(
-      page.getByRole("heading", { name: "Особисті дані" }),
-    ).toBeVisible();
-
-    // Edit city
-    await page.fill("#profile-city", "Львів");
-    const saveBtn = page.getByRole("button", { name: /Зберегти зміни/i });
-    await saveBtn.click({ force: true });
-
-    // Verify success message
-    await expect(
-      page.getByText("Дані профілю успішно оновлено!"),
-    ).toBeVisible();
-
-    // Capture screenshot of details tab
-    await page.screenshot({
-      caret: "initial",
-      path: path.join(
-        screenshotsDir,
-        `profile-details-${testInfo.project.name}.png`,
-      ),
-      fullPage: true,
-    });
+    // 2. Sensitive customer profile headings and controls are completely absent
+    await expect(page.locator("h1")).toHaveCount(0);
+    await expect(page.locator("body")).not.toContainText(
+      "Особистий кабінет покупця",
+    );
   });
 });

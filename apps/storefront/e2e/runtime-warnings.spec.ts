@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Storefront runtime diagnostics", () => {
-  test("has no browser console warnings, errors, or uncaught page errors", async ({
+  test("has no browser console warnings, errors, or uncaught page errors on public routes", async ({
     page,
   }) => {
     const runtimeDiagnostics: string[] = [];
@@ -16,9 +16,13 @@ test.describe("Storefront runtime diagnostics", () => {
     });
 
     for (const route of [
-      "/vendor/products/new",
-      "/catalog/odiah/futbolka-svitlo",
-      "/moderation",
+      "/",
+      "/catalog",
+      "/stories",
+      "/events",
+      "/charity",
+      "/partners",
+      "/join-as-artisan",
     ]) {
       await page.goto(route);
       await expect(page.locator("body")).toBeVisible();

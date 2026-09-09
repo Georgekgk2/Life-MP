@@ -4,6 +4,8 @@
 # Scope: Build tool native binary (@esbuild linux-arm64/linux-x64 @ 0.25.0)
 # Reason: Upstream Go standard library CVEs statically compiled into esbuild binary.
 # Exposure: Zero. esbuild is a build-time bundler tool, not exposed to user traffic or production runtime.
+# Owner / Sign-off: Life-MP Security Owner
+# Risk Acceptance: Accepted for build-time execution only; esbuild binary is not invoked during production HTTP handling.
 # TTL / Review Date: 2026-11-19 (Quarterly security audit review trigger)
 # Review Trigger: Any bump to esbuild or tsx dependencies in pnpm-workspace.yaml
 # =============================================================================
@@ -31,7 +33,3 @@ CVE-2026-56858
 CVE-2026-56859
 CVE-2026-56860
 CVE-2026-56862
-
-# Upstream js-yaml omap quadratic regex (patched via override to ^4.1.0):
-CVE-2026-59870
-GHSA-5p4m-2wfm-xmqj

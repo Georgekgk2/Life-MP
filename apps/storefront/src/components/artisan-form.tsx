@@ -243,6 +243,7 @@ export function ArtisanForm() {
 
   return (
     <form
+      method="post"
       onSubmit={handleSubmit}
       noValidate
       className="card artisan-form"

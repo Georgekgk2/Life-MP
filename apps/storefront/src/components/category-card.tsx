@@ -12,6 +12,7 @@ export function CategoryCard({ category }: CategoryCardProps) {
       <div className="card__visual category-card__visual">
         <CardImage
           src={category.imageSrc}
+          fallbackSrc="/images/categories/category-dim.webp"
           alt={`Ілюстрація категорії «${category.name}»`}
         />
       </div>

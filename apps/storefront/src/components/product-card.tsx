@@ -15,6 +15,7 @@ export function ProductCard({ product }: ProductCardProps) {
       <div className="card__visual product-card__visual">
         <CardImage
           src={product.imageSrc}
+          fallbackSrc="/images/products/chashka-ranok.webp"
           alt={`Фото виробу «${product.name}»`}
         />
       </div>

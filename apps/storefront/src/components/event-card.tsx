@@ -12,6 +12,7 @@ export function EventCard({ event }: EventCardProps) {
       <div className="card__visual event-card__visual">
         <CardImage
           src={event.imageSrc}
+          fallbackSrc="/images/events/event-maisteria.webp"
           alt={`Ілюстрація події «${event.title}»`}
         />
       </div>

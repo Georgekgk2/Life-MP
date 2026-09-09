@@ -4,7 +4,7 @@
 # =============================================================================
 
 # --- Stage 1: Install dependencies ---
-FROM node:22-alpine AS deps
+FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS deps
 RUN corepack enable && corepack prepare pnpm@11.4.0 --activate
 WORKDIR /app
 
@@ -18,7 +18,7 @@ COPY packages/config/package.json ./packages/config/
 RUN pnpm install --frozen-lockfile
 
 # --- Stage 2: Build ---
-FROM node:22-alpine AS builder
+FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS builder
 RUN corepack enable && corepack prepare pnpm@11.4.0 --activate
 WORKDIR /app
 
@@ -34,8 +34,9 @@ RUN pnpm --filter @life/types build
 RUN pnpm --filter @life/config build
 
 # --- Stage 3: Production runtime ---
-FROM node:22-alpine AS runner
-RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx /root/.cache
+FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS runner
+RUN apk upgrade --no-cache && \
+    rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx /root/.cache
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 medusa
 WORKDIR /app

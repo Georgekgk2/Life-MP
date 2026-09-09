@@ -39,7 +39,7 @@ function generateOrderNumber(): string {
 }
 
 function generateTrackingNumber(): string {
-  const prefix = "2045";
+  const prefix = "DEMO-NP-";
   const randomBody = Math.floor(1000000000 + Math.random() * 9000000000);
   return `${prefix}${randomBody}`;
 }
@@ -51,9 +51,9 @@ function getInitialStoredState(): StoredOrderState {
         id: "ord_demo_parent_1",
         orderNumber: "LF-20260819-1001",
         customer: {
-          fullName: "Олена Мельник",
-          phone: "+380 67 123 45 67",
-          email: "olena@example.ua",
+          fullName: "Демо Покупець",
+          phone: "+380 00 000 00 00",
+          email: "demo-buyer@example.internal",
           city: "Київ",
           novaPoshtaBranch: "Відділення №42 (вул. Саксаганського, 102)",
           paymentMethod: "sandbox_escrow",
@@ -111,7 +111,7 @@ function getInitialStoredState(): StoredOrderState {
         platformCommissionUah: 84,
         vendorPayoutUah: 756,
         status: "shipped",
-        trackingNumber: "20450819001122",
+        trackingNumber: "DEMO-NP-0000000001",
         trackingStatusCode: 4,
         trackingStatusName: "Посилка прямує до отримувача",
         createdAt: "2026-08-19T10:00:00.000Z",
@@ -138,7 +138,7 @@ function getInitialStoredState(): StoredOrderState {
         platformCommissionUah: 39,
         vendorPayoutUah: 351,
         status: "delivered",
-        trackingNumber: "20450819003344",
+        trackingNumber: "DEMO-NP-0000000002",
         trackingStatusCode: 9,
         trackingStatusName: "Посилку отримано та оплачено (Вручено)",
         createdAt: "2026-08-19T10:00:00.000Z",

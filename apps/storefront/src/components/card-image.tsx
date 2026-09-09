@@ -4,18 +4,26 @@ import { useEffect, useState } from "react";
 
 type CardImageProps = Readonly<{
   src?: string | undefined;
+  fallbackSrc?: string | undefined;
   alt: string;
   loading?: "lazy" | "eager";
 }>;
 
-export function CardImage({ src, alt, loading = "lazy" }: CardImageProps) {
-  const [currentSrc, setCurrentSrc] = useState(src);
-  const [hasError, setHasError] = useState(!src);
+export function CardImage({
+  src,
+  fallbackSrc,
+  alt,
+  loading = "lazy",
+}: CardImageProps) {
+  const initialSrc = src || fallbackSrc;
+  const [currentSrc, setCurrentSrc] = useState(initialSrc);
+  const [hasError, setHasError] = useState(!initialSrc);
 
   useEffect(() => {
-    setCurrentSrc(src);
-    setHasError(!src);
-  }, [src]);
+    const nextSrc = src || fallbackSrc;
+    setCurrentSrc(nextSrc);
+    setHasError(!nextSrc);
+  }, [src, fallbackSrc]);
 
   if (!currentSrc || hasError) {
     return (
@@ -39,7 +47,13 @@ export function CardImage({ src, alt, loading = "lazy" }: CardImageProps) {
       alt={alt}
       loading={loading}
       decoding="async"
-      onError={() => setHasError(true)}
+      onError={() => {
+        if (fallbackSrc && currentSrc !== fallbackSrc) {
+          setCurrentSrc(fallbackSrc);
+        } else {
+          setHasError(true);
+        }
+      }}
     />
   );
 }

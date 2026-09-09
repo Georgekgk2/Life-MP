@@ -12,11 +12,11 @@ export function CheckoutView() {
   const { items, vendorGroups, totalItems, totalAmountUah } = useCart();
 
   const [formData, setFormData] = useState<CheckoutCustomerInput>({
-    fullName: "Олена Мельник",
-    phone: "+380 67 123 45 67",
-    email: "olena.melnyk@example.ua",
-    city: "Київ",
-    novaPoshtaBranch: "Відділення №42 (вул. Саксаганського, 102)",
+    fullName: "",
+    phone: "",
+    email: "",
+    city: "",
+    novaPoshtaBranch: "",
     paymentMethod: "sandbox_escrow",
     comment: "",
   });
@@ -100,7 +100,7 @@ export function CheckoutView() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit}>
+      <form method="post" onSubmit={handleSubmit}>
         <div
           style={{
             display: "grid",

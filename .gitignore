@@ -68,3 +68,7 @@ docker-compose.local.yaml
 tmp/
 temp/
 .cache/
+.worktrees/
+\!artifacts/
+/artifacts/screenshots/
+docs-infra/

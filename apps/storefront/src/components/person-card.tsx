@@ -12,6 +12,7 @@ export function PersonCard({ person }: PersonCardProps) {
       <div className="card__visual person-card__visual">
         <CardImage
           src={person.imageSrc}
+          fallbackSrc="/images/people/person-olena.webp"
           alt={`Портрет учасника спільноти: ${person.name}`}
         />
       </div>

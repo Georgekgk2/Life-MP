@@ -1,38 +1,5 @@
-import type { Metadata } from "next";
-import { ModerationDashboard, SectionHeading } from "@/components";
-
-export const metadata: Metadata = {
-  title: "Кабінет модератора",
-  description:
-    "Панель модерації та верифікації заявок майстерень до каталогу маркетплейсу Life-MP.",
-};
+import { notFound } from "next/navigation";
 
 export default function ModerationPage() {
-  return (
-    <div className="page-shell page-section page-section--spacious">
-      <SectionHeading
-        level="h1"
-        eyebrow="Внутрішній контроль та комплаєнс"
-        title="Кабінет модератора платформи"
-        description="Панель розгляду анкет українських майстерень, перевірки автентичності складу та допуску виробів до каталогу Life-MP."
-      />
-
-      <aside
-        className="notice"
-        aria-label="Правила модерації"
-        style={{ marginTop: "1.5rem", marginBottom: "2rem" }}
-      >
-        <h2 className="notice__title">
-          Режим комплаєнс-контролю (Phase P0 Containment)
-        </h2>
-        <p>
-          Розгляд заявок здійснюється уповноваженими ролями платформи. Рішення
-          модератора фіксуються в журналі аудиту та синхронізуються з базою
-          даних Medusa v2 (@life/commerce).
-        </p>
-      </aside>
-
-      <ModerationDashboard />
-    </div>
-  );
+  notFound();
 }

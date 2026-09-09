@@ -86,6 +86,7 @@ export function SiteHeader() {
               <Link
                 className="button button--secondary"
                 href="/profile"
+                prefetch={false}
                 onClick={closeMenu}
               >
                 Особистий кабінет
@@ -143,6 +144,7 @@ export function SiteHeader() {
             </button>
             <Link
               href="/profile"
+              prefetch={false}
               className="site-header__action site-header__profile-link"
               aria-label="Особистий кабінет покупця"
             >

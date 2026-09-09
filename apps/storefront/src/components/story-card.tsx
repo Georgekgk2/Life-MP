@@ -12,6 +12,7 @@ export function StoryCard({ story }: StoryCardProps) {
       <div className="card__visual story-card__visual">
         <CardImage
           src={story.imageSrc}
+          fallbackSrc="/images/stories/story-politsia.webp"
           alt={`Ілюстрація історії «${story.title}»`}
         />
       </div>

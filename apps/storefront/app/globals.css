@@ -683,8 +683,8 @@
     display: grid;
     gap: var(--space-2);
     padding: var(--space-4);
-    border-left: var(--space-1) solid var(--color-primary);
-    border-radius: var(--radius-sm);
+    border: var(--border-width) solid var(--color-border);
+    border-radius: var(--radius-md);
     background: var(--color-primary-quiet);
     color: var(--color-ink-subtle);
     font-size: var(--text-sm);
@@ -1596,6 +1596,17 @@
     color: var(--color-accent-strong);
   }
 
+  .page-section--accent .partner-card .card__eyebrow {
+    color: var(--color-accent-strong);
+  }
+
+  .page-section--accent .partner-card .card__title {
+    color: var(--color-ink);
+  }
+
+  .page-section--accent .partner-card .card__description {
+    color: var(--color-ink-subtle);
+  }
   .button,
   button.button,
   a.button {

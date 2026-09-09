@@ -268,6 +268,7 @@ export function VendorProductForm() {
 
   return (
     <form
+      method="post"
       onSubmit={handleSubmit}
       noValidate
       className="card vendor-product-form"

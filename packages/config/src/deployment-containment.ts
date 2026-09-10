@@ -6,6 +6,7 @@ import {
   realpathSync,
 } from "node:fs";
 import { join } from "node:path";
+import { load as loadYaml } from "js-yaml";
 
 export type DeploymentContainmentViolation = Readonly<{
   rule: string;
@@ -103,187 +104,6 @@ export const FORBIDDEN_SCRIPT_FILENAMES: readonly string[] = Object.freeze([
   "rollback.sh",
   "deploy-colocated-prod.sh",
 ]);
-
-type ParsedWorkflowStep = {
-  uses?: string | undefined;
-  run?: string | undefined;
-};
-
-type ParsedWorkflowJob = {
-  id: string;
-  permissions?: Record<string, string> | string | undefined;
-  steps: ParsedWorkflowStep[];
-};
-
-type ParsedWorkflowDoc = {
-  on?: Record<string, unknown> | string | undefined;
-  permissions?: Record<string, string> | string | undefined;
-  jobs: Record<string, ParsedWorkflowJob>;
-};
-
-function parseWorkflowYaml(content: string): ParsedWorkflowDoc {
-  const lines = content.split("\n");
-  const doc: ParsedWorkflowDoc = { jobs: {} };
-  let currentSection: "on" | "permissions" | "jobs" | null = null;
-  let currentJob: ParsedWorkflowJob | null = null;
-  let inJobSteps = false;
-  let currentStep: ParsedWorkflowStep | null = null;
-  let inJobPermissions = false;
-  let inPushBranches = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    const raw = lines[i] ?? "";
-    const trimmed = raw.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-
-    const indent = raw.search(/\S/);
-
-    if (indent === 0) {
-      currentSection = null;
-      currentJob = null;
-      inJobSteps = false;
-      inJobPermissions = false;
-      inPushBranches = false;
-
-      if (trimmed.startsWith("on:")) {
-        currentSection = "on";
-        const inline = trimmed.slice(3).trim();
-        if (inline) {
-          doc.on = inline;
-        } else {
-          doc.on = {};
-        }
-      } else if (trimmed.startsWith("permissions:")) {
-        currentSection = "permissions";
-        const inline = trimmed.slice(12).trim();
-        if (inline) doc.permissions = inline;
-      } else if (trimmed.startsWith("jobs:")) {
-        currentSection = "jobs";
-      }
-      continue;
-    }
-
-    if (currentSection === "on") {
-      if (typeof doc.on !== "object" || doc.on === null) doc.on = {};
-      const onObj = doc.on as Record<string, unknown>;
-
-      if (indent === 2) {
-        inPushBranches = false;
-        const colonIdx = trimmed.indexOf(":");
-        const trigger =
-          colonIdx > -1 ? trimmed.slice(0, colonIdx).trim() : trimmed;
-        onObj[trigger] = {};
-        if (colonIdx > -1) {
-          const rest = trimmed.slice(colonIdx + 1).trim();
-          if (rest) onObj[trigger] = rest;
-        }
-      } else if (indent === 4) {
-        if (trimmed.startsWith("branches:")) {
-          inPushBranches = true;
-          const rest = trimmed.slice(9).trim();
-          if (rest.startsWith("[") && rest.endsWith("]")) {
-            const branches = rest
-              .slice(1, -1)
-              .split(",")
-              .map((s) => s.trim().replace(/['"]/g, ""))
-              .filter(Boolean);
-            const pushObj = (onObj["push"] as Record<string, unknown>) || {};
-            pushObj["branches"] = branches;
-            onObj["push"] = pushObj;
-          } else {
-            const pushObj = (onObj["push"] as Record<string, unknown>) || {};
-            pushObj["branches"] = [];
-            onObj["push"] = pushObj;
-          }
-        }
-      } else if (indent === 6 && inPushBranches) {
-        if (trimmed.startsWith("- ")) {
-          const pushObj = (onObj["push"] as Record<string, unknown>) || {};
-          const branches = (pushObj["branches"] as string[]) || [];
-          branches.push(trimmed.slice(2).trim().replace(/['"]/g, ""));
-          pushObj["branches"] = branches;
-          onObj["push"] = pushObj;
-        }
-      }
-    } else if (currentSection === "permissions") {
-      if (indent === 2) {
-        const colonIdx = trimmed.indexOf(":");
-        if (colonIdx > -1) {
-          const k = trimmed.slice(0, colonIdx).trim();
-          const v = trimmed.slice(colonIdx + 1).trim();
-          if (typeof doc.permissions !== "object" || doc.permissions === null) {
-            doc.permissions = {};
-          }
-          (doc.permissions as Record<string, string>)[k] = v;
-        }
-      }
-    } else if (currentSection === "jobs") {
-      if (indent === 2) {
-        const colonIdx = trimmed.indexOf(":");
-        const jobName =
-          colonIdx > -1 ? trimmed.slice(0, colonIdx).trim() : trimmed;
-        currentJob = { id: jobName, steps: [] };
-        doc.jobs[jobName] = currentJob;
-        inJobSteps = false;
-        inJobPermissions = false;
-      } else if (indent === 4 && currentJob) {
-        if (trimmed.startsWith("permissions:")) {
-          inJobPermissions = true;
-          inJobSteps = false;
-          const inline = trimmed.slice(12).trim();
-          if (inline) currentJob.permissions = inline;
-        } else if (trimmed.startsWith("steps:")) {
-          inJobSteps = true;
-          inJobPermissions = false;
-        }
-      } else if (indent === 6 && currentJob) {
-        if (inJobPermissions) {
-          const colonIdx = trimmed.indexOf(":");
-          if (colonIdx > -1) {
-            const k = trimmed.slice(0, colonIdx).trim();
-            const v = trimmed.slice(colonIdx + 1).trim();
-            if (
-              typeof currentJob.permissions !== "object" ||
-              currentJob.permissions === null
-            ) {
-              currentJob.permissions = {};
-            }
-            (currentJob.permissions as Record<string, string>)[k] = v;
-          }
-        } else if (inJobSteps) {
-          if (trimmed.startsWith("- uses:")) {
-            const rawUses = trimmed.slice(7).trim();
-            const uses = rawUses.split("#")[0]?.trim();
-            const newStep: ParsedWorkflowStep = { uses };
-            currentStep = newStep;
-            currentJob.steps.push(newStep);
-          } else if (trimmed.startsWith("- run:")) {
-            const newStep: ParsedWorkflowStep = {
-              run: trimmed.slice(6).trim(),
-            };
-            currentStep = newStep;
-            currentJob.steps.push(newStep);
-          } else if (trimmed.startsWith("- name:")) {
-            const newStep: ParsedWorkflowStep = {};
-            currentStep = newStep;
-            currentJob.steps.push(newStep);
-          }
-        }
-      } else if (indent > 6 && currentJob && inJobSteps && currentStep) {
-        if (trimmed.startsWith("uses:")) {
-          const rawUses = trimmed.slice(5).trim();
-          const uses = rawUses.split("#")[0]?.trim();
-          currentStep.uses = uses ?? undefined;
-        } else if (trimmed.startsWith("run:")) {
-          currentStep.run = trimmed.slice(4).trim();
-        } else if (currentStep.run && trimmed) {
-          currentStep.run += "\n" + trimmed;
-        }
-      }
-    }
-  }
-  return doc;
-}
 
 function isValidCalendarDate(dateStr: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
@@ -448,14 +268,42 @@ export function scanDeploymentContainment(
           });
         }
 
-        const doc = parseWorkflowYaml(content);
+        let doc: unknown;
+        try {
+          doc = loadYaml(content);
+        } catch (err) {
+          violations.push({
+            rule: "P0-WORKFLOW-YAML-INVALID",
+            path: relPath,
+            message: `Failed to parse workflow YAML: ${String(err)}`,
+          });
+          if (/packages:\s*write/.test(content)) {
+            violations.push({
+              rule: "P0-NO-PACKAGES-WRITE",
+              path: relPath,
+              message: `Forbidden "packages: write" permission found in ${relPath}.`,
+            });
+          }
+          continue;
+        }
 
-        if (!doc || typeof doc !== "object") continue;
+        if (!doc || typeof doc !== "object" || Array.isArray(doc)) {
+          violations.push({
+            rule: "P0-WORKFLOW-YAML-INVALID",
+            path: relPath,
+            message: `Workflow YAML in ${relPath} must resolve to a mapping object.`,
+          });
+          continue;
+        }
+
+        const docRecord = doc as Record<string, unknown>;
+
         if (
-          doc["on"] &&
-          (doc["on"] === "pull_request_target" ||
-            (typeof doc["on"] === "object" &&
-              "pull_request_target" in (doc["on"] as Record<string, unknown>)))
+          docRecord["on"] &&
+          (docRecord["on"] === "pull_request_target" ||
+            (typeof docRecord["on"] === "object" &&
+              "pull_request_target" in
+                (docRecord["on"] as Record<string, unknown>)))
         ) {
           violations.push({
             rule: "P0-NO-PR-TARGET",
@@ -471,7 +319,11 @@ export function scanDeploymentContainment(
           if (typeof permVal === "string") {
             return permVal === "write-all";
           }
-          if (permVal && typeof permVal === "object") {
+          if (
+            permVal &&
+            typeof permVal === "object" &&
+            !Array.isArray(permVal)
+          ) {
             const permObj = permVal as Record<string, unknown>;
             if (targetPerm) {
               return permObj[targetPerm] === "write";
@@ -482,17 +334,19 @@ export function scanDeploymentContainment(
         };
 
         const topLevelHasPackagesWrite = hasWritePermission(
-          doc["permissions"],
+          docRecord["permissions"],
           "packages",
         );
-        const docJobs = doc["jobs"] as Record<string, unknown> | undefined;
+        const docJobs = docRecord["jobs"];
         const anyJobHasPackagesWrite =
           docJobs &&
           typeof docJobs === "object" &&
-          Object.values(docJobs).some(
+          !Array.isArray(docJobs) &&
+          Object.values(docJobs as Record<string, unknown>).some(
             (j: unknown) =>
               j &&
               typeof j === "object" &&
+              !Array.isArray(j) &&
               hasWritePermission(
                 (j as Record<string, unknown>)["permissions"],
                 "packages",
@@ -514,7 +368,7 @@ export function scanDeploymentContainment(
         } else if (policyStatus === "CONTAINED_PHASE_P2") {
           if (file === "release-images.yml") {
             // 1. Top-level permissions check
-            if (hasWritePermission(doc["permissions"])) {
+            if (hasWritePermission(docRecord["permissions"])) {
               violations.push({
                 rule: "P2-TOPLEVEL-WRITE-PERMISSIONS",
                 path: relPath,
@@ -523,15 +377,16 @@ export function scanDeploymentContainment(
             }
 
             // 2. Strict Trigger Validation
-            const docOn = doc["on"] as Record<string, unknown> | undefined;
-            if (!docOn || typeof docOn !== "object") {
+            const docOn = docRecord["on"];
+            if (!docOn || typeof docOn !== "object" || Array.isArray(docOn)) {
               violations.push({
                 rule: "P2-FORBIDDEN-TRIGGER",
                 path: relPath,
                 message: `Workflow ${relPath} trigger must be an object specifying push on main.`,
               });
             } else {
-              const triggerKeys = Object.keys(docOn);
+              const onObj = docOn as Record<string, unknown>;
+              const triggerKeys = Object.keys(onObj);
               if (triggerKeys.length !== 1 || triggerKeys[0] !== "push") {
                 violations.push({
                   rule: "P2-FORBIDDEN-TRIGGER",
@@ -541,69 +396,140 @@ export function scanDeploymentContainment(
                   )}). In Phase P2, triggers must be restricted strictly to push on main.`,
                 });
               } else {
-                const pushConfig = docOn["push"] as
-                  Record<string, unknown> | undefined;
+                const pushConfig = onObj["push"];
                 if (
                   !pushConfig ||
                   typeof pushConfig !== "object" ||
-                  !Array.isArray(pushConfig["branches"])
+                  Array.isArray(pushConfig)
                 ) {
                   violations.push({
-                    rule: "P2-FORBIDDEN-BRANCH",
+                    rule: "P2-FORBIDDEN-TRIGGER",
                     path: relPath,
                     message: `Workflow ${relPath} push trigger must specify branches: ["main"].`,
                   });
-                } else if (
-                  pushConfig["branches"].length !== 1 ||
-                  pushConfig["branches"][0] !== "main"
-                ) {
-                  violations.push({
-                    rule: "P2-FORBIDDEN-BRANCH",
-                    path: relPath,
-                    message: `Workflow ${relPath} push trigger is configured for branches [${(
-                      pushConfig["branches"] as string[]
-                    ).join(", ")}]. Only ["main"] is permitted.`,
-                  });
+                } else {
+                  const pushRecord = pushConfig as Record<string, unknown>;
+                  const pushKeys = Object.keys(pushRecord);
+                  if (pushKeys.length !== 1 || pushKeys[0] !== "branches") {
+                    violations.push({
+                      rule: "P2-FORBIDDEN-TRIGGER",
+                      path: relPath,
+                      message: `Workflow ${relPath} push trigger contains unapproved filters (${pushKeys
+                        .filter((k) => k !== "branches")
+                        .join(
+                          ", ",
+                        )}). In Phase P2, push triggers must contain only "branches: [main]".`,
+                    });
+                  }
+                  const branches = pushRecord["branches"];
+                  if (
+                    !Array.isArray(branches) ||
+                    branches.length !== 1 ||
+                    branches[0] !== "main"
+                  ) {
+                    violations.push({
+                      rule: "P2-FORBIDDEN-BRANCH",
+                      path: relPath,
+                      message: `Workflow ${relPath} push trigger is configured for branches [${
+                        Array.isArray(branches)
+                          ? branches.join(", ")
+                          : String(branches)
+                      }]. Only ["main"] is permitted.`,
+                    });
+                  }
                 }
               }
             }
 
             // 3. Job-Level Permissions & Steps Validation
-            if (docJobs && typeof docJobs === "object") {
-              for (const [jobId, rawJobData] of Object.entries(docJobs)) {
-                if (!rawJobData || typeof rawJobData !== "object") continue;
+            let foundCommercePush = false;
+            let foundStorefrontPush = false;
+
+            if (
+              !docJobs ||
+              typeof docJobs !== "object" ||
+              Array.isArray(docJobs)
+            ) {
+              violations.push({
+                rule: "P0-WORKFLOW-YAML-INVALID",
+                path: relPath,
+                message: `Jobs in ${relPath} must be an object.`,
+              });
+            } else {
+              const jobsObj = docJobs as Record<string, unknown>;
+              for (const [jobId, rawJobData] of Object.entries(jobsObj)) {
+                if (
+                  !rawJobData ||
+                  typeof rawJobData !== "object" ||
+                  Array.isArray(rawJobData)
+                ) {
+                  violations.push({
+                    rule: "P0-WORKFLOW-YAML-INVALID",
+                    path: relPath,
+                    message: `Job "${jobId}" in ${relPath} must be an object.`,
+                  });
+                  continue;
+                }
                 const jobData = rawJobData as Record<string, unknown>;
 
+                // Ban job-level reusable workflows
+                if ("uses" in jobData && typeof jobData["uses"] === "string") {
+                  violations.push({
+                    rule: "P2-FORBIDDEN-REUSABLE-WORKFLOW",
+                    path: relPath,
+                    message: `Job "${jobId}" in ${relPath} references reusable workflow "${jobData["uses"]}". Reusable workflows are strictly forbidden in Phase P2 release pipeline.`,
+                  });
+                }
+
                 if (jobId === "publish") {
-                  const jobPerms = jobData["permissions"] as
-                    Record<string, unknown> | undefined;
-                  if (jobPerms && typeof jobPerms === "object") {
-                    for (const [permKey, permVal] of Object.entries(jobPerms)) {
-                      if (
-                        permKey === "packages" ||
-                        permKey === "attestations" ||
-                        permKey === "id-token"
-                      ) {
-                        if (permVal !== "write") {
-                          violations.push({
-                            rule: "P2-PUBLISH-PERMISSION-MISMATCH",
-                            path: relPath,
-                            message: `Job "publish" permission "${permKey}" must be "write", got "${permVal}".`,
-                          });
-                        }
-                      } else if (permKey === "contents") {
-                        if (permVal !== "read") {
-                          violations.push({
-                            rule: "P2-PUBLISH-FORBIDDEN-PERMISSIONS",
-                            path: relPath,
-                            message: `Job "publish" permission "${permKey}" must be "read", got "${permVal}".`,
-                          });
-                        }
-                      } else {
+                  const jobPerms = jobData["permissions"];
+                  if (
+                    !jobPerms ||
+                    typeof jobPerms !== "object" ||
+                    Array.isArray(jobPerms)
+                  ) {
+                    violations.push({
+                      rule: "P2-PUBLISH-FORBIDDEN-PERMISSIONS",
+                      path: relPath,
+                      message: `Job "publish" permissions must be a scoped object, got "${String(
+                        jobPerms,
+                      )}".`,
+                    });
+                  } else {
+                    const permsObj = jobPerms as Record<string, unknown>;
+                    const expectedPerms: Record<string, string> = {
+                      contents: "read",
+                      packages: "write",
+                      attestations: "write",
+                      "id-token": "write",
+                    };
+                    for (const [permKey, permVal] of Object.entries(permsObj)) {
+                      if (!(permKey in expectedPerms)) {
                         violations.push({
                           rule: "P2-PUBLISH-FORBIDDEN-PERMISSIONS",
                           path: relPath,
-                          message: `Job "publish" contains unapproved permission "${permKey}: ${permVal}".`,
+                          message: `Job "publish" contains unapproved permission "${permKey}: ${String(
+                            permVal,
+                          )}".`,
+                        });
+                      } else if (permVal !== expectedPerms[permKey]) {
+                        violations.push({
+                          rule: "P2-PUBLISH-FORBIDDEN-PERMISSIONS",
+                          path: relPath,
+                          message: `Job "publish" permission "${permKey}" must be "${
+                            expectedPerms[permKey]
+                          }", got "${String(permVal)}".`,
+                        });
+                      }
+                    }
+                    for (const [reqKey, reqVal] of Object.entries(
+                      expectedPerms,
+                    )) {
+                      if (!(reqKey in permsObj)) {
+                        violations.push({
+                          rule: "P2-PUBLISH-PERMISSION-MISMATCH",
+                          path: relPath,
+                          message: `Job "publish" is missing required permission "${reqKey}: ${reqVal}".`,
                         });
                       }
                     }
@@ -622,7 +548,13 @@ export function scanDeploymentContainment(
                 const steps = jobData["steps"];
                 if (Array.isArray(steps)) {
                   for (const step of steps) {
-                    if (!step || typeof step !== "object") continue;
+                    if (
+                      !step ||
+                      typeof step !== "object" ||
+                      Array.isArray(step)
+                    ) {
+                      continue;
+                    }
                     const stepObj = step as Record<string, unknown>;
 
                     if (typeof stepObj["uses"] === "string") {
@@ -654,15 +586,63 @@ export function scanDeploymentContainment(
                       }
                     }
 
-                    // 5. Inspect step.run for any docker push commands
+                    // 5. Inspect step.run for any container publishing commands
                     if (typeof stepObj["run"] === "string") {
-                      const pushMatches = stepObj["run"].matchAll(
-                        /docker\s+push\s+([^\s\n\r]+)/g,
+                      const runScript = stepObj["run"];
+
+                      // Check for forbidden container publishing commands
+                      const forbiddenPublishPatterns = [
+                        {
+                          pattern: /buildx\s+.*--push/i,
+                          name: "docker buildx ... --push",
+                        },
+                        {
+                          pattern: /--push\s+.*buildx/i,
+                          name: "docker buildx ... --push",
+                        },
+                        {
+                          pattern: /docker\s+image\s+push/i,
+                          name: "docker image push",
+                        },
+                        { pattern: /podman\s+push/i, name: "podman push" },
+                        { pattern: /crane\s+push/i, name: "crane push" },
+                        { pattern: /oras\s+push/i, name: "oras push" },
+                        { pattern: /skopeo\s+copy/i, name: "skopeo copy" },
+                      ];
+                      for (const forbidden of forbiddenPublishPatterns) {
+                        if (forbidden.pattern.test(runScript)) {
+                          violations.push({
+                            rule: "P2-FORBIDDEN-PUBLISH-COMMAND",
+                            path: relPath,
+                            message: `Forbidden container publishing command "${forbidden.name}" detected in job "${jobId}" in ${relPath}. Only explicit docker push to approved repositories is permitted.`,
+                          });
+                        }
+                      }
+
+                      // Check docker push commands
+                      const pushMatches = runScript.matchAll(
+                        /docker\s+push\s+([^\n\r;]+)/g,
                       );
                       for (const pushMatch of pushMatches) {
-                        const pushedTarget = pushMatch[1] ?? "";
+                        const rawTarget = (pushMatch[1] ?? "").trim();
+                        const cleanTarget = rawTarget.replace(/['"]/g, "");
                         const repoName =
-                          pushedTarget.split(":")[0]?.split("@")[0] ?? "";
+                          cleanTarget.split(":")[0]?.split("@")[0]?.trim() ??
+                          "";
+
+                        if (
+                          repoName.startsWith("$") ||
+                          repoName.includes("${") ||
+                          repoName.includes("$(")
+                        ) {
+                          violations.push({
+                            rule: "P2-UNAUTHORIZED-IMAGE-REPO",
+                            path: relPath,
+                            message: `docker push to dynamic or variable target "${rawTarget}" in ${relPath} is forbidden. Only static allowlisted image repositories may be targeted.`,
+                          });
+                          continue;
+                        }
+
                         if (
                           !(
                             PERMITTED_GHCR_REPOSITORIES as readonly string[]
@@ -673,6 +653,19 @@ export function scanDeploymentContainment(
                             path: relPath,
                             message: `Unauthorized docker push to image repository "${repoName}" in ${relPath}. Only approved repositories are permitted.`,
                           });
+                        } else {
+                          if (jobId === "publish") {
+                            if (
+                              repoName === "ghcr.io/georgekgk2/life-commerce"
+                            ) {
+                              foundCommercePush = true;
+                            }
+                            if (
+                              repoName === "ghcr.io/georgekgk2/life-storefront"
+                            ) {
+                              foundStorefrontPush = true;
+                            }
+                          }
                         }
                       }
                     }
@@ -681,19 +674,19 @@ export function scanDeploymentContainment(
               }
             }
 
-            // 6. Verify required image pushes are both present
-            if (!content.includes("ghcr.io/georgekgk2/life-commerce")) {
+            // 6. Verify required image pushes were actually found in publish job
+            if (!foundCommercePush) {
               violations.push({
                 rule: "P2-MISSING-EXPECTED-IMAGE-PUSH",
                 path: relPath,
-                message: `Workflow ${relPath} is missing required push for "ghcr.io/georgekgk2/life-commerce".`,
+                message: `Workflow ${relPath} is missing required push command for "ghcr.io/georgekgk2/life-commerce" in job "publish".`,
               });
             }
-            if (!content.includes("ghcr.io/georgekgk2/life-storefront")) {
+            if (!foundStorefrontPush) {
               violations.push({
                 rule: "P2-MISSING-EXPECTED-IMAGE-PUSH",
                 path: relPath,
-                message: `Workflow ${relPath} is missing required push for "ghcr.io/georgekgk2/life-storefront".`,
+                message: `Workflow ${relPath} is missing required push command for "ghcr.io/georgekgk2/life-storefront" in job "publish".`,
               });
             }
           } else {

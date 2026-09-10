@@ -766,7 +766,10 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       packages: write
+      attestations: write
+      id-token: write
     steps:
       - run: docker push ghcr.io/georgekgk2/life-commerce:sha-123
       - run: docker push ghcr.io/georgekgk2/life-storefront:sha-123
@@ -1349,6 +1352,331 @@ jobs:
             (v) =>
               v.rule === "P2-FORBIDDEN-LOCAL-ACTION" ||
               v.rule === "P2-FORBIDDEN-DOCKER-ACTION",
+          ),
+        ).toBe(true);
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("fails in Phase P2 if publish job has flow mapping with excessive write permissions or write-all", () => {
+    for (const badPerms of [
+      "permissions: {contents: write, packages: write, actions: write}",
+      "permissions: write-all",
+      "permissions: [contents, packages]",
+    ]) {
+      const tempDir = mkdtempSync(
+        join(tmpdir(), "life-containment-p2-flow-perms-"),
+      );
+      try {
+        mkdirSync(join(tempDir, "infra"), { recursive: true });
+        const p2Gates = createValidPolicyGates();
+        p2Gates["allow_ghcr_image_push"] = true;
+        writeFileSync(
+          join(tempDir, "infra", "deployment-policy.json"),
+          JSON.stringify({
+            status: "CONTAINED_PHASE_P2",
+            gates: p2Gates,
+          }),
+        );
+
+        mkdirSync(join(tempDir, ".github", "workflows"), { recursive: true });
+        writeFileSync(
+          join(tempDir, ".github", "workflows", "release-images.yml"),
+          `name: Release
+on:
+  push:
+    branches: [main]
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    ${badPerms}
+    steps:
+      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-123
+      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-123
+`,
+        );
+
+        const result = scanDeploymentContainment(tempDir);
+        expect(result.valid).toBe(false);
+        expect(
+          result.violations.some(
+            (v) => v.rule === "P2-PUBLISH-FORBIDDEN-PERMISSIONS",
+          ),
+        ).toBe(true);
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("fails in Phase P2 if release-images.yml contains extra push trigger filters like tags or paths", () => {
+    for (const triggerSnippet of [
+      `on:
+  push:
+    branches: [main]
+    tags: [v*]`,
+      `on:
+  push:
+    branches: [main]
+    paths: ["apps/**"]`,
+      `on:
+  push:
+    branches: [main]
+  workflow_dispatch:`,
+    ]) {
+      const tempDir = mkdtempSync(
+        join(tmpdir(), "life-containment-p2-bad-trigger-"),
+      );
+      try {
+        mkdirSync(join(tempDir, "infra"), { recursive: true });
+        const p2Gates = createValidPolicyGates();
+        p2Gates["allow_ghcr_image_push"] = true;
+        writeFileSync(
+          join(tempDir, "infra", "deployment-policy.json"),
+          JSON.stringify({
+            status: "CONTAINED_PHASE_P2",
+            gates: p2Gates,
+          }),
+        );
+
+        mkdirSync(join(tempDir, ".github", "workflows"), { recursive: true });
+        writeFileSync(
+          join(tempDir, ".github", "workflows", "release-images.yml"),
+          `name: Release
+${triggerSnippet}
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    steps:
+      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-123
+      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-123
+`,
+        );
+
+        const result = scanDeploymentContainment(tempDir);
+        expect(result.valid).toBe(false);
+        expect(
+          result.violations.some((v) => v.rule === "P2-FORBIDDEN-TRIGGER"),
+        ).toBe(true);
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("fails in Phase P2 if release-images.yml only contains echo of image names without actual docker push in publish", () => {
+    const tempDir = mkdtempSync(
+      join(tmpdir(), "life-containment-p2-fake-push-"),
+    );
+    try {
+      mkdirSync(join(tempDir, "infra"), { recursive: true });
+      const p2Gates = createValidPolicyGates();
+      p2Gates["allow_ghcr_image_push"] = true;
+      writeFileSync(
+        join(tempDir, "infra", "deployment-policy.json"),
+        JSON.stringify({
+          status: "CONTAINED_PHASE_P2",
+          gates: p2Gates,
+        }),
+      );
+
+      mkdirSync(join(tempDir, ".github", "workflows"), { recursive: true });
+      writeFileSync(
+        join(tempDir, ".github", "workflows", "release-images.yml"),
+        `name: Release
+on:
+  push:
+    branches: [main]
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    steps:
+      - run: echo "ghcr.io/georgekgk2/life-commerce and ghcr.io/georgekgk2/life-storefront"
+`,
+      );
+
+      const result = scanDeploymentContainment(tempDir);
+      expect(result.valid).toBe(false);
+      expect(
+        result.violations.some(
+          (v) => v.rule === "P2-MISSING-EXPECTED-IMAGE-PUSH",
+        ),
+      ).toBe(true);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails in Phase P2 if release-images.yml contains job-level reusable workflow (uses)", () => {
+    const tempDir = mkdtempSync(
+      join(tmpdir(), "life-containment-p2-job-uses-"),
+    );
+    try {
+      mkdirSync(join(tempDir, "infra"), { recursive: true });
+      const p2Gates = createValidPolicyGates();
+      p2Gates["allow_ghcr_image_push"] = true;
+      writeFileSync(
+        join(tempDir, "infra", "deployment-policy.json"),
+        JSON.stringify({
+          status: "CONTAINED_PHASE_P2",
+          gates: p2Gates,
+        }),
+      );
+
+      mkdirSync(join(tempDir, ".github", "workflows"), { recursive: true });
+      writeFileSync(
+        join(tempDir, ".github", "workflows", "release-images.yml"),
+        `name: Release
+on:
+  push:
+    branches: [main]
+jobs:
+  rogue:
+    uses: evil-org/reusable-workflow/.github/workflows/publish.yml@v1
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    steps:
+      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-123
+      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-123
+`,
+      );
+
+      const result = scanDeploymentContainment(tempDir);
+      expect(result.valid).toBe(false);
+      expect(
+        result.violations.some(
+          (v) => v.rule === "P2-FORBIDDEN-REUSABLE-WORKFLOW",
+        ),
+      ).toBe(true);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails in Phase P2 if release-images.yml contains forbidden container publishing commands", () => {
+    for (const forbiddenCommand of [
+      "docker buildx build --push -t docker.io/rogue/image .",
+      "docker image push ghcr.io/georgekgk2/life-commerce:123",
+      "podman push ghcr.io/georgekgk2/life-commerce:123",
+      "crane push image.tar ghcr.io/georgekgk2/life-commerce:123",
+      "oras push ghcr.io/georgekgk2/life-commerce:123",
+      "skopeo copy docker-archive:image.tar docker://ghcr.io/georgekgk2/life-commerce:123",
+    ]) {
+      const tempDir = mkdtempSync(
+        join(tmpdir(), "life-containment-p2-forbidden-publish-cmd-"),
+      );
+      try {
+        mkdirSync(join(tempDir, "infra"), { recursive: true });
+        const p2Gates = createValidPolicyGates();
+        p2Gates["allow_ghcr_image_push"] = true;
+        writeFileSync(
+          join(tempDir, "infra", "deployment-policy.json"),
+          JSON.stringify({
+            status: "CONTAINED_PHASE_P2",
+            gates: p2Gates,
+          }),
+        );
+
+        mkdirSync(join(tempDir, ".github", "workflows"), { recursive: true });
+        writeFileSync(
+          join(tempDir, ".github", "workflows", "release-images.yml"),
+          `name: Release
+on:
+  push:
+    branches: [main]
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    steps:
+      - run: ${forbiddenCommand}
+      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-123
+      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-123
+`,
+        );
+
+        const result = scanDeploymentContainment(tempDir);
+        expect(result.valid).toBe(false);
+        expect(
+          result.violations.some(
+            (v) => v.rule === "P2-FORBIDDEN-PUBLISH-COMMAND",
+          ),
+        ).toBe(true);
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("fails in Phase P2 if docker push uses variable or dynamic target", () => {
+    for (const dynamicTarget of [
+      "docker push $IMAGE_TARGET",
+      "docker push ${IMAGE_NAME}:latest",
+      "docker push $(cat image.txt)",
+    ]) {
+      const tempDir = mkdtempSync(
+        join(tmpdir(), "life-containment-p2-dynamic-target-"),
+      );
+      try {
+        mkdirSync(join(tempDir, "infra"), { recursive: true });
+        const p2Gates = createValidPolicyGates();
+        p2Gates["allow_ghcr_image_push"] = true;
+        writeFileSync(
+          join(tempDir, "infra", "deployment-policy.json"),
+          JSON.stringify({
+            status: "CONTAINED_PHASE_P2",
+            gates: p2Gates,
+          }),
+        );
+
+        mkdirSync(join(tempDir, ".github", "workflows"), { recursive: true });
+        writeFileSync(
+          join(tempDir, ".github", "workflows", "release-images.yml"),
+          `name: Release
+on:
+  push:
+    branches: [main]
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    steps:
+      - run: ${dynamicTarget}
+      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-123
+      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-123
+`,
+        );
+
+        const result = scanDeploymentContainment(tempDir);
+        expect(result.valid).toBe(false);
+        expect(
+          result.violations.some(
+            (v) => v.rule === "P2-UNAUTHORIZED-IMAGE-REPO",
           ),
         ).toBe(true);
       } finally {

@@ -24,6 +24,7 @@ WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/commerce/node_modules ./apps/commerce/node_modules
+COPY --from=deps /app/packages/config/node_modules ./packages/config/node_modules
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps/commerce ./apps/commerce

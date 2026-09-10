@@ -59,7 +59,7 @@ export const PERMITTED_ACTIONS: readonly string[] = Object.freeze([
   "aquasecurity/trivy-action",
   "actions/download-artifact",
   "docker/login-action",
-  "actions/attest-build-provenance",
+  "sigstore/cosign-installer",
 ]);
 
 export const MANDATORY_POLICY_GATES: readonly string[] = Object.freeze([
@@ -528,7 +528,6 @@ export function scanDeploymentContainment(
                     const expectedPerms: Record<string, string> = {
                       contents: "read",
                       packages: "write",
-                      attestations: "write",
                       "id-token": "write",
                     };
                     for (const [permKey, permVal] of Object.entries(permsObj)) {

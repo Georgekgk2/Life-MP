@@ -404,7 +404,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      attestations: write
       id-token: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
@@ -453,19 +452,81 @@ jobs:
           echo "commerce_digest=$COMMERCE_DIGEST" >> "$GITHUB_OUTPUT"
           echo "storefront_digest=$STOREFRONT_DIGEST" >> "$GITHUB_OUTPUT"
 
-      - name: Attest build provenance (Commerce Container)
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.2.3
-        with:
-          subject-name: ghcr.io/georgekgk2/life-commerce
-          subject-digest: ${{ steps.push-images.outputs.commerce_digest }}
-          push-to-registry: true
+      - name: Install Cosign for keyless provenance signing
+        uses: sigstore/cosign-installer@7e8b541eb2e61bf99390e1afd4be13a184e9ebc5 # v3.10.1
 
-      - name: Attest build provenance (Storefront Container)
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.2.3
-        with:
-          subject-name: ghcr.io/georgekgk2/life-storefront
-          subject-digest: ${{ steps.push-images.outputs.storefront_digest }}
-          push-to-registry: true
+      - name: Attest build provenance via Cosign Keyless OIDC
+        run: |
+          COMMERCE_DIGEST="${{ steps.push-images.outputs.commerce_digest }}"
+          STOREFRONT_DIGEST="${{ steps.push-images.outputs.storefront_digest }}"
+
+          cat << 'EOF' > /tmp/provenance-predicate.json
+          {
+            "buildDefinition": {
+              "buildType": "https://actions.github.io/buildtypes/workflow/v1",
+              "externalParameters": {
+                "workflow": {
+                  "ref": "refs/heads/main",
+                  "repository": "https://github.com/Georgekgk2/Life-MP",
+                  "path": ".github/workflows/release-images.yml"
+                }
+              },
+              "internalParameters": {
+                "github": {
+                  "event_name": "push",
+                  "runner_environment": "github-hosted"
+                }
+              },
+              "resolvedDependencies": [
+                {
+                  "uri": "git+https://github.com/Georgekgk2/Life-MP@refs/heads/main",
+                  "digest": {
+                    "gitCommit": "${{ github.sha }}"
+                  }
+                }
+              ]
+            },
+            "runDetails": {
+              "builder": {
+                "id": "https://github.com/Georgekgk2/Life-MP/.github/workflows/release-images.yml@refs/heads/main"
+              },
+              "metadata": {
+                "invocationId": "https://github.com/Georgekgk2/Life-MP/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}"
+              }
+            }
+          }
+          EOF
+
+          echo "Attesting Commerce container provenance via Cosign keyless OIDC..."
+          cosign attest --yes \
+            --predicate /tmp/provenance-predicate.json \
+            --type https://slsa.dev/provenance/v1 \
+            "ghcr.io/georgekgk2/life-commerce@$COMMERCE_DIGEST"
+
+          echo "Attesting Storefront container provenance via Cosign keyless OIDC..."
+          cosign attest --yes \
+            --predicate /tmp/provenance-predicate.json \
+            --type https://slsa.dev/provenance/v1 \
+            "ghcr.io/georgekgk2/life-storefront@$STOREFRONT_DIGEST"
+
+      - name: Verify Cosign Keyless Attestation (Fail-Closed)
+        run: |
+          COMMERCE_DIGEST="${{ steps.push-images.outputs.commerce_digest }}"
+          STOREFRONT_DIGEST="${{ steps.push-images.outputs.storefront_digest }}"
+
+          echo "Verifying Commerce attestation against exact OIDC identity..."
+          cosign verify-attestation \
+            --type https://slsa.dev/provenance/v1 \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            --certificate-identity-regexp "^https://github\.com/Georgekgk2/Life-MP/\.github/workflows/release-images\.yml@refs/heads/main$" \
+            "ghcr.io/georgekgk2/life-commerce@$COMMERCE_DIGEST"
+
+          echo "Verifying Storefront attestation against exact OIDC identity..."
+          cosign verify-attestation \
+            --type https://slsa.dev/provenance/v1 \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            --certificate-identity-regexp "^https://github\.com/Georgekgk2/Life-MP/\.github/workflows/release-images\.yml@refs/heads/main$" \
+            "ghcr.io/georgekgk2/life-storefront@$STOREFRONT_DIGEST"
 
       - name: Generate immutable release manifest (IMAGE_DIGESTS.json)
         run: |
@@ -479,6 +540,12 @@ jobs:
             "sourceCommit": "${{ github.sha }}",
             "buildTimestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "policyStatus": "CONTAINED_PHASE_P2",
+            "provenance": {
+              "system": "sigstore-cosign-keyless",
+              "attestationType": "https://slsa.dev/provenance/v1",
+              "certificateIssuer": "https://token.actions.githubusercontent.com",
+              "certificateIdentity": "https://github.com/Georgekgk2/Life-MP/.github/workflows/release-images.yml@refs/heads/main"
+            },
             "images": {
               "commerce": {
                 "repository": "ghcr.io/georgekgk2/life-commerce",

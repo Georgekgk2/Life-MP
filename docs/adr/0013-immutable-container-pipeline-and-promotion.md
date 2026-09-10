@@ -58,16 +58,18 @@
    Лише після успішної перевірки контрольних сум виконується завантаження відповідного архіву в локальний Docker-демон (`docker load -i commerce.tar` та `docker load -i storefront.tar`) і відправка в GitHub Container Registry під інформаційним commit-тегом:
    - `ghcr.io/georgekgk2/life-commerce:sha-<github_sha>`;
    - `ghcr.io/georgekgk2/life-storefront:sha-<github_sha>`.
-7. **Фіксація дайджестів та атестація:**
+7. **Фіксація дайджестів та Cosign-атестація:**
    З реєстру отримується канонічний `sha256`-хеш образу (remote manifest digest). Окремо фіксуються:
    - локальний SHA-256 хеш tar-архіву;
    - локальний Image ID / config digest;
    - фінальний registry manifest digest.
-     Ці дані формують звіт `IMAGE_DIGESTS.json`, що зберігається як завантажуваний артефакт workflow.
+   Для кожного опублікованого образу виконується криптографічна атестація походження через Cosign Keyless OIDC (`cosign attest` та `cosign verify-attestation`) із перевіркою емітента (`https://token.actions.githubusercontent.com`) та ідентичності workflow.
+   Лише після успішної верифікації формується звіт `IMAGE_DIGESTS.json`, що зберігається як завантажуваний артефакт workflow.
 8. **Статус тегів та дайджестів:**
    Інформаційний тег `sha-<github_sha>` призначений виключно для зручності аудиту та пошуку в інтерфейсі GHCR і не є криптографічно незмінним (теги в реєстрах можуть перезаписуватися). Єдиним авторитетним, юридично та технічно незмінним ідентифікатором є **канонічний registry manifest digest (`@sha256:...`)**, що повертається реєстром під час публікації. Усі подальші кроки (compose, promotion, перевірки) використовують **виключно дайджест**.
 9. **Вимога атестації та інваріант непридатності (Attestation Failure Invariant):**
-   Оскільки публікація образу в реєстр (`docker push`) передує підписанню атестації (`actions/attest-build-provenance`), у разі помилки кроку атестації частково завантажений або осиротілий (orphaned) образ може технічно опинитися в GHCR. Будь-який образ у GHCR вважається **суворо неавторитетним, некваліфікованим та непридатним для промоції (`STRICT NO-GO`)**, якщо процес атестації зазнав збою або якщо відсутній верифікований workflow-артефакт `IMAGE_DIGESTS.json`. Промоція у фазі P2b дозволяється **виключно за наявності пари: канонічний manifest digest + підтверджена криптографічна атестація походження**.
+   Оскільки публікація образу в реєстр (`docker push`) передує підписанню атестації Cosign (`cosign attest`), у разі помилки кроку атестації або верифікації частково завантажений або осиротілий (orphaned) образ може технічно опинитися в GHCR. Будь-який образ у GHCR вважається **суворо неавторитетним, некваліфікованим та непридатним для промоції (`STRICT NO-GO`)**, якщо процес атестації зазнав збою або якщо відсутній верифікований workflow-артефакт `IMAGE_DIGESTS.json`. Промоція у фазі P2b дозволяється **виключно за наявності пари: канонічний manifest digest + підтверджена криптографічна атестація походження Cosign**.
+   *Privacy Trade-off Note:* Використання публічного Sigstore/Rekor фіксує в сертифікаті Fulcio та журналі прозорості назву репозиторію та шлях workflow (`Georgekgk2/Life-MP/.github/workflows/release-images.yml@refs/heads/main`). Цей компроміс явно прийнято для збереження приватності самого коду без необхідності робити репозиторій публічним.
 
 ### 2. Модель тригерів, дозволів та повний граф перевірок у CI
 
@@ -80,11 +82,11 @@
   3. `security-audit` (permissions: `contents: read`) — Secret Detection (Gitleaks) та аудит виробничих залежностей (`pnpm audit --prod --audit-level=high`);
   4. `codeql-analysis` (permissions: `contents: read`, `actions: read`) — статичний аналіз CodeQL для `javascript-typescript` зі збереженням SARIF-артефакту (`upload: "never"`, згідно з ADR 0011; дозвіл `security-events: write` не вимагається);
   5. `image-build-scan` (permissions: `contents: read`) — компіляція образів у tar-архіви, розрахунок контрольних сум, fail-closed сканування Trivy та збереження артефактів;
-  6. `publish` (permissions: `contents: read`, `packages: write`, `attestations: write`, `id-token: write`; залежність `needs: [verify-and-test, integration-and-e2e, security-audit, codeql-analysis, image-build-scan]`) — завантаження артефактів, перевірка хешів, пуш у GHCR, генерація маніфесту та атестація.
-     Джоба `publish` виконується **виключно за умови, що всі 5 попередніх обов'язкових джоб завершилися з результатом `success`** (використання `always()` чи слабких умов суворо заборонено).
-- **Мінімальні права (Least Privilege):** Дозволи `packages: write`, `attestations: write` та `id-token: write` надаються суворо ізольовано на рівні джоби `publish`. Джоба `codeql-analysis` має `actions: read`. Усі інші джоби мають виключно `contents: read`.
-- **Незмінні посилання на GitHub Actions:** Усі екшени у workflow фіксуються виключно за точними 40-символьними immutable commit SHAs (checkout, buildx, login, trivy-action, upload-artifact, download-artifact, attest-build-provenance).
-- **Атестація збірки:** Застосовується `actions/attest-build-provenance` для кожного опублікованого образу (`subject-name: ghcr.io/georgekgk2/life-commerce` та `life-storefront`). Параметр `subject-digest` береться **суворо з результату push у реєстр** (канонічний remote manifest digest, наприклад `sha256:...`), а не з локального Image ID чи хешу tar-архіву.
+  6. `publish` (permissions: `contents: read`, `packages: write`, `id-token: write`; залежність `needs: [verify-and-test, catalog-provider-integration, catalog-provider-migrations, storefront-e2e, security-audit, codeql-analysis, image-build-scan]`) — завантаження артефактів, перевірка хешів, пуш у GHCR, генерація маніфесту та атестація Cosign.
+     Джоба `publish` виконується **виключно за умови, що всі 7 попередніх обов'язкових джоб завершилися з результатом `success`** (використання `always()` чи слабких умов суворо заборонено).
+- **Мінімальні права (Least Privilege):** Дозволи `packages: write` та `id-token: write` надаються суворо ізольовано на рівні джоби `publish`. Джоба `codeql-analysis` має `actions: read`. Усі інші джоби мають виключно `contents: read`.
+- **Незмінні посилання на GitHub Actions:** Усі екшени у workflow фіксуються виключно за точними 40-символьними immutable commit SHAs (checkout, buildx, login, trivy-action, upload-artifact, download-artifact, cosign-installer).
+- **Атестація збірки:** Застосовується `cosign attest` та `cosign verify-attestation` для кожного опублікованого образу (`ghcr.io/georgekgk2/life-commerce` та `life-storefront`). Атестація прив'язується **суворо до канонічного remote manifest digest** (`@sha256:...`).
 - **Аутентифікація:** Використовується виключно системний короткоживучий `GITHUB_TOKEN`, жодних персональних токенів доступу (PAT) або постійних секретів.
 
 ### 3. Фазове розмежування політики репозиторію (Фаза P0 ➔ Фаза P2)

@@ -18,7 +18,7 @@ const result = scanDeploymentContainment(rootDir);
 
 if (!result.valid) {
   console.error(
-    "❌ DEPLOYMENT CONTAINMENT CHECK FAILED (Phase P0 Containment):",
+    "❌ DEPLOYMENT CONTAINMENT CHECK FAILED (Containment Gate):",
   );
   for (const v of result.violations) {
     console.error(`  [${v.rule}] ${v.path}: ${v.message}`);
@@ -27,6 +27,6 @@ if (!result.valid) {
 }
 
 console.log(
-  "✅ Deployment containment check passed: All capability gates are locked (Phase P0 Containment).",
+  "✅ Deployment containment check passed: All capability gates conform to containment policy.",
 );
 process.exit(0);

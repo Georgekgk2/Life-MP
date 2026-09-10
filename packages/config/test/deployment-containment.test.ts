@@ -12,6 +12,7 @@ import {
   scanDeploymentContainment,
   MANDATORY_POLICY_GATES,
   PERMITTED_SCRIPT_PATHS,
+  PERMITTED_GHCR_REPOSITORIES,
   FORBIDDEN_REMOTE_COMMAND_PATTERNS,
   FORBIDDEN_SCRIPT_FILENAMES,
   getPermittedScripts,
@@ -725,6 +726,299 @@ describe("packages/config deployment-containment scanner", () => {
           (v) => v.rule === "P0-FORBIDDEN-SYMLINK" && v.path === "scripts/sub",
         ),
       ).toBe(true);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("enforces that PERMITTED_GHCR_REPOSITORIES is runtime frozen and contains exact allowlisted repos", () => {
+    expect(Object.isFrozen(PERMITTED_GHCR_REPOSITORIES)).toBe(true);
+    expect(PERMITTED_GHCR_REPOSITORIES).toEqual([
+      "ghcr.io/georgekgk2/life-commerce",
+      "ghcr.io/georgekgk2/life-storefront",
+    ]);
+  });
+
+  it("passes when deployment policy is in Phase P2 (CONTAINED_PHASE_P2) and conforms to contract", () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "life-containment-p2-pass-"));
+    try {
+      mkdirSync(join(tempDir, "infra"), { recursive: true });
+      const p2Gates = createValidPolicyGates();
+      p2Gates["allow_ghcr_image_push"] = true;
+      writeFileSync(
+        join(tempDir, "infra", "deployment-policy.json"),
+        JSON.stringify({
+          status: "CONTAINED_PHASE_P2",
+          gates: p2Gates,
+        }),
+      );
+
+      mkdirSync(join(tempDir, ".github", "workflows"), { recursive: true });
+      writeFileSync(
+        join(tempDir, ".github", "workflows", "release-images.yml"),
+        `name: Release
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-123
+      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-123
+`,
+      );
+
+      const result = scanDeploymentContainment(tempDir);
+      expect(result.valid).toBe(true);
+      expect(result.violations).toHaveLength(0);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails when deployment policy has an unknown status", () => {
+    const tempDir = mkdtempSync(
+      join(tmpdir(), "life-containment-unknown-status-"),
+    );
+    try {
+      mkdirSync(join(tempDir, "infra"), { recursive: true });
+      writeFileSync(
+        join(tempDir, "infra", "deployment-policy.json"),
+        JSON.stringify({
+          status: "UNRESTRICTED",
+          gates: createValidPolicyGates(),
+        }),
+      );
+
+      const result = scanDeploymentContainment(tempDir);
+      expect(result.valid).toBe(false);
+      expect(result.violations.some((v) => v.rule === "P0-POLICY-STATUS")).toBe(
+        true,
+      );
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails in Phase P2 if allow_ghcr_image_push is false or missing", () => {
+    const tempDir = mkdtempSync(
+      join(tmpdir(), "life-containment-p2-gate-fail-"),
+    );
+    try {
+      mkdirSync(join(tempDir, "infra"), { recursive: true });
+      const p2Gates = createValidPolicyGates();
+      p2Gates["allow_ghcr_image_push"] = false;
+      writeFileSync(
+        join(tempDir, "infra", "deployment-policy.json"),
+        JSON.stringify({
+          status: "CONTAINED_PHASE_P2",
+          gates: p2Gates,
+        }),
+      );
+
+      const result = scanDeploymentContainment(tempDir);
+      expect(result.valid).toBe(false);
+      expect(result.violations.some((v) => v.rule === "P2-GATE-STATE")).toBe(
+        true,
+      );
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails in Phase P2 if any commercial or remote gate is set to true", () => {
+    for (const forbiddenGate of [
+      "allow_remote_deployment",
+      "allow_live_fiscalization",
+    ]) {
+      const tempDir = mkdtempSync(
+        join(tmpdir(), "life-containment-p2-bad-gate-"),
+      );
+      try {
+        mkdirSync(join(tempDir, "infra"), { recursive: true });
+        const p2Gates = createValidPolicyGates();
+        p2Gates["allow_ghcr_image_push"] = true;
+        p2Gates[forbiddenGate] = true;
+        writeFileSync(
+          join(tempDir, "infra", "deployment-policy.json"),
+          JSON.stringify({
+            status: "CONTAINED_PHASE_P2",
+            gates: p2Gates,
+          }),
+        );
+
+        const result = scanDeploymentContainment(tempDir);
+        expect(result.valid).toBe(false);
+        expect(result.violations.some((v) => v.rule === "P0-GATE-LOCKED")).toBe(
+          true,
+        );
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("fails in Phase P2 if release-images.yml contains top-level packages: write", () => {
+    const tempDir = mkdtempSync(
+      join(tmpdir(), "life-containment-p2-toplevel-write-"),
+    );
+    try {
+      mkdirSync(join(tempDir, "infra"), { recursive: true });
+      const p2Gates = createValidPolicyGates();
+      p2Gates["allow_ghcr_image_push"] = true;
+      writeFileSync(
+        join(tempDir, "infra", "deployment-policy.json"),
+        JSON.stringify({
+          status: "CONTAINED_PHASE_P2",
+          gates: p2Gates,
+        }),
+      );
+
+      mkdirSync(join(tempDir, ".github", "workflows"), { recursive: true });
+      writeFileSync(
+        join(tempDir, ".github", "workflows", "release-images.yml"),
+        `name: Release
+on:
+  push:
+    branches: [main]
+permissions:
+  packages: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+`,
+      );
+
+      const result = scanDeploymentContainment(tempDir);
+      expect(result.valid).toBe(false);
+      expect(
+        result.violations.some((v) => v.rule === "P2-TOPLEVEL-PACKAGES-WRITE"),
+      ).toBe(true);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails in Phase P2 if release-images.yml triggers on pull_request", () => {
+    const tempDir = mkdtempSync(
+      join(tmpdir(), "life-containment-p2-pr-trigger-"),
+    );
+    try {
+      mkdirSync(join(tempDir, "infra"), { recursive: true });
+      const p2Gates = createValidPolicyGates();
+      p2Gates["allow_ghcr_image_push"] = true;
+      writeFileSync(
+        join(tempDir, "infra", "deployment-policy.json"),
+        JSON.stringify({
+          status: "CONTAINED_PHASE_P2",
+          gates: p2Gates,
+        }),
+      );
+
+      mkdirSync(join(tempDir, ".github", "workflows"), { recursive: true });
+      writeFileSync(
+        join(tempDir, ".github", "workflows", "release-images.yml"),
+        `name: Release
+on:
+  pull_request:
+    branches: [main]
+`,
+      );
+
+      const result = scanDeploymentContainment(tempDir);
+      expect(result.valid).toBe(false);
+      expect(
+        result.violations.some((v) => v.rule === "P2-FORBIDDEN-TRIGGER"),
+      ).toBe(true);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails in Phase P2 if an unauthorized secondary workflow contains packages: write", () => {
+    const tempDir = mkdtempSync(
+      join(tmpdir(), "life-containment-p2-unauth-wf-"),
+    );
+    try {
+      mkdirSync(join(tempDir, "infra"), { recursive: true });
+      const p2Gates = createValidPolicyGates();
+      p2Gates["allow_ghcr_image_push"] = true;
+      writeFileSync(
+        join(tempDir, "infra", "deployment-policy.json"),
+        JSON.stringify({
+          status: "CONTAINED_PHASE_P2",
+          gates: p2Gates,
+        }),
+      );
+
+      mkdirSync(join(tempDir, ".github", "workflows"), { recursive: true });
+      writeFileSync(
+        join(tempDir, ".github", "workflows", "ci.yml"),
+        `name: CI
+jobs:
+  rogue:
+    permissions:
+      packages: write
+`,
+      );
+
+      const result = scanDeploymentContainment(tempDir);
+      expect(result.valid).toBe(false);
+      expect(
+        result.violations.some(
+          (v) => v.rule === "P0-UNAUTHORIZED-PUBLISH-WORKFLOW",
+        ),
+      ).toBe(true);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("validates .trivyignore format and fails closed when entries are expired or unannotated", () => {
+    const tempDir = mkdtempSync(
+      join(tmpdir(), "life-containment-trivyignore-"),
+    );
+    try {
+      mkdirSync(join(tempDir, "infra"), { recursive: true });
+      writeFileSync(
+        join(tempDir, "infra", "deployment-policy.json"),
+        JSON.stringify({
+          status: "CONTAINED",
+          gates: createValidPolicyGates(),
+        }),
+      );
+
+      // Expired entry
+      writeFileSync(
+        join(tempDir, ".trivyignore"),
+        `# reason: test | owner: security | expires: 2020-01-01\nCVE-2020-1234\n`,
+      );
+      let result = scanDeploymentContainment(tempDir);
+      expect(result.valid).toBe(false);
+      expect(
+        result.violations.some((v) => v.rule === "P0-TRIVYIGNORE-EXPIRED"),
+      ).toBe(true);
+
+      // Unannotated entry
+      writeFileSync(join(tempDir, ".trivyignore"), `CVE-2025-9999\n`);
+      result = scanDeploymentContainment(tempDir);
+      expect(result.valid).toBe(false);
+      expect(
+        result.violations.some((v) => v.rule === "P0-TRIVYIGNORE-UNANNOTATED"),
+      ).toBe(true);
+
+      // Valid annotated entry
+      writeFileSync(
+        join(tempDir, ".trivyignore"),
+        `# reason: test valid | owner: security | expires: 2099-12-31\nCVE-2025-9999\n`,
+      );
+      result = scanDeploymentContainment(tempDir);
+      expect(result.valid).toBe(true);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

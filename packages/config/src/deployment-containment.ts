@@ -42,6 +42,11 @@ export type DeploymentPolicyFile = Readonly<{
  * (e.g. external generative APIs in generate-marketplace-images.mjs) or local child processes.
  */
 
+export const PERMITTED_GHCR_REPOSITORIES: readonly string[] = Object.freeze([
+  "ghcr.io/georgekgk2/life-commerce",
+  "ghcr.io/georgekgk2/life-storefront",
+]);
+
 export const MANDATORY_POLICY_GATES: readonly string[] = Object.freeze([
   "allow_remote_deployment",
   "allow_ssh_execution",
@@ -105,6 +110,7 @@ export function scanDeploymentContainment(
   const violations: DeploymentContainmentViolation[] = [];
 
   // 1. Validate infra/deployment-policy.json
+  let policyStatus = "CONTAINED";
   const policyPath = join(rootDir, "infra", "deployment-policy.json");
   if (!existsSync(policyPath)) {
     violations.push({
@@ -117,13 +123,18 @@ export function scanDeploymentContainment(
     try {
       const raw = readFileSync(policyPath, "utf-8");
       const parsed = JSON.parse(raw) as DeploymentPolicyFile;
-      if (parsed.status !== "CONTAINED") {
+      const isValidStatus =
+        parsed.status === "CONTAINED" || parsed.status === "CONTAINED_PHASE_P2";
+      if (!isValidStatus) {
         violations.push({
           rule: "P0-POLICY-STATUS",
           path: "infra/deployment-policy.json",
-          message: `Expected status to be "CONTAINED", got "${parsed.status}".`,
+          message: `Expected status to be "CONTAINED" or "CONTAINED_PHASE_P2", got "${parsed.status}".`,
         });
+      } else {
+        policyStatus = parsed.status;
       }
+
       if (!parsed.gates || typeof parsed.gates !== "object") {
         violations.push({
           rule: "P0-POLICY-GATES",
@@ -142,14 +153,36 @@ export function scanDeploymentContainment(
           }
         }
 
-        // Enforce all gates must be locked (false)
-        for (const [gateName, gateValue] of Object.entries(parsed.gates)) {
-          if (gateValue !== false) {
+        if (parsed.status === "CONTAINED") {
+          // In Phase P0, all gates must be locked (false)
+          for (const [gateName, gateValue] of Object.entries(parsed.gates)) {
+            if (gateValue !== false) {
+              violations.push({
+                rule: "P0-GATE-LOCKED",
+                path: "infra/deployment-policy.json",
+                message: `In Phase P0 ("CONTAINED"), gate "${gateName}" must be false, but got ${gateValue}.`,
+              });
+            }
+          }
+        } else if (parsed.status === "CONTAINED_PHASE_P2") {
+          // In Phase P2, allow_ghcr_image_push must be true
+          if (parsed.gates["allow_ghcr_image_push"] !== true) {
             violations.push({
-              rule: "P0-GATE-LOCKED",
+              rule: "P2-GATE-STATE",
               path: "infra/deployment-policy.json",
-              message: `Gate "${gateName}" must be false, but got ${gateValue}.`,
+              message: `In Phase P2 ("CONTAINED_PHASE_P2"), gate "allow_ghcr_image_push" must be true, but got ${parsed.gates["allow_ghcr_image_push"]}.`,
             });
+          }
+          // All other gates must remain locked (false)
+          for (const [gateName, gateValue] of Object.entries(parsed.gates)) {
+            if (gateName === "allow_ghcr_image_push") continue;
+            if (gateValue !== false) {
+              violations.push({
+                rule: "P0-GATE-LOCKED",
+                path: "infra/deployment-policy.json",
+                message: `In Phase P2 ("CONTAINED_PHASE_P2"), gate "${gateName}" must remain false, but got ${gateValue}.`,
+              });
+            }
           }
         }
       }
@@ -181,26 +214,22 @@ export function scanDeploymentContainment(
       }
 
       if (file.endsWith(".yml") || file.endsWith(".yaml")) {
-        const content = readFileSync(join(workflowsDir, file), "utf-8");
+        const fullPath = join(workflowsDir, file);
+        const relPath = `.github/workflows/${file}`;
+        const content = readFileSync(fullPath, "utf-8");
+
         if (content.includes("appleboy/ssh-action")) {
           violations.push({
             rule: "P0-NO-SSH-ACTION",
-            path: `.github/workflows/${file}`,
-            message: `Forbidden appleboy/ssh-action found in .github/workflows/${file}.`,
+            path: relPath,
+            message: `Forbidden appleboy/ssh-action found in ${relPath}.`,
           });
         }
         if (content.includes("docker/build-push-action")) {
           violations.push({
             rule: "P0-NO-BUILD-PUSH-ACTION",
-            path: `.github/workflows/${file}`,
-            message: `Forbidden docker/build-push-action found in .github/workflows/${file}.`,
-          });
-        }
-        if (content.includes("packages: write")) {
-          violations.push({
-            rule: "P0-NO-PACKAGES-WRITE",
-            path: `.github/workflows/${file}`,
-            message: `Forbidden "packages: write" permission found in .github/workflows/${file}.`,
+            path: relPath,
+            message: `Forbidden docker/build-push-action found in ${relPath}.`,
           });
         }
         if (
@@ -210,16 +239,97 @@ export function scanDeploymentContainment(
         ) {
           violations.push({
             rule: "P0-NO-DEPLOY-SECRETS",
-            path: `.github/workflows/${file}`,
-            message: `Forbidden deployment secret reference found in .github/workflows/${file}.`,
+            path: relPath,
+            message: `Forbidden deployment secret reference found in ${relPath}.`,
           });
         }
         if (content.includes("skip_tests:")) {
           violations.push({
             rule: "P0-NO-SKIP-TESTS",
-            path: `.github/workflows/${file}`,
-            message: `Forbidden skip_tests input found in .github/workflows/${file}.`,
+            path: relPath,
+            message: `Forbidden skip_tests input found in ${relPath}.`,
           });
+        }
+        if (content.includes("pull_request_target")) {
+          violations.push({
+            rule: "P0-NO-PR-TARGET",
+            path: relPath,
+            message: `Forbidden pull_request_target trigger found in ${relPath}.`,
+          });
+        }
+
+        const hasPackagesWrite = /packages:\s*write/.test(content);
+
+        if (policyStatus === "CONTAINED") {
+          if (hasPackagesWrite) {
+            violations.push({
+              rule: "P0-NO-PACKAGES-WRITE",
+              path: relPath,
+              message: `Forbidden "packages: write" permission found in ${relPath} in Phase P0.`,
+            });
+          }
+        } else if (policyStatus === "CONTAINED_PHASE_P2") {
+          if (file === "release-images.yml") {
+            // Validate release-images.yml strict P2 contract:
+            // 1. Must NOT have top-level packages: write
+            const lines = content.split("\n");
+            let inTopLevelPermissions = false;
+            for (const line of lines) {
+              if (/^permissions:/.test(line)) {
+                inTopLevelPermissions = true;
+              } else if (/^[a-zA-Z0-9_-]+:/.test(line) && !/^\s+/.test(line)) {
+                inTopLevelPermissions = false;
+              }
+              if (inTopLevelPermissions && /packages:\s*write/.test(line)) {
+                violations.push({
+                  rule: "P2-TOPLEVEL-PACKAGES-WRITE",
+                  path: relPath,
+                  message: `Top-level "packages: write" is forbidden in ${relPath}. Permissions must be scoped strictly to the publish job.`,
+                });
+                break;
+              }
+            }
+
+            // 2. Trigger must be strictly push: branches: [main]
+            if (
+              content.includes("pull_request:") ||
+              /pull_request\s*:/i.test(content)
+            ) {
+              violations.push({
+                rule: "P2-FORBIDDEN-TRIGGER",
+                path: relPath,
+                message: `Workflow ${relPath} must not trigger on pull_request. Triggers must be restricted strictly to push on main.`,
+              });
+            }
+
+            // 3. Image repositories must be allowlisted
+            const repoMatches = content.matchAll(
+              /ghcr\.io\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+/g,
+            );
+            for (const match of repoMatches) {
+              const repo = match[0];
+              if (
+                !(PERMITTED_GHCR_REPOSITORIES as readonly string[]).includes(
+                  repo,
+                )
+              ) {
+                violations.push({
+                  rule: "P2-UNAUTHORIZED-IMAGE-REPO",
+                  path: relPath,
+                  message: `Unauthorized GHCR image repository "${repo}" in ${relPath}. Only approved repositories are permitted.`,
+                });
+              }
+            }
+          } else {
+            // Any other workflow file must NOT contain packages: write
+            if (hasPackagesWrite) {
+              violations.push({
+                rule: "P0-UNAUTHORIZED-PUBLISH-WORKFLOW",
+                path: relPath,
+                message: `Forbidden "packages: write" permission found in unauthorized workflow ${relPath}. Only .github/workflows/release-images.yml may publish in Phase P2.`,
+              });
+            }
+          }
         }
       }
     }
@@ -414,6 +524,90 @@ export function scanDeploymentContainment(
           }
         };
         scanDir(scriptsDir);
+      }
+    }
+  }
+
+  // 5. Scan .trivyignore for structured metadata and non-expired entries
+  const trivyignorePath = join(rootDir, ".trivyignore");
+  if (existsSync(trivyignorePath)) {
+    const content = readFileSync(trivyignorePath, "utf-8");
+    const lines = content.split("\n");
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    let lastComment = "";
+    let blockExpires: string | null = null;
+    let blockReason: string | null = null;
+    let blockOwner: string | null = null;
+
+    for (let i = 0; i < lines.length; i++) {
+      const rawLine = lines[i] ?? "";
+      const trimmed = rawLine.trim();
+
+      if (!trimmed) {
+        lastComment = "";
+        continue;
+      }
+
+      if (trimmed.startsWith("#")) {
+        lastComment = trimmed;
+        const ttlMatch = trimmed.match(
+          /TTL\s*\/\s*Review\s*Date:\s*(\d{4}-\d{2}-\d{2})/i,
+        );
+        if (ttlMatch && ttlMatch[1]) blockExpires = ttlMatch[1];
+        const reasonMatch = trimmed.match(/Reason:\s*(.+)/i);
+        if (reasonMatch && reasonMatch[1]) blockReason = reasonMatch[1].trim();
+        const ownerMatch = trimmed.match(/Owner(?:\s*\/\s*Sign-off)?:\s*(.+)/i);
+        if (ownerMatch && ownerMatch[1]) blockOwner = ownerMatch[1].trim();
+        continue;
+      }
+
+      // Active suppression line
+      const cveMatch = trimmed.match(
+        /^(CVE-\d{4}-\d+)(?:\s+exp:(\d{4}-\d{2}-\d{2}))?$/i,
+      );
+      if (!cveMatch || !cveMatch[1]) {
+        violations.push({
+          rule: "P0-TRIVYIGNORE-INVALID-SYNTAX",
+          path: ".trivyignore",
+          message: `Invalid syntax in .trivyignore at line ${i + 1}: "${trimmed}". Expected "CVE-YYYY-XXXXX" or "CVE-YYYY-XXXXX exp:YYYY-MM-DD".`,
+        });
+        continue;
+      }
+
+      const cveId = cveMatch[1];
+      const inlineExp = cveMatch[2] ?? null;
+
+      let itemExpires = inlineExp || blockExpires;
+      let itemReason = blockReason;
+      let itemOwner = blockOwner;
+
+      if (lastComment) {
+        const commentExpMatch = lastComment.match(
+          /expires:\s*(\d{4}-\d{2}-\d{2})/i,
+        );
+        if (commentExpMatch && commentExpMatch[1])
+          itemExpires = commentExpMatch[1];
+        const commentReasonMatch = lastComment.match(/reason:\s*([^|]+)/i);
+        if (commentReasonMatch && commentReasonMatch[1])
+          itemReason = commentReasonMatch[1].trim();
+        const commentOwnerMatch = lastComment.match(/owner:\s*([^|]+)/i);
+        if (commentOwnerMatch && commentOwnerMatch[1])
+          itemOwner = commentOwnerMatch[1].trim();
+      }
+
+      if (!itemExpires || !itemReason || !itemOwner) {
+        violations.push({
+          rule: "P0-TRIVYIGNORE-UNANNOTATED",
+          path: ".trivyignore",
+          message: `Suppression entry "${cveId}" at line ${i + 1} is missing mandatory metadata (reason, owner, expires).`,
+        });
+      } else if (itemExpires < todayStr) {
+        violations.push({
+          rule: "P0-TRIVYIGNORE-EXPIRED",
+          path: ".trivyignore",
+          message: `Suppression entry "${cveId}" at line ${i + 1} has expired on ${itemExpires}.`,
+        });
       }
     }
   }

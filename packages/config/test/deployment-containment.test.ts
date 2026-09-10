@@ -771,8 +771,8 @@ jobs:
       attestations: write
       id-token: write
     steps:
-      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-123
-      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-123
+      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-\${{ github.sha }}
+      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-\${{ github.sha }}
 `,
       );
 
@@ -1204,8 +1204,8 @@ jobs:
     permissions:
       packages: write
     steps:
-      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-123
-      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-123
+      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-\${{ github.sha }}
+      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-\${{ github.sha }}
 `,
       );
 
@@ -1248,8 +1248,8 @@ jobs:
     permissions:
       packages: write
     steps:
-      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-123
-      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-123
+      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-\${{ github.sha }}
+      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-\${{ github.sha }}
       - run: docker push docker.io/rogue/image:latest
 `,
       );
@@ -1393,8 +1393,8 @@ jobs:
     runs-on: ubuntu-latest
     ${badPerms}
     steps:
-      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-123
-      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-123
+      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-\${{ github.sha }}
+      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-\${{ github.sha }}
 `,
         );
 
@@ -1455,8 +1455,8 @@ jobs:
       attestations: write
       id-token: write
     steps:
-      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-123
-      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-123
+      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-\${{ github.sha }}
+      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-\${{ github.sha }}
 `,
         );
 
@@ -1553,8 +1553,8 @@ jobs:
       attestations: write
       id-token: write
     steps:
-      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-123
-      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-123
+      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-\${{ github.sha }}
+      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-\${{ github.sha }}
 `,
       );
 
@@ -1611,8 +1611,8 @@ jobs:
       id-token: write
     steps:
       - run: ${forbiddenCommand}
-      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-123
-      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-123
+      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-\${{ github.sha }}
+      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-\${{ github.sha }}
 `,
         );
 
@@ -1667,8 +1667,8 @@ jobs:
       id-token: write
     steps:
       - run: ${dynamicTarget}
-      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-123
-      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-123
+      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-\${{ github.sha }}
+      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-\${{ github.sha }}
 `,
         );
 
@@ -1712,7 +1712,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-123
+      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-\${{ github.sha }}
   publish:
     runs-on: ubuntu-latest
     permissions:
@@ -1721,8 +1721,8 @@ jobs:
       attestations: write
       id-token: write
     steps:
-      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-123
-      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-123
+      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-\${{ github.sha }}
+      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-\${{ github.sha }}
 `,
       );
 
@@ -1738,9 +1738,9 @@ jobs:
 
   it("fails in Phase P2 if chained push via && or || contains unauthorized registry target", () => {
     for (const chainedCmd of [
-      "docker push ghcr.io/georgekgk2/life-commerce:sha-123 && docker push docker.io/rogue/image:latest",
-      "docker push ghcr.io/georgekgk2/life-commerce:sha-123 || docker push docker.io/rogue/image:latest",
-      "docker push ghcr.io/georgekgk2/life-commerce:sha-123; docker push docker.io/rogue/image:latest",
+      "docker push ghcr.io/georgekgk2/life-commerce:sha-${{ github.sha }} && docker push docker.io/rogue/image:latest",
+      "docker push ghcr.io/georgekgk2/life-commerce:sha-${{ github.sha }} || docker push docker.io/rogue/image:latest",
+      "docker push ghcr.io/georgekgk2/life-commerce:sha-${{ github.sha }}; docker push docker.io/rogue/image:latest",
     ]) {
       const tempDir = mkdtempSync(
         join(tmpdir(), "life-containment-p2-chained-push-"),
@@ -1774,7 +1774,7 @@ jobs:
       id-token: write
     steps:
       - run: ${chainedCmd}
-      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-123
+      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-\${{ github.sha }}
 `,
         );
 
@@ -1824,8 +1824,8 @@ jobs:
       id-token: write
     steps:
       - run: |
-          # docker push ghcr.io/georgekgk2/life-commerce:sha-123
-          # docker push ghcr.io/georgekgk2/life-storefront:sha-123
+          # docker push ghcr.io/georgekgk2/life-commerce:sha-\${{ github.sha }}
+          # docker push ghcr.io/georgekgk2/life-storefront:sha-\${{ github.sha }}
           echo "Done"
 `,
       );
@@ -1896,10 +1896,10 @@ jobs:
 
   it("fails in Phase P2 if secondary workflow contains docker buildx --push or docker push", () => {
     for (const forbiddenPub of [
-      "docker buildx build --push -t ghcr.io/georgekgk2/life-commerce:sha-123 .",
-      "docker push ghcr.io/georgekgk2/life-commerce:sha-123",
-      "docker image push ghcr.io/georgekgk2/life-commerce:sha-123",
-      "podman push ghcr.io/georgekgk2/life-commerce:sha-123",
+      "docker buildx build --push -t ghcr.io/georgekgk2/life-commerce:sha-${{ github.sha }} .",
+      "docker push ghcr.io/georgekgk2/life-commerce:sha-${{ github.sha }}",
+      "docker image push ghcr.io/georgekgk2/life-commerce:sha-${{ github.sha }}",
+      "podman push ghcr.io/georgekgk2/life-commerce:sha-${{ github.sha }}",
     ]) {
       const tempDir = mkdtempSync(
         join(tmpdir(), "life-containment-p2-secondary-publish-"),
@@ -1984,7 +1984,7 @@ jobs:
       id-token: write
     steps:
       - run: ${mutableTag}
-      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-123
+      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-\${{ github.sha }}
 `,
         );
 
@@ -1992,6 +1992,214 @@ jobs:
         expect(result.valid).toBe(false);
         expect(
           result.violations.some((v) => v.rule === "P2-MUTABLE-IMAGE-TAG"),
+        ).toBe(true);
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("fails in Phase P2 if release-images.yml uses non-exact commit tags like sha-manual or sha-anything", () => {
+    for (const badTag of [
+      "docker push ghcr.io/georgekgk2/life-commerce:sha-manual",
+      "docker push ghcr.io/georgekgk2/life-commerce:sha-anything",
+      "docker push ghcr.io/georgekgk2/life-commerce:sha-123",
+    ]) {
+      const tempDir = mkdtempSync(
+        join(tmpdir(), "life-containment-p2-nonexact-tag-"),
+      );
+      try {
+        mkdirSync(join(tempDir, "infra"), { recursive: true });
+        const p2Gates = createValidPolicyGates();
+        p2Gates["allow_ghcr_image_push"] = true;
+        writeFileSync(
+          join(tempDir, "infra", "deployment-policy.json"),
+          JSON.stringify({
+            status: "CONTAINED_PHASE_P2",
+            gates: p2Gates,
+          }),
+        );
+
+        mkdirSync(join(tempDir, ".github", "workflows"), { recursive: true });
+        writeFileSync(
+          join(tempDir, ".github", "workflows", "release-images.yml"),
+          `name: Release
+on:
+  push:
+    branches: [main]
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    steps:
+      - run: ${badTag}
+      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-\${{ github.sha }}
+`,
+        );
+
+        const result = scanDeploymentContainment(tempDir);
+        expect(result.valid).toBe(false);
+        expect(
+          result.violations.some((v) => v.rule === "P2-MUTABLE-IMAGE-TAG"),
+        ).toBe(true);
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("fails in Phase P2 if push commands are wrapped in echo or printf strings", () => {
+    const tempDir = mkdtempSync(
+      join(tmpdir(), "life-containment-p2-string-wrapped-push-"),
+    );
+    try {
+      mkdirSync(join(tempDir, "infra"), { recursive: true });
+      const p2Gates = createValidPolicyGates();
+      p2Gates["allow_ghcr_image_push"] = true;
+      writeFileSync(
+        join(tempDir, "infra", "deployment-policy.json"),
+        JSON.stringify({
+          status: "CONTAINED_PHASE_P2",
+          gates: p2Gates,
+        }),
+      );
+
+      mkdirSync(join(tempDir, ".github", "workflows"), { recursive: true });
+      writeFileSync(
+        join(tempDir, ".github", "workflows", "release-images.yml"),
+        `name: Release
+on:
+  push:
+    branches: [main]
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    steps:
+      - run: |
+          echo "docker push ghcr.io/georgekgk2/life-commerce:sha-\${{ github.sha }}"
+          printf 'docker push ghcr.io/georgekgk2/life-storefront:sha-\${{ github.sha }}\\n'
+`,
+      );
+
+      const result = scanDeploymentContainment(tempDir);
+      expect(result.valid).toBe(false);
+      expect(
+        result.violations.some(
+          (v) => v.rule === "P2-MISSING-EXPECTED-IMAGE-PUSH",
+        ),
+      ).toBe(true);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails in Phase P2 if arbitrary external actions are used even if pinned to 40-char SHA", () => {
+    const tempDir = mkdtempSync(
+      join(tmpdir(), "life-containment-p2-unauthorized-action-"),
+    );
+    try {
+      mkdirSync(join(tempDir, "infra"), { recursive: true });
+      const p2Gates = createValidPolicyGates();
+      p2Gates["allow_ghcr_image_push"] = true;
+      writeFileSync(
+        join(tempDir, "infra", "deployment-policy.json"),
+        JSON.stringify({
+          status: "CONTAINED_PHASE_P2",
+          gates: p2Gates,
+        }),
+      );
+
+      mkdirSync(join(tempDir, ".github", "workflows"), { recursive: true });
+      writeFileSync(
+        join(tempDir, ".github", "workflows", "release-images.yml"),
+        `name: Release
+on:
+  push:
+    branches: [main]
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    steps:
+      - uses: evil-org/steal-token@0123456789abcdef0123456789abcdef01234567
+      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-\${{ github.sha }}
+      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-\${{ github.sha }}
+`,
+      );
+
+      const result = scanDeploymentContainment(tempDir);
+      expect(result.valid).toBe(false);
+      expect(
+        result.violations.some((v) => v.rule === "P2-UNAUTHORIZED-ACTION"),
+      ).toBe(true);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails in Phase P2 if docker/login-action specifies registry other than ghcr.io or omits registry", () => {
+    for (const loginConfig of [
+      "with:\n          registry: docker.io",
+      "with:\n          registry: quay.io",
+      "with:\n          username: test",
+    ]) {
+      const tempDir = mkdtempSync(
+        join(tmpdir(), "life-containment-p2-bad-login-registry-"),
+      );
+      try {
+        mkdirSync(join(tempDir, "infra"), { recursive: true });
+        const p2Gates = createValidPolicyGates();
+        p2Gates["allow_ghcr_image_push"] = true;
+        writeFileSync(
+          join(tempDir, "infra", "deployment-policy.json"),
+          JSON.stringify({
+            status: "CONTAINED_PHASE_P2",
+            gates: p2Gates,
+          }),
+        );
+
+        mkdirSync(join(tempDir, ".github", "workflows"), { recursive: true });
+        writeFileSync(
+          join(tempDir, ".github", "workflows", "release-images.yml"),
+          `name: Release
+on:
+  push:
+    branches: [main]
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    steps:
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        ${loginConfig}
+      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-\${{ github.sha }}
+      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-\${{ github.sha }}
+`,
+        );
+
+        const result = scanDeploymentContainment(tempDir);
+        expect(result.valid).toBe(false);
+        expect(
+          result.violations.some(
+            (v) => v.rule === "P2-UNAUTHORIZED-REGISTRY-LOGIN",
+          ),
         ).toBe(true);
       } finally {
         rmSync(tempDir, { recursive: true, force: true });

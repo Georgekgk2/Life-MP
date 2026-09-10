@@ -48,6 +48,20 @@ export const PERMITTED_GHCR_REPOSITORIES: readonly string[] = Object.freeze([
   "ghcr.io/georgekgk2/life-storefront",
 ]);
 
+export const PERMITTED_ACTIONS: readonly string[] = Object.freeze([
+  "actions/checkout",
+  "actions/setup-node",
+  "gitleaks/gitleaks-action",
+  "github/codeql-action/init",
+  "github/codeql-action/analyze",
+  "actions/upload-artifact",
+  "docker/setup-buildx-action",
+  "aquasecurity/trivy-action",
+  "actions/download-artifact",
+  "docker/login-action",
+  "actions/attest-build-provenance",
+]);
+
 export const MANDATORY_POLICY_GATES: readonly string[] = Object.freeze([
   "allow_remote_deployment",
   "allow_ssh_execution",
@@ -586,16 +600,53 @@ export function scanDeploymentContainment(
                           message: `Docker action "${uses}" is forbidden in ${relPath}.`,
                         });
                       } else {
-                        const isPinnedSha =
-                          /^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+(?:\/[a-zA-Z0-9._-]+)*@[0-9a-f]{40}$/i.test(
-                            uses,
-                          );
-                        if (!isPinnedSha) {
+                        const atIdx = uses.indexOf("@");
+                        if (atIdx === -1) {
                           violations.push({
                             rule: "P2-MUTABLE-ACTION-REF",
                             path: relPath,
                             message: `Action reference "${uses}" in ${relPath} is not pinned to an immutable 40-character commit SHA.`,
                           });
+                        } else {
+                          const actionRepo = uses.slice(0, atIdx).trim();
+                          const actionRef = uses.slice(atIdx + 1).trim();
+
+                          if (
+                            !(PERMITTED_ACTIONS as readonly string[]).includes(
+                              actionRepo,
+                            )
+                          ) {
+                            violations.push({
+                              rule: "P2-UNAUTHORIZED-ACTION",
+                              path: relPath,
+                              message: `Unauthorized action "${actionRepo}" in ${relPath}. Only approved actions in allowlist are permitted.`,
+                            });
+                          }
+
+                          if (!/^[0-9a-f]{40}$/i.test(actionRef)) {
+                            violations.push({
+                              rule: "P2-MUTABLE-ACTION-REF",
+                              path: relPath,
+                              message: `Action reference "${uses}" in ${relPath} is not pinned to an immutable 40-character commit SHA.`,
+                            });
+                          }
+
+                          // Registry validation for login action
+                          if (actionRepo === "docker/login-action") {
+                            const stepWith = stepObj["with"] as
+                              Record<string, unknown> | undefined;
+                            if (
+                              !stepWith ||
+                              typeof stepWith !== "object" ||
+                              stepWith["registry"] !== "ghcr.io"
+                            ) {
+                              violations.push({
+                                rule: "P2-UNAUTHORIZED-REGISTRY-LOGIN",
+                                path: relPath,
+                                message: `docker/login-action in ${relPath} must specify registry: ghcr.io. Logins to other registries are strictly forbidden.`,
+                              });
+                            }
+                          }
                         }
                       }
                     }
@@ -604,6 +655,18 @@ export function scanDeploymentContainment(
                     if (typeof stepObj["run"] === "string") {
                       const commands = extractShellCommands(stepObj["run"]);
                       for (const cmd of commands) {
+                        const tokens = cmd.split(/\s+/).filter(Boolean);
+                        const firstToken = tokens[0] ?? "";
+
+                        // Reject indirect command execution
+                        if (firstToken === "eval" || firstToken === "exec") {
+                          violations.push({
+                            rule: "P2-FORBIDDEN-PUBLISH-COMMAND",
+                            path: relPath,
+                            message: `Indirect command execution via "${firstToken}" is forbidden in job "${jobId}" in ${relPath}.`,
+                          });
+                        }
+
                         // Check for forbidden container publishing commands
                         if (
                           /buildx\s+.*--push/i.test(cmd) ||
@@ -622,21 +685,25 @@ export function scanDeploymentContainment(
                         }
 
                         // Check docker push commands
-                        if (/\bdocker\s+push\b/.test(cmd)) {
-                          if (jobId !== "publish") {
-                            violations.push({
-                              rule: "P2-UNAUTHORIZED-PUBLISH-JOB",
-                              path: relPath,
-                              message: `Forbidden docker push in job "${jobId}" in ${relPath}. Container publishing is strictly restricted to job "publish".`,
-                            });
-                          }
+                        const isExecutableDockerPush =
+                          tokens.length >= 2 &&
+                          tokens[0] === "docker" &&
+                          tokens[1] === "push";
 
-                          const tokens = cmd.split(/\s+/).filter(Boolean);
-                          const pushIdx = tokens.indexOf("push");
-                          const targetRaw = tokens
-                            .slice(pushIdx + 1)
-                            .join(" ")
-                            .trim();
+                        if (
+                          (/\bdocker\s+push\b/.test(cmd) ||
+                            isExecutableDockerPush) &&
+                          jobId !== "publish"
+                        ) {
+                          violations.push({
+                            rule: "P2-UNAUTHORIZED-PUBLISH-JOB",
+                            path: relPath,
+                            message: `Forbidden docker push in job "${jobId}" in ${relPath}. Container publishing is strictly restricted to job "publish".`,
+                          });
+                        }
+
+                        if (isExecutableDockerPush) {
+                          const targetRaw = tokens.slice(2).join(" ").trim();
                           const cleanTarget = targetRaw.replace(/['"]/g, "");
                           const repoName =
                             cleanTarget.split(":")[0]?.split("@")[0]?.trim() ??
@@ -667,15 +734,13 @@ export function scanDeploymentContainment(
                             });
                           } else {
                             const tag = cleanTarget.split(":")[1]?.trim() ?? "";
-                            if (
-                              !tag ||
-                              (!tag.startsWith("sha-") &&
-                                tag !== "sha-${{ github.sha }}")
-                            ) {
+                            const isExactCommitTag =
+                              /^sha-\$\{\{\s*github\.sha\s*\}\}$/.test(tag);
+                            if (!isExactCommitTag) {
                               violations.push({
                                 rule: "P2-MUTABLE-IMAGE-TAG",
                                 path: relPath,
-                                message: `docker push to mutable or unapproved tag "${tag}" in ${relPath} is forbidden. Only immutable commit tags starting with "sha-" are permitted.`,
+                                message: `docker push to unapproved tag "${tag}" in ${relPath} is forbidden. Only exact commit tag "sha-\${{ github.sha }}" is permitted.`,
                               });
                             } else if (jobId === "publish") {
                               if (

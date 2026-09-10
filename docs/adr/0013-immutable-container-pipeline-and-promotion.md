@@ -7,7 +7,7 @@
 ## Контекст
 
 1. **Проблема збірки на цільовому хості:**
-   Поточна конфігурація `deploy/docker-compose.prod.yml` містить директиви `build:`, що передбачає компіляцію застосунків (Next.js 16 та Medusa v2) безпосередньо на цільовому сервері під час кожного оновлення. Це створює такі ризики:
+   Поточний файл `deploy/docker-compose.prod.yml` містить директиви `build:`. Якщо запускати цей compose-файл на цільовому хості, це вимагатиме локальної компіляції додатків (Next.js 16 та Medusa v2). Фактичний стан та topology цільового сервера наразі не підтверджені згідно з [ADR 0004](0004-production-isolation.md). Така потенційна збірка створює ризики:
    - пікове споживання процесорних ресурсів та оперативної пам'яті (ризик аварійних збоїв OOM);
    - наявність вихідного коду, складальних інструментів та розробницьких пакетів на робочому сервері;
    - відсутність гарантії повної байтової ідентичності зібраних контейнерних образів між середовищами;
@@ -38,16 +38,20 @@
 3. **Сканування кожного архіву:** Сканер Trivy (`aquasecurity/trivy-action`, зафіксований за незмінним commit SHA) послідовно перевіряє безпосередньо експортовані файли архівів:
    - `input: /tmp/commerce.tar`;
    - `input: /tmp/storefront.tar`.
-4. **Політика вразливостей:** Встановлюється fail-closed поріг `severity: "CRITICAL,HIGH"`. Дозволені винятки регламентуються виключно через перевірений файл `.trivyignore`, де кожен запис має задокументовану причину та дату обов'язкового перегляду. Вразливості, для яких апстрім не випустив виправлення (`ignore-unfixed: true`), відстежуються як задокументовані залишкові ризики.
+4. **Політика вразливостей:** Встановлюється чіткий контракт сканування:
+   - Будь-яка виправна (fixable) вразливість рівня HIGH або CRITICAL викликає негайну зупинку (fail-closed);
+   - Невиправлені апстрімом вразливості (`ignore-unfixed: true`) дозволяються виключно як задокументований залишковий ризик;
+   - Винятки через `.trivyignore` дозволяються лише за умови машино-перевірюваного формату заголовка для кожного запису:
+     `# CVE-YYYY-XXXX | reason: <обґрунтування> | expires: YYYY-MM-DD | owner: <відповідальний>` (що перевіряється в preflight-перевірці).
 5. **Завантаження та Публікація:** Лише після успішного сканування та звірки контрольної суми виконується завантаження відповідного архіву в локальний Docker-демон (`docker load -i /tmp/<name>.tar`) і відправка в GitHub Container Registry:
    - `ghcr.io/georgekgk2/life-commerce:sha-<github_sha>`;
    - `ghcr.io/georgekgk2/life-storefront:sha-<github_sha>`.
 6. **Фіксація дайджестів та атестація:**
-   З реєстру отримується канонічний `sha256`-хеш образу (digest). Окремо фіксуються:
+   З реєстру отримується канонічний `sha256`-хеш образу (remote manifest digest). Окремо фіксуються:
    - локальний SHA-256 хеш tar-архіву;
    - локальний Image ID / config digest;
    - фінальний registry manifest digest.
-     Ці дані формують звіт `IMAGE_DIGESTS.json`, що зберігається як артефакт workflow.
+     Ці дані формують звіт `IMAGE_DIGESTS.json`, що зберігається як завантажуваний артефакт workflow.
 
 ### 2. Модель тригерів, дозволів та повний граф перевірок у CI
 
@@ -55,14 +59,16 @@
 - **Прив'язка до Commit SHA:** Перевірки на гілці PR не замінюють перевірку результуючого комміту в `main`. Збірка та публікація артефактів виконуються суворо для точного `github.sha`, який злито в `main`.
 - **Автономний релізний граф (Release Workflow):**
   Оскільки джоби не можуть мати міжфайлових залежностей `needs` між окремими workflow-файлами, релізний пайплайн `.github/workflows/release-images.yml` реалізується як єдиний самодостатній граф, що покриває всі обов'язкові виміри якості до запуску публікації:
-  1. `verify-and-test` — збірка workspace, lint, typecheck, модульні тести (`vitest`) та перевірка документації (`check-docs.mjs`);
-  2. `integration-and-e2e` — запуск тестової бази даних, міграцій, інтеграційних тестів та Playwright E2E;
-  3. `security-audit` — Secret Detection (Gitleaks) та аудит виробничих залежностей (`pnpm audit --prod --audit-level=high`);
-  4. `image-build-scan` — компіляція образів у tar-архіви, розрахунок контрольних сум та fail-closed сканування Trivy;
-  5. `publish` (має залежність `needs: [verify-and-test, integration-and-e2e, security-audit, image-build-scan]`) — завантаження, пуш у GHCR, генерація маніфесту та атестація.
-     Це гарантує, що публікація виконується **виключно за умови проходження повного комплексу перевірок** саме для того комміту, який потрапив у `main`.
-- **Мінімальні права (Least Privilege):** Дозволи `packages: write`, `attestations: write` та `id-token: write` надаються суворо ізольовано на рівні джоби `publish`. Усі інші джоби в пайплайні мають лише `contents: read`.
-- **Атестація збірки:** Застосовується `actions/attest-build-provenance` для кожного опублікованого образу (`subject-name: ghcr.io/georgekgk2/life-commerce` та `life-storefront`) із прив'язкою до отриманого registry digest та `github.sha`.
+  1. `verify-and-test` (permissions: `contents: read`) — збірка workspace, lint, typecheck, модульні тести (`vitest`) та перевірка документації (`check-docs.mjs`);
+  2. `integration-and-e2e` (permissions: `contents: read`) — запуск тестової бази даних, міграцій, інтеграційних тестів та Playwright E2E;
+  3. `security-audit` (permissions: `contents: read`) — Secret Detection (Gitleaks) та аудит виробничих залежностей (`pnpm audit --prod --audit-level=high`);
+  4. `codeql-analysis` (permissions: `contents: read`, `actions: read`, `security-events: write`) — семантичний статичний аналіз CodeQL для `javascript-typescript`;
+  5. `image-build-scan` (permissions: `contents: read`) — компіляція образів у tar-архіви, розрахунок контрольних сум та fail-closed сканування Trivy;
+  6. `publish` (permissions: `contents: read`, `packages: write`, `attestations: write`, `id-token: write`; залежність `needs: [verify-and-test, integration-and-e2e, security-audit, codeql-analysis, image-build-scan]`) — завантаження, пуш у GHCR, генерація маніфесту та атестація.
+     Це гарантує, що публікація виконується **виключно за умови проходження повного комплексу з усіх обов'язкових перевірок** саме для того комміту, який потрапив у `main`.
+- **Мінімальні права (Least Privilege):** Дозволи `packages: write`, `attestations: write` та `id-token: write` надаються суворо ізольовано на рівні джоби `publish`. Джоба `codeql-analysis` має `security-events: write` та `actions: read`. Усі інші джоби мають виключно `contents: read`.
+- **Незмінні посилання на GitHub Actions:** Усі екшени у workflow фіксуються виключно за точними 40-символьними immutable commit SHAs (checkout, buildx, login, trivy-action, upload-artifact, attest-build-provenance).
+- **Атестація збірки:** Застосовується `actions/attest-build-provenance` для кожного опублікованого образу (`subject-name: ghcr.io/georgekgk2/life-commerce` та `life-storefront`). Параметр `subject-digest` береться **суворо з результату push у реєстр** (канонічний remote manifest digest, наприклад `sha256:...`), а не з локального Image ID чи хешу tar-архіву.
 - **Аутентифікація:** Використовується виключно системний короткоживучий `GITHUB_TOKEN`, жодних персональних токенів доступу (PAT) або постійних секретів.
 
 ### 3. Фазове розмежування політики репозиторію (Фаза P0 ➔ Фаза P2)
@@ -98,7 +104,7 @@
 
 ## Наслідки
 
-- **Безпека хоста:** Усувається пікове навантаження CPU та RAM під час релізів; на сервері відсутні компілятори, сирцеві коди та кеші збірки.
+- **Безпека хоста:** Після майбутньої промоції та переходу на готові образи збірка на боці хоста більше не буде потрібна; фактичний поточний стан цільового сервера залишається неперевіреним відповідно до [ADR 0004](0004-production-isolation.md).
 - **Межі відтворюваності (Reproducibility Boundary):** Збірка не гарантує bit-for-bit reproducibility до моменту публікації через оновлення системних пакунків Alpine під час виконання інструкції `RUN apk upgrade --no-cache`. Проте після публікації конкретний `sha256`-дайджест у реєстрі є незмінним (immutable) і гарантує детерміноване розгортання одного й того самого бінарного артефакту.
 - **Ізоляція ресурсів:** Архітектура P2 не використовує self-hosted runner або remote build і призначена зменшити майбутній host blast radius. Фактична production isolation залишається неперевіреною відповідно до [ADR 0004](0004-production-isolation.md).
 

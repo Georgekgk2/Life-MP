@@ -6,6 +6,7 @@ import {
   realpathSync,
 } from "node:fs";
 import { join } from "node:path";
+import { load as loadYaml } from "js-yaml";
 
 export type DeploymentContainmentViolation = Readonly<{
   rule: string;
@@ -28,7 +29,7 @@ export type DeploymentPolicyFile = Readonly<{
 /**
  * SECURITY NOTICE & BOUNDARY SPECIFICATION:
  * This deployment containment scanner is a repository-local static defense-in-depth preflight control.
- * It verifies repository invariants, files, and scripts against Phase P0 containment policy constraints.
+ * It verifies repository invariants, files, and scripts against Phase P0/P2 containment policy constraints.
  * It DOES NOT constitute an autonomous security boundary or sovereign authorization.
  * Sovereign containment and authorization rely upon:
  * 1. Protected branch enforcement (disallowing unreviewed merges);
@@ -41,6 +42,25 @@ export type DeploymentPolicyFile = Readonly<{
  * commands (SSH, rsync, Docker contexts), but does not isolate arbitrary outbound network calls
  * (e.g. external generative APIs in generate-marketplace-images.mjs) or local child processes.
  */
+
+export const PERMITTED_GHCR_REPOSITORIES: readonly string[] = Object.freeze([
+  "ghcr.io/georgekgk2/life-commerce",
+  "ghcr.io/georgekgk2/life-storefront",
+]);
+
+export const PERMITTED_ACTIONS: readonly string[] = Object.freeze([
+  "actions/checkout",
+  "actions/setup-node",
+  "gitleaks/gitleaks-action",
+  "github/codeql-action/init",
+  "github/codeql-action/analyze",
+  "actions/upload-artifact",
+  "docker/setup-buildx-action",
+  "aquasecurity/trivy-action",
+  "actions/download-artifact",
+  "docker/login-action",
+  "actions/attest-build-provenance",
+]);
 
 export const MANDATORY_POLICY_GATES: readonly string[] = Object.freeze([
   "allow_remote_deployment",
@@ -99,12 +119,43 @@ export const FORBIDDEN_SCRIPT_FILENAMES: readonly string[] = Object.freeze([
   "deploy-colocated-prod.sh",
 ]);
 
+function isValidCalendarDate(dateStr: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
+  const parts = dateStr.split("-").map(Number);
+  const y = parts[0];
+  const m = parts[1];
+  const d = parts[2];
+  if (!y || !m || !d || y < 2020 || m < 1 || m > 12 || d < 1 || d > 31)
+    return false;
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return (
+    date.getUTCFullYear() === y &&
+    date.getUTCMonth() + 1 === m &&
+    date.getUTCDate() === d
+  );
+}
+
+function extractShellCommands(script: string): string[] {
+  const effectiveLines = script
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith("#"))
+    .map((l) => l.split(/\s+#\s+/)[0]?.trim() || "");
+
+  const normalizedScript = effectiveLines.join("\n");
+  return normalizedScript
+    .split(/(?:&&|\|\||[;\n&|])/)
+    .map((c) => c.trim())
+    .filter(Boolean);
+}
+
 export function scanDeploymentContainment(
   rootDir: string,
 ): DeploymentContainmentResult {
   const violations: DeploymentContainmentViolation[] = [];
 
   // 1. Validate infra/deployment-policy.json
+  let policyStatus = "CONTAINED";
   const policyPath = join(rootDir, "infra", "deployment-policy.json");
   if (!existsSync(policyPath)) {
     violations.push({
@@ -117,13 +168,18 @@ export function scanDeploymentContainment(
     try {
       const raw = readFileSync(policyPath, "utf-8");
       const parsed = JSON.parse(raw) as DeploymentPolicyFile;
-      if (parsed.status !== "CONTAINED") {
+      const isValidStatus =
+        parsed.status === "CONTAINED" || parsed.status === "CONTAINED_PHASE_P2";
+      if (!isValidStatus) {
         violations.push({
           rule: "P0-POLICY-STATUS",
           path: "infra/deployment-policy.json",
-          message: `Expected status to be "CONTAINED", got "${parsed.status}".`,
+          message: `Expected status to be "CONTAINED" or "CONTAINED_PHASE_P2", got "${parsed.status}".`,
         });
+      } else {
+        policyStatus = parsed.status;
       }
+
       if (!parsed.gates || typeof parsed.gates !== "object") {
         violations.push({
           rule: "P0-POLICY-GATES",
@@ -142,14 +198,36 @@ export function scanDeploymentContainment(
           }
         }
 
-        // Enforce all gates must be locked (false)
-        for (const [gateName, gateValue] of Object.entries(parsed.gates)) {
-          if (gateValue !== false) {
+        if (parsed.status === "CONTAINED") {
+          // In Phase P0, all gates must be locked (false)
+          for (const [gateName, gateValue] of Object.entries(parsed.gates)) {
+            if (gateValue !== false) {
+              violations.push({
+                rule: "P0-GATE-LOCKED",
+                path: "infra/deployment-policy.json",
+                message: `In Phase P0 ("CONTAINED"), gate "${gateName}" must be false, but got ${gateValue}.`,
+              });
+            }
+          }
+        } else if (parsed.status === "CONTAINED_PHASE_P2") {
+          // In Phase P2, allow_ghcr_image_push must be true
+          if (parsed.gates["allow_ghcr_image_push"] !== true) {
             violations.push({
-              rule: "P0-GATE-LOCKED",
+              rule: "P2-GATE-STATE",
               path: "infra/deployment-policy.json",
-              message: `Gate "${gateName}" must be false, but got ${gateValue}.`,
+              message: `In Phase P2 ("CONTAINED_PHASE_P2"), gate "allow_ghcr_image_push" must be true, but got ${parsed.gates["allow_ghcr_image_push"]}.`,
             });
+          }
+          // All other gates must remain locked (false)
+          for (const [gateName, gateValue] of Object.entries(parsed.gates)) {
+            if (gateName === "allow_ghcr_image_push") continue;
+            if (gateValue !== false) {
+              violations.push({
+                rule: "P0-GATE-LOCKED",
+                path: "infra/deployment-policy.json",
+                message: `In Phase P2 ("CONTAINED_PHASE_P2"), gate "${gateName}" must remain false, but got ${gateValue}.`,
+              });
+            }
           }
         }
       }
@@ -181,26 +259,22 @@ export function scanDeploymentContainment(
       }
 
       if (file.endsWith(".yml") || file.endsWith(".yaml")) {
-        const content = readFileSync(join(workflowsDir, file), "utf-8");
+        const fullPath = join(workflowsDir, file);
+        const relPath = `.github/workflows/${file}`;
+        const content = readFileSync(fullPath, "utf-8");
+
         if (content.includes("appleboy/ssh-action")) {
           violations.push({
             rule: "P0-NO-SSH-ACTION",
-            path: `.github/workflows/${file}`,
-            message: `Forbidden appleboy/ssh-action found in .github/workflows/${file}.`,
+            path: relPath,
+            message: `Forbidden appleboy/ssh-action found in ${relPath}.`,
           });
         }
         if (content.includes("docker/build-push-action")) {
           violations.push({
             rule: "P0-NO-BUILD-PUSH-ACTION",
-            path: `.github/workflows/${file}`,
-            message: `Forbidden docker/build-push-action found in .github/workflows/${file}.`,
-          });
-        }
-        if (content.includes("packages: write")) {
-          violations.push({
-            rule: "P0-NO-PACKAGES-WRITE",
-            path: `.github/workflows/${file}`,
-            message: `Forbidden "packages: write" permission found in .github/workflows/${file}.`,
+            path: relPath,
+            message: `Forbidden docker/build-push-action found in ${relPath}.`,
           });
         }
         if (
@@ -210,16 +284,604 @@ export function scanDeploymentContainment(
         ) {
           violations.push({
             rule: "P0-NO-DEPLOY-SECRETS",
-            path: `.github/workflows/${file}`,
-            message: `Forbidden deployment secret reference found in .github/workflows/${file}.`,
+            path: relPath,
+            message: `Forbidden deployment secret reference found in ${relPath}.`,
           });
         }
         if (content.includes("skip_tests:")) {
           violations.push({
             rule: "P0-NO-SKIP-TESTS",
-            path: `.github/workflows/${file}`,
-            message: `Forbidden skip_tests input found in .github/workflows/${file}.`,
+            path: relPath,
+            message: `Forbidden skip_tests input found in ${relPath}.`,
           });
+        }
+
+        let doc: unknown;
+        try {
+          doc = loadYaml(content);
+        } catch (err) {
+          violations.push({
+            rule: "P0-WORKFLOW-YAML-INVALID",
+            path: relPath,
+            message: `Failed to parse workflow YAML: ${String(err)}`,
+          });
+          if (/packages:\s*write/.test(content)) {
+            violations.push({
+              rule: "P0-NO-PACKAGES-WRITE",
+              path: relPath,
+              message: `Forbidden "packages: write" permission found in ${relPath}.`,
+            });
+          }
+          continue;
+        }
+
+        if (!doc || typeof doc !== "object" || Array.isArray(doc)) {
+          violations.push({
+            rule: "P0-WORKFLOW-YAML-INVALID",
+            path: relPath,
+            message: `Workflow YAML in ${relPath} must resolve to a mapping object.`,
+          });
+          continue;
+        }
+
+        const docRecord = doc as Record<string, unknown>;
+
+        if (
+          docRecord["on"] &&
+          (docRecord["on"] === "pull_request_target" ||
+            (typeof docRecord["on"] === "object" &&
+              "pull_request_target" in
+                (docRecord["on"] as Record<string, unknown>)))
+        ) {
+          violations.push({
+            rule: "P0-NO-PR-TARGET",
+            path: relPath,
+            message: `Forbidden pull_request_target trigger found in ${relPath}.`,
+          });
+        }
+
+        const hasWritePermission = (
+          permVal: unknown,
+          targetPerm?: string,
+        ): boolean => {
+          if (typeof permVal === "string") {
+            return permVal === "write-all";
+          }
+          if (
+            permVal &&
+            typeof permVal === "object" &&
+            !Array.isArray(permVal)
+          ) {
+            const permObj = permVal as Record<string, unknown>;
+            if (targetPerm) {
+              return permObj[targetPerm] === "write";
+            }
+            return Object.values(permObj).some((v) => v === "write");
+          }
+          return false;
+        };
+
+        const topLevelHasPackagesWrite = hasWritePermission(
+          docRecord["permissions"],
+          "packages",
+        );
+        const docJobs = docRecord["jobs"];
+        const anyJobHasPackagesWrite =
+          docJobs &&
+          typeof docJobs === "object" &&
+          !Array.isArray(docJobs) &&
+          Object.values(docJobs as Record<string, unknown>).some(
+            (j: unknown) =>
+              j &&
+              typeof j === "object" &&
+              !Array.isArray(j) &&
+              hasWritePermission(
+                (j as Record<string, unknown>)["permissions"],
+                "packages",
+              ),
+          );
+
+        if (policyStatus === "CONTAINED") {
+          if (
+            topLevelHasPackagesWrite ||
+            anyJobHasPackagesWrite ||
+            /packages:\s*write/.test(content)
+          ) {
+            violations.push({
+              rule: "P0-NO-PACKAGES-WRITE",
+              path: relPath,
+              message: `Forbidden "packages: write" permission found in ${relPath} in Phase P0.`,
+            });
+          }
+        } else if (policyStatus === "CONTAINED_PHASE_P2") {
+          if (file === "release-images.yml") {
+            // 1. Top-level permissions check
+            if (hasWritePermission(docRecord["permissions"])) {
+              violations.push({
+                rule: "P2-TOPLEVEL-WRITE-PERMISSIONS",
+                path: relPath,
+                message: `Top-level write permission is forbidden in ${relPath}. Permissions must be scoped strictly to the publish job.`,
+              });
+            }
+
+            // 2. Strict Trigger Validation
+            const docOn = docRecord["on"];
+            if (!docOn || typeof docOn !== "object" || Array.isArray(docOn)) {
+              violations.push({
+                rule: "P2-FORBIDDEN-TRIGGER",
+                path: relPath,
+                message: `Workflow ${relPath} trigger must be an object specifying push on main.`,
+              });
+            } else {
+              const onObj = docOn as Record<string, unknown>;
+              const triggerKeys = Object.keys(onObj);
+              if (triggerKeys.length !== 1 || triggerKeys[0] !== "push") {
+                violations.push({
+                  rule: "P2-FORBIDDEN-TRIGGER",
+                  path: relPath,
+                  message: `Workflow ${relPath} contains unapproved trigger (${triggerKeys.join(
+                    ", ",
+                  )}). In Phase P2, triggers must be restricted strictly to push on main.`,
+                });
+              } else {
+                const pushConfig = onObj["push"];
+                if (
+                  !pushConfig ||
+                  typeof pushConfig !== "object" ||
+                  Array.isArray(pushConfig)
+                ) {
+                  violations.push({
+                    rule: "P2-FORBIDDEN-TRIGGER",
+                    path: relPath,
+                    message: `Workflow ${relPath} push trigger must specify branches: ["main"].`,
+                  });
+                } else {
+                  const pushRecord = pushConfig as Record<string, unknown>;
+                  const pushKeys = Object.keys(pushRecord);
+                  if (pushKeys.length !== 1 || pushKeys[0] !== "branches") {
+                    violations.push({
+                      rule: "P2-FORBIDDEN-TRIGGER",
+                      path: relPath,
+                      message: `Workflow ${relPath} push trigger contains unapproved filters (${pushKeys
+                        .filter((k) => k !== "branches")
+                        .join(
+                          ", ",
+                        )}). In Phase P2, push triggers must contain only "branches: [main]".`,
+                    });
+                  }
+                  const branches = pushRecord["branches"];
+                  if (
+                    !Array.isArray(branches) ||
+                    branches.length !== 1 ||
+                    branches[0] !== "main"
+                  ) {
+                    violations.push({
+                      rule: "P2-FORBIDDEN-BRANCH",
+                      path: relPath,
+                      message: `Workflow ${relPath} push trigger is configured for branches [${
+                        Array.isArray(branches)
+                          ? branches.join(", ")
+                          : String(branches)
+                      }]. Only ["main"] is permitted.`,
+                    });
+                  }
+                }
+              }
+            }
+
+            // 3. Job-Level Permissions & Steps Validation
+            let foundCommercePush = false;
+            let foundStorefrontPush = false;
+
+            if (
+              !docJobs ||
+              typeof docJobs !== "object" ||
+              Array.isArray(docJobs)
+            ) {
+              violations.push({
+                rule: "P0-WORKFLOW-YAML-INVALID",
+                path: relPath,
+                message: `Jobs in ${relPath} must be an object.`,
+              });
+            } else {
+              const jobsObj = docJobs as Record<string, unknown>;
+              for (const [jobId, rawJobData] of Object.entries(jobsObj)) {
+                if (
+                  !rawJobData ||
+                  typeof rawJobData !== "object" ||
+                  Array.isArray(rawJobData)
+                ) {
+                  violations.push({
+                    rule: "P0-WORKFLOW-YAML-INVALID",
+                    path: relPath,
+                    message: `Job "${jobId}" in ${relPath} must be an object.`,
+                  });
+                  continue;
+                }
+                const jobData = rawJobData as Record<string, unknown>;
+
+                // Ban job-level reusable workflows
+                if ("uses" in jobData && typeof jobData["uses"] === "string") {
+                  violations.push({
+                    rule: "P2-FORBIDDEN-REUSABLE-WORKFLOW",
+                    path: relPath,
+                    message: `Job "${jobId}" in ${relPath} references reusable workflow "${jobData["uses"]}". Reusable workflows are strictly forbidden in Phase P2 release pipeline.`,
+                  });
+                }
+
+                if (jobId === "publish") {
+                  const jobPerms = jobData["permissions"];
+                  if (
+                    !jobPerms ||
+                    typeof jobPerms !== "object" ||
+                    Array.isArray(jobPerms)
+                  ) {
+                    violations.push({
+                      rule: "P2-PUBLISH-FORBIDDEN-PERMISSIONS",
+                      path: relPath,
+                      message: `Job "publish" permissions must be a scoped object, got "${String(
+                        jobPerms,
+                      )}".`,
+                    });
+                  } else {
+                    const permsObj = jobPerms as Record<string, unknown>;
+                    const expectedPerms: Record<string, string> = {
+                      contents: "read",
+                      packages: "write",
+                      attestations: "write",
+                      "id-token": "write",
+                    };
+                    for (const [permKey, permVal] of Object.entries(permsObj)) {
+                      if (!(permKey in expectedPerms)) {
+                        violations.push({
+                          rule: "P2-PUBLISH-FORBIDDEN-PERMISSIONS",
+                          path: relPath,
+                          message: `Job "publish" contains unapproved permission "${permKey}: ${String(
+                            permVal,
+                          )}".`,
+                        });
+                      } else if (permVal !== expectedPerms[permKey]) {
+                        violations.push({
+                          rule: "P2-PUBLISH-FORBIDDEN-PERMISSIONS",
+                          path: relPath,
+                          message: `Job "publish" permission "${permKey}" must be "${
+                            expectedPerms[permKey]
+                          }", got "${String(permVal)}".`,
+                        });
+                      }
+                    }
+                    for (const [reqKey, reqVal] of Object.entries(
+                      expectedPerms,
+                    )) {
+                      if (!(reqKey in permsObj)) {
+                        violations.push({
+                          rule: "P2-PUBLISH-PERMISSION-MISMATCH",
+                          path: relPath,
+                          message: `Job "publish" is missing required permission "${reqKey}: ${reqVal}".`,
+                        });
+                      }
+                    }
+                  }
+                } else {
+                  if (hasWritePermission(jobData["permissions"])) {
+                    violations.push({
+                      rule: "P2-JOB-FORBIDDEN-WRITE-PERMISSIONS",
+                      path: relPath,
+                      message: `Job "${jobId}" in ${relPath} is not permitted to have write permissions. Only job "publish" may have write permissions in Phase P2.`,
+                    });
+                  }
+                }
+
+                // 4. Action References Validation
+                const steps = jobData["steps"];
+                if (Array.isArray(steps)) {
+                  for (const step of steps) {
+                    if (
+                      !step ||
+                      typeof step !== "object" ||
+                      Array.isArray(step)
+                    ) {
+                      continue;
+                    }
+                    const stepObj = step as Record<string, unknown>;
+
+                    if (typeof stepObj["uses"] === "string") {
+                      const uses = stepObj["uses"].trim();
+                      if (uses.startsWith("./")) {
+                        violations.push({
+                          rule: "P2-FORBIDDEN-LOCAL-ACTION",
+                          path: relPath,
+                          message: `Local action "${uses}" is forbidden in ${relPath}. All actions must be pinned external GitHub Actions.`,
+                        });
+                      } else if (uses.startsWith("docker://")) {
+                        violations.push({
+                          rule: "P2-FORBIDDEN-DOCKER-ACTION",
+                          path: relPath,
+                          message: `Docker action "${uses}" is forbidden in ${relPath}.`,
+                        });
+                      } else {
+                        const atIdx = uses.indexOf("@");
+                        if (atIdx === -1) {
+                          violations.push({
+                            rule: "P2-MUTABLE-ACTION-REF",
+                            path: relPath,
+                            message: `Action reference "${uses}" in ${relPath} is not pinned to an immutable 40-character commit SHA.`,
+                          });
+                        } else {
+                          const actionRepo = uses.slice(0, atIdx).trim();
+                          const actionRef = uses.slice(atIdx + 1).trim();
+
+                          if (
+                            !(PERMITTED_ACTIONS as readonly string[]).includes(
+                              actionRepo,
+                            )
+                          ) {
+                            violations.push({
+                              rule: "P2-UNAUTHORIZED-ACTION",
+                              path: relPath,
+                              message: `Unauthorized action "${actionRepo}" in ${relPath}. Only approved actions in allowlist are permitted.`,
+                            });
+                          }
+
+                          if (!/^[0-9a-f]{40}$/i.test(actionRef)) {
+                            violations.push({
+                              rule: "P2-MUTABLE-ACTION-REF",
+                              path: relPath,
+                              message: `Action reference "${uses}" in ${relPath} is not pinned to an immutable 40-character commit SHA.`,
+                            });
+                          }
+
+                          // Registry validation for login action
+                          if (actionRepo === "docker/login-action") {
+                            const stepWith = stepObj["with"] as
+                              Record<string, unknown> | undefined;
+                            if (
+                              !stepWith ||
+                              typeof stepWith !== "object" ||
+                              stepWith["registry"] !== "ghcr.io"
+                            ) {
+                              violations.push({
+                                rule: "P2-UNAUTHORIZED-REGISTRY-LOGIN",
+                                path: relPath,
+                                message: `docker/login-action in ${relPath} must specify registry: ghcr.io. Logins to other registries are strictly forbidden.`,
+                              });
+                            }
+                          }
+                        }
+                      }
+                    }
+
+                    // 5. Inspect step.run for any container publishing commands
+                    if (typeof stepObj["run"] === "string") {
+                      const commands = extractShellCommands(stepObj["run"]);
+                      for (const cmd of commands) {
+                        const tokens = cmd.split(/\s+/).filter(Boolean);
+                        const firstToken = tokens[0] ?? "";
+
+                        // Reject indirect command execution
+                        if (firstToken === "eval" || firstToken === "exec") {
+                          violations.push({
+                            rule: "P2-FORBIDDEN-PUBLISH-COMMAND",
+                            path: relPath,
+                            message: `Indirect command execution via "${firstToken}" is forbidden in job "${jobId}" in ${relPath}.`,
+                          });
+                        }
+
+                        // Check for forbidden container publishing commands
+                        if (
+                          /buildx\s+.*--push/i.test(cmd) ||
+                          /--push\s+.*buildx/i.test(cmd) ||
+                          /docker\s+image\s+push/i.test(cmd) ||
+                          /podman\s+push/i.test(cmd) ||
+                          /crane\s+push/i.test(cmd) ||
+                          /oras\s+push/i.test(cmd) ||
+                          /skopeo\s+copy/i.test(cmd)
+                        ) {
+                          violations.push({
+                            rule: "P2-FORBIDDEN-PUBLISH-COMMAND",
+                            path: relPath,
+                            message: `Forbidden container publishing command detected in job "${jobId}" in ${relPath}. Only explicit docker push to approved repositories is permitted.`,
+                          });
+                        }
+
+                        // Check docker push commands
+                        const isExecutableDockerPush =
+                          tokens.length >= 2 &&
+                          tokens[0] === "docker" &&
+                          tokens[1] === "push";
+
+                        if (
+                          (/\bdocker\s+push\b/.test(cmd) ||
+                            isExecutableDockerPush) &&
+                          jobId !== "publish"
+                        ) {
+                          violations.push({
+                            rule: "P2-UNAUTHORIZED-PUBLISH-JOB",
+                            path: relPath,
+                            message: `Forbidden docker push in job "${jobId}" in ${relPath}. Container publishing is strictly restricted to job "publish".`,
+                          });
+                        }
+
+                        if (isExecutableDockerPush) {
+                          const targetRaw = tokens.slice(2).join(" ").trim();
+                          const cleanTarget = targetRaw.replace(/['"]/g, "");
+                          const repoName =
+                            cleanTarget.split(":")[0]?.split("@")[0]?.trim() ??
+                            "";
+
+                          if (
+                            repoName.startsWith("$") ||
+                            repoName.includes("${") ||
+                            repoName.includes("$(")
+                          ) {
+                            violations.push({
+                              rule: "P2-UNAUTHORIZED-IMAGE-REPO",
+                              path: relPath,
+                              message: `docker push to dynamic or variable target "${targetRaw}" in ${relPath} is forbidden. Only static allowlisted image repositories may be targeted.`,
+                            });
+                            continue;
+                          }
+
+                          if (
+                            !(
+                              PERMITTED_GHCR_REPOSITORIES as readonly string[]
+                            ).includes(repoName)
+                          ) {
+                            violations.push({
+                              rule: "P2-UNAUTHORIZED-IMAGE-REPO",
+                              path: relPath,
+                              message: `Unauthorized docker push to image repository "${repoName}" in ${relPath}. Only approved repositories are permitted.`,
+                            });
+                          } else {
+                            const tag = cleanTarget.split(":")[1]?.trim() ?? "";
+                            const isExactCommitTag =
+                              /^sha-\$\{\{\s*github\.sha\s*\}\}$/.test(tag);
+                            if (!isExactCommitTag) {
+                              violations.push({
+                                rule: "P2-MUTABLE-IMAGE-TAG",
+                                path: relPath,
+                                message: `docker push to unapproved tag "${tag}" in ${relPath} is forbidden. Only exact commit tag "sha-\${{ github.sha }}" is permitted.`,
+                              });
+                            } else if (jobId === "publish") {
+                              if (
+                                repoName === "ghcr.io/georgekgk2/life-commerce"
+                              ) {
+                                foundCommercePush = true;
+                              }
+                              if (
+                                repoName ===
+                                "ghcr.io/georgekgk2/life-storefront"
+                              ) {
+                                foundStorefrontPush = true;
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+
+            // 6. Verify required image pushes were actually found in publish job
+            if (!foundCommercePush) {
+              violations.push({
+                rule: "P2-MISSING-EXPECTED-IMAGE-PUSH",
+                path: relPath,
+                message: `Workflow ${relPath} is missing required push command for "ghcr.io/georgekgk2/life-commerce" in job "publish".`,
+              });
+            }
+            if (!foundStorefrontPush) {
+              violations.push({
+                rule: "P2-MISSING-EXPECTED-IMAGE-PUSH",
+                path: relPath,
+                message: `Workflow ${relPath} is missing required push command for "ghcr.io/georgekgk2/life-storefront" in job "publish".`,
+              });
+            }
+          } else {
+            // Secondary workflow checks in Phase P2
+            // 1. Top-level permissions check
+            if (hasWritePermission(docRecord["permissions"], "packages")) {
+              violations.push({
+                rule: "P0-UNAUTHORIZED-PUBLISH-WORKFLOW",
+                path: relPath,
+                message: `Forbidden "packages: write" permission found in unauthorized workflow ${relPath}. Only .github/workflows/release-images.yml may publish in Phase P2.`,
+              });
+            }
+            if (hasWritePermission(docRecord["permissions"])) {
+              violations.push({
+                rule: "P2-SECONDARY-WORKFLOW-WRITE-PERMISSIONS",
+                path: relPath,
+                message: `Workflow ${relPath} is not permitted to have top-level write permissions in Phase P2.`,
+              });
+            }
+
+            // 2. Job-level permissions, reusable workflows, and step commands check
+            if (
+              docJobs &&
+              typeof docJobs === "object" &&
+              !Array.isArray(docJobs)
+            ) {
+              const jobsObj = docJobs as Record<string, unknown>;
+              for (const [jobId, rawJobData] of Object.entries(jobsObj)) {
+                if (
+                  !rawJobData ||
+                  typeof rawJobData !== "object" ||
+                  Array.isArray(rawJobData)
+                ) {
+                  continue;
+                }
+                const jobData = rawJobData as Record<string, unknown>;
+
+                if ("uses" in jobData && typeof jobData["uses"] === "string") {
+                  violations.push({
+                    rule: "P2-FORBIDDEN-REUSABLE-WORKFLOW",
+                    path: relPath,
+                    message: `Job "${jobId}" in secondary workflow ${relPath} references reusable workflow "${jobData["uses"]}". Reusable workflows are strictly forbidden in Phase P2.`,
+                  });
+                }
+
+                if (hasWritePermission(jobData["permissions"], "packages")) {
+                  violations.push({
+                    rule: "P0-UNAUTHORIZED-PUBLISH-WORKFLOW",
+                    path: relPath,
+                    message: `Forbidden "packages: write" permission found in unauthorized workflow ${relPath}. Only .github/workflows/release-images.yml may publish in Phase P2.`,
+                  });
+                }
+
+                if (hasWritePermission(jobData["permissions"])) {
+                  violations.push({
+                    rule: "P2-SECONDARY-WORKFLOW-WRITE-PERMISSIONS",
+                    path: relPath,
+                    message: `Job "${jobId}" in secondary workflow ${relPath} is not permitted to have write permissions in Phase P2.`,
+                  });
+                }
+
+                const steps = jobData["steps"];
+                if (Array.isArray(steps)) {
+                  for (const step of steps) {
+                    if (
+                      !step ||
+                      typeof step !== "object" ||
+                      Array.isArray(step)
+                    ) {
+                      continue;
+                    }
+                    const stepObj = step as Record<string, unknown>;
+                    if (typeof stepObj["run"] === "string") {
+                      const commands = extractShellCommands(stepObj["run"]);
+                      for (const cmd of commands) {
+                        if (
+                          /buildx\s+.*--push/i.test(cmd) ||
+                          /--push\s+.*buildx/i.test(cmd) ||
+                          /docker\s+image\s+push/i.test(cmd) ||
+                          /podman\s+push/i.test(cmd) ||
+                          /crane\s+push/i.test(cmd) ||
+                          /oras\s+push/i.test(cmd) ||
+                          /skopeo\s+copy/i.test(cmd)
+                        ) {
+                          violations.push({
+                            rule: "P2-FORBIDDEN-PUBLISH-COMMAND",
+                            path: relPath,
+                            message: `Forbidden container publishing command detected in secondary workflow ${relPath}.`,
+                          });
+                        }
+
+                        if (/\bdocker\s+push\b/.test(cmd)) {
+                          violations.push({
+                            rule: "P2-UNAUTHORIZED-PUBLISH-WORKFLOW",
+                            path: relPath,
+                            message: `Forbidden docker push in secondary workflow ${relPath}. Only .github/workflows/release-images.yml may publish in Phase P2.`,
+                          });
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -415,6 +1077,88 @@ export function scanDeploymentContainment(
         };
         scanDir(scriptsDir);
       }
+    }
+  }
+
+  // 5. Scan .trivyignore for structured metadata and non-expired entries
+  const trivyignorePath = join(rootDir, ".trivyignore");
+  if (existsSync(trivyignorePath)) {
+    const content = readFileSync(trivyignorePath, "utf-8");
+    const lines = content.split("\n");
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    let lastComment = "";
+
+    for (let i = 0; i < lines.length; i++) {
+      const rawLine = lines[i] ?? "";
+      const trimmed = rawLine.trim();
+
+      if (!trimmed) {
+        lastComment = "";
+        continue;
+      }
+
+      if (trimmed.startsWith("#")) {
+        lastComment = trimmed;
+        continue;
+      }
+
+      // Active suppression line
+      const cveMatch = trimmed.match(
+        /^(CVE-\d{4}-\d+)(?:\s+exp:(\d{4}-\d{2}-\d{2}))?$/i,
+      );
+      if (!cveMatch || !cveMatch[1]) {
+        violations.push({
+          rule: "P0-TRIVYIGNORE-INVALID-SYNTAX",
+          path: ".trivyignore",
+          message: `Invalid syntax in .trivyignore at line ${i + 1}: "${trimmed}". Expected "CVE-YYYY-XXXXX" or "CVE-YYYY-XXXXX exp:YYYY-MM-DD".`,
+        });
+        lastComment = "";
+        continue;
+      }
+
+      const cveId = cveMatch[1];
+      const inlineExp = cveMatch[2] ?? null;
+
+      let itemExpires = inlineExp;
+      let itemReason: string | null = null;
+      let itemOwner: string | null = null;
+
+      if (lastComment) {
+        const commentExpMatch = lastComment.match(
+          /expires:\s*(\d{4}-\d{2}-\d{2})/i,
+        );
+        if (commentExpMatch && commentExpMatch[1])
+          itemExpires = commentExpMatch[1];
+        const commentReasonMatch = lastComment.match(/reason:\s*([^|]+)/i);
+        if (commentReasonMatch && commentReasonMatch[1])
+          itemReason = commentReasonMatch[1].trim();
+        const commentOwnerMatch = lastComment.match(/owner:\s*([^|]+)/i);
+        if (commentOwnerMatch && commentOwnerMatch[1])
+          itemOwner = commentOwnerMatch[1].trim();
+      }
+
+      if (!itemExpires || !itemReason || !itemOwner) {
+        violations.push({
+          rule: "P0-TRIVYIGNORE-UNANNOTATED",
+          path: ".trivyignore",
+          message: `Suppression entry "${cveId}" at line ${i + 1} is missing mandatory metadata (reason, owner, expires).`,
+        });
+      } else if (!isValidCalendarDate(itemExpires)) {
+        violations.push({
+          rule: "P0-TRIVYIGNORE-INVALID-DATE",
+          path: ".trivyignore",
+          message: `Suppression entry "${cveId}" at line ${i + 1} has invalid calendar expiration date "${itemExpires}".`,
+        });
+      } else if (itemExpires < todayStr) {
+        violations.push({
+          rule: "P0-TRIVYIGNORE-EXPIRED",
+          path: ".trivyignore",
+          message: `Suppression entry "${cveId}" at line ${i + 1} has expired on ${itemExpires}.`,
+        });
+      }
+
+      lastComment = ""; // Strictly reset after consuming for this entry!
     }
   }
 

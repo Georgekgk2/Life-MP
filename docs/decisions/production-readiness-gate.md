@@ -90,6 +90,12 @@ Public infrastructure accessibility не є application, legal, financial або
 - виконувати remote provisioning або production deployment;
 - видавати локальний readiness за юридичне, фінансове чи operational sign-off.
 
+### 5.1 Інваріант промоції контейнерних образів GHCR (Фаза P2)
+
+- Будь-який образ у GHCR вважається **суворо непридатним та неавторитетним для промоції (`STRICT NO-GO`)**, якщо процес криптографічної атестації походження (`actions/attest-build-provenance`) не відбувся або завершився аварією, а також за відсутності згенерованого маніфесту `IMAGE_DIGESTS.json`.
+- Публікація в реєстр (`docker push`) передує атестації. Наявність контейнера в GHCR без валідної пари (manifest digest + provenance attestation) кваліфікується як осиротілий артефакт (orphaned artifact) і підлягає безумовній дискваліфікації.
+- Єдиним авторитетним ідентифікатором для Compose promotion (Фаза P2b) є **канонічний registry manifest digest (`@sha256:...`)** з верифікованого маніфесту `IMAGE_DIGESTS.json`.
+
 ## 6. Підсумок
 
 - **Локальний sandbox:** `PARTIAL / evidence-bound`.

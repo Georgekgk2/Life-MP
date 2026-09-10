@@ -1,17 +1,17 @@
 {
   "version": "1.0.0",
-  "policy_name": "Life-MP Phase P0 Deployment Containment Policy",
-  "last_updated": "2026-08-21",
-  "status": "CONTAINED",
+  "policy_name": "Life-MP Phase P2 Deployment Containment Policy",
+  "last_updated": "2026-09-10",
+  "status": "CONTAINED_PHASE_P2",
   "gates": {
     "allow_remote_deployment": false,
     "allow_ssh_execution": false,
-    "allow_ghcr_image_push": false,
+    "allow_ghcr_image_push": true,
     "allow_production_dns_tls": false,
     "allow_live_payment_gateway": false,
     "allow_live_shipping_api": false,
     "allow_live_fiscalization": false
   },
-  "rationale": "Commercial readiness, legal roles (COM-1..COM-5), fiscalization (FSC-1), shipping (LOG-1), and formal infrastructure readiness gates remain pending approval. All deployment capabilities are strictly contained.",
+  "rationale": "Phase P2 allows CI-based container image publishing to GHCR under immutable digest protocol (ADR 0013). Remote deployment, SSH execution, live payments, shipping, and fiscalization remain strictly locked.",
   "canonical_runbook": "docs/decisions/production-readiness-gate.md"
 }

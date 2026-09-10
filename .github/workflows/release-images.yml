@@ -1,0 +1,507 @@
+# =============================================================================
+# Life-MP Autonomous Container Release Pipeline (Phase P2 GHCR Promotion)
+# =============================================================================
+# Conforms strictly to ADR 0013 and Phase P2 Containment Policy:
+# 1. Triggered strictly on post-merge push to main (never on PR or forks).
+# 2. Complete autonomous quality/security release graph (all 9 dimensions).
+# 3. Single-Artifact Pipeline with Cryptographic Checksum Invariant (Zero TOCTOU).
+# 4. Job-scoped permissions: packages: write and attestations: write on publish only.
+# 5. Immutable action references pinned to exact 40-character commit SHAs.
+# =============================================================================
+
+name: Release Container Images (GHCR)
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-ghcr-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ===========================================================================
+  # 1. Quality & Workspace Verification
+  # ===========================================================================
+  verify-and-test:
+    name: Quality Preflight
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build full workspace
+        run: pnpm run build
+
+      - name: Verify deployment containment preflight
+        run: node scripts/verify-deployment-containment.mjs
+
+      - name: Check documentation
+        run: pnpm run docs:check
+
+      - name: Check code formatting
+        run: pnpm run format:check
+
+      - name: Lint all packages
+        run: pnpm run lint
+
+      - name: Typecheck all packages
+        run: pnpm run typecheck
+
+      - name: Run unit test suites
+        run: pnpm run test
+
+  # ===========================================================================
+  # 2. Catalog Provider Database Integration Tests
+  # ===========================================================================
+  catalog-provider-integration:
+    name: Catalog Provider Integration
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci_bootstrap
+          POSTGRES_PASSWORD: ci_bootstrap_password
+          POSTGRES_DB: ci_control
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Packages
+        run: pnpm run build
+
+      - name: Bootstrap CI Test Database
+        env:
+          TEST_BOOTSTRAP_DATABASE_URL: postgresql://ci_bootstrap:ci_bootstrap_password@127.0.0.1:5432/ci_control
+          TEST_APPLICATION_DATABASE_URL: postgresql://life_medusa_test:ci_test_password@127.0.0.1:5432/life_medusa_test
+        run: pnpm --filter @life/commerce exec tsx ./src/scripts/bootstrap-ci-test-database.ts
+
+      - name: Run Integration Tests
+        env:
+          DATABASE_URL: postgresql://life_medusa_test:ci_test_password@127.0.0.1:5432/life_medusa_test
+          TEST_DATABASE_URL: postgresql://life_medusa_test:ci_test_password@127.0.0.1:5432/life_medusa_test
+          TEST_RUNNER_DATABASE_URL: postgresql://ci_bootstrap:ci_bootstrap_password@127.0.0.1:5432/postgres
+          REDIS_URL: redis://127.0.0.1:6379
+          NODE_ENV: test
+          ALLOW_SYNTHETIC_CATALOG: "true"
+          JWT_SECRET: ci_jwt_secret_test_only
+          COOKIE_SECRET: ci_cookie_secret_test_only
+        run: pnpm run test:integration
+
+  # ===========================================================================
+  # 3. Catalog Provider Migration Idempotence Tests
+  # ===========================================================================
+  catalog-provider-migrations:
+    name: Catalog Provider Migrations
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci_bootstrap
+          POSTGRES_PASSWORD: ci_bootstrap_password
+          POSTGRES_DB: ci_control
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Packages
+        run: pnpm run build
+
+      - name: Bootstrap CI Migration Database
+        env:
+          TEST_BOOTSTRAP_DATABASE_URL: postgresql://ci_bootstrap:ci_bootstrap_password@127.0.0.1:5432/ci_control
+          TEST_APPLICATION_DATABASE_URL: postgresql://life_medusa_migration_test:ci_migration_password@127.0.0.1:5432/life_medusa_migration_test
+        run: pnpm --filter @life/commerce exec tsx ./src/scripts/bootstrap-ci-test-database.ts
+
+      - name: Run Migration Idempotence Tests
+        env:
+          DATABASE_URL: postgresql://life_medusa_migration_test:ci_migration_password@127.0.0.1:5432/life_medusa_migration_test
+          MIGRATION_TEST_DATABASE_URL: postgresql://life_medusa_migration_test:ci_migration_password@127.0.0.1:5432/life_medusa_migration_test
+          TEST_RUNNER_DATABASE_URL: postgresql://ci_bootstrap:ci_bootstrap_password@127.0.0.1:5432/postgres
+          REDIS_URL: redis://127.0.0.1:6379
+          NODE_ENV: test
+          ALLOW_SYNTHETIC_CATALOG: "true"
+          JWT_SECRET: ci_jwt_secret_test_only
+          COOKIE_SECRET: ci_cookie_secret_test_only
+        run: pnpm run test:migrations
+
+  # ===========================================================================
+  # 4. Storefront E2E Validation
+  # ===========================================================================
+  storefront-e2e:
+    name: Storefront E2E
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @life/storefront exec playwright install --with-deps chromium
+
+      - name: Build Storefront
+        run: pnpm --filter @life/storefront run build
+
+      - name: Run Storefront E2E Tests
+        run: pnpm --filter @life/storefront run test:e2e
+        env:
+          STOREFRONT_BASE_URL: http://127.0.0.1:3000
+          NODE_ENV: production
+          LIFE_RUNTIME_ENV: public-demo
+          ALLOW_PUBLIC_DEMO_CATALOG: "true"
+          ALLOW_SYNTHETIC_CATALOG: "false"
+
+  # ===========================================================================
+  # 5. Security Audits (Gitleaks & Dependencies)
+  # ===========================================================================
+  security-audit:
+    name: Security Audits
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Secret Detection (Gitleaks)
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Fail-Closed Production Dependency Audit
+        run: pnpm audit --prod --audit-level=high
+
+  # ===========================================================================
+  # 6. Static Code Security Analysis (CodeQL)
+  # ===========================================================================
+  codeql-analysis:
+    name: CodeQL Static Security Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3
+        with:
+          languages: javascript-typescript
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3
+        with:
+          upload: "never"
+          output: ../results
+
+      - name: Archive CodeQL SARIF report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: codeql-sarif-release
+          path: ../results/javascript-typescript.sarif
+          retention-days: 14
+
+  # ===========================================================================
+  # 7. Single-Artifact Build, Checksum & Vulnerability Scan
+  # ===========================================================================
+  image-build-scan:
+    name: Image Build & Vulnerability Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.10.0
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Install dependencies & Build Config
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --filter @life/config build
+
+      - name: Verify containment preflight before container compile
+        run: node scripts/verify-deployment-containment.mjs
+
+      - name: Build and export Commerce container archive
+        run: |
+          mkdir -p /tmp/release-artifacts
+          DOCKER_BUILDKIT=1 docker buildx build \
+            --platform linux/amd64 \
+            -f deploy/Dockerfile.commerce \
+            -t ghcr.io/georgekgk2/life-commerce:sha-${{ github.sha }} \
+            --output type=docker,dest=/tmp/release-artifacts/commerce.tar \
+            .
+
+      - name: Build and export Storefront container archive
+        run: |
+          DOCKER_BUILDKIT=1 docker buildx build \
+            --platform linux/amd64 \
+            -f deploy/Dockerfile.storefront \
+            -t ghcr.io/georgekgk2/life-storefront:sha-${{ github.sha }} \
+            --output type=docker,dest=/tmp/release-artifacts/storefront.tar \
+            .
+
+      - name: Compute cryptographic SHA-256 archive checksums (Pre-Scan Invariant)
+        run: |
+          cd /tmp/release-artifacts
+          sha256sum commerce.tar storefront.tar > checksums.txt
+          echo "=== Computed Checksum Manifest ==="
+          cat checksums.txt
+          sha256sum -c checksums.txt
+
+      - name: Fail-Closed Trivy Vulnerability Scan (Commerce Archive)
+        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # master
+        with:
+          input: "/tmp/release-artifacts/commerce.tar"
+          format: "table"
+          exit-code: "1"
+          ignore-unfixed: true
+          trivyignores: ".trivyignore"
+          severity: "CRITICAL,HIGH"
+        env:
+          TRIVY_NO_PROGRESS: "true"
+
+      - name: Fail-Closed Trivy Vulnerability Scan (Storefront Archive)
+        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # master
+        with:
+          input: "/tmp/release-artifacts/storefront.tar"
+          format: "table"
+          exit-code: "1"
+          ignore-unfixed: true
+          trivyignores: ".trivyignore"
+          severity: "CRITICAL,HIGH"
+        env:
+          TRIVY_NO_PROGRESS: "true"
+
+      - name: Verify checksum invariant post-scan before artifact packaging
+        run: |
+          cd /tmp/release-artifacts
+          echo "Verifying SHA-256 archive checksums after vulnerability scan..."
+          sha256sum -c checksums.txt
+
+      - name: Upload scanned release archives and checksum manifest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-tar-archives
+          path: /tmp/release-artifacts/
+          retention-days: 1
+          if-no-files-found: error
+
+  # ===========================================================================
+  # 8. Cryptographically Verified GHCR Publication & Attestation
+  # ===========================================================================
+  publish:
+    name: GHCR Publication & Provenance Attestation
+    needs:
+      - verify-and-test
+      - catalog-provider-integration
+      - catalog-provider-migrations
+      - storefront-e2e
+      - security-audit
+      - codeql-analysis
+      - image-build-scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.2.2
+
+      - name: Download scanned release archives
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-tar-archives
+          path: /tmp/release-artifacts
+
+      - name: Enforce Checksum Invariant before Docker ingestion (Fail-Closed)
+        run: |
+          cd /tmp/release-artifacts
+          echo "Verifying SHA-256 archive checksums against build manifest..."
+          sha256sum -c checksums.txt
+
+      - name: Ingest verified archives into Docker engine
+        run: |
+          docker load -i /tmp/release-artifacts/commerce.tar
+          docker load -i /tmp/release-artifacts/storefront.tar
+
+      - name: Authenticate to GitHub Container Registry
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.3.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish verified images to GHCR and capture manifest digests
+        id: push-images
+        run: |
+          echo "Pushing commerce image to GHCR..."
+          docker push ghcr.io/georgekgk2/life-commerce:sha-${{ github.sha }}
+
+          echo "Pushing storefront image to GHCR..."
+          docker push ghcr.io/georgekgk2/life-storefront:sha-${{ github.sha }}
+
+          COMMERCE_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ghcr.io/georgekgk2/life-commerce:sha-${{ github.sha }} | cut -d'@' -f2)
+          STOREFRONT_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ghcr.io/georgekgk2/life-storefront:sha-${{ github.sha }} | cut -d'@' -f2)
+
+          if [ -z "$COMMERCE_DIGEST" ] || [ -z "$STOREFRONT_DIGEST" ]; then
+            echo "ERROR: Failed to obtain registry manifest digest from published image"
+            exit 1
+          fi
+
+          echo "commerce_digest=$COMMERCE_DIGEST" >> "$GITHUB_OUTPUT"
+          echo "storefront_digest=$STOREFRONT_DIGEST" >> "$GITHUB_OUTPUT"
+
+      - name: Attest build provenance (Commerce Container)
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.2.3
+        with:
+          subject-name: ghcr.io/georgekgk2/life-commerce
+          subject-digest: ${{ steps.push-images.outputs.commerce_digest }}
+          push-to-registry: true
+
+      - name: Attest build provenance (Storefront Container)
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.2.3
+        with:
+          subject-name: ghcr.io/georgekgk2/life-storefront
+          subject-digest: ${{ steps.push-images.outputs.storefront_digest }}
+          push-to-registry: true
+
+      - name: Generate immutable release manifest (IMAGE_DIGESTS.json)
+        run: |
+          COMMERCE_TAR_SHA=$(sha256sum /tmp/release-artifacts/commerce.tar | awk '{print $1}')
+          STOREFRONT_TAR_SHA=$(sha256sum /tmp/release-artifacts/storefront.tar | awk '{print $1}')
+          COMMERCE_IMAGE_ID=$(docker inspect --format='{{.Id}}' ghcr.io/georgekgk2/life-commerce:sha-${{ github.sha }})
+          STOREFRONT_IMAGE_ID=$(docker inspect --format='{{.Id}}' ghcr.io/georgekgk2/life-storefront:sha-${{ github.sha }})
+
+          cat << EOF > /tmp/IMAGE_DIGESTS.json
+          {
+            "sourceCommit": "${{ github.sha }}",
+            "buildTimestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "policyStatus": "CONTAINED_PHASE_P2",
+            "images": {
+              "commerce": {
+                "repository": "ghcr.io/georgekgk2/life-commerce",
+                "tag": "sha-${{ github.sha }}",
+                "digest": "${{ steps.push-images.outputs.commerce_digest }}",
+                "imageId": "$COMMERCE_IMAGE_ID",
+                "tarChecksum": "$COMMERCE_TAR_SHA"
+              },
+              "storefront": {
+                "repository": "ghcr.io/georgekgk2/life-storefront",
+                "tag": "sha-${{ github.sha }}",
+                "digest": "${{ steps.push-images.outputs.storefront_digest }}",
+                "imageId": "$STOREFRONT_IMAGE_ID",
+                "tarChecksum": "$STOREFRONT_TAR_SHA"
+              }
+            }
+          }
+          EOF
+          cat /tmp/IMAGE_DIGESTS.json
+
+      - name: Upload image digests manifest artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: image-digests-manifest
+          path: /tmp/IMAGE_DIGESTS.json
+          retention-days: 90

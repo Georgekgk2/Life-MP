@@ -1,4 +1,11 @@
 #!/usr/bin/env node
+/**
+ * SECURITY NOTICE:
+ * This script is a repository-local defense-in-depth preflight check.
+ * It verifies Phase P0 containment policy invariants.
+ * It DOES NOT constitute sovereign security authorization.
+ * Sovereign enforcement relies on branch protection, independent peer review, and isolated CI runners.
+ */
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { scanDeploymentContainment } from "../packages/config/dist/index.js";

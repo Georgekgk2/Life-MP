@@ -87,6 +87,19 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
 
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build config package for containment preflight
+        run: pnpm --filter @life/config build
+
+      - name: Verify deployment containment (Fail-Closed Preflight)
+        run: node scripts/verify-deployment-containment.mjs
+
       - name: Build image for scanning
         run: |
           DOCKER_BUILDKIT=1 docker build \

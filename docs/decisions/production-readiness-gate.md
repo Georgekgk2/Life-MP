@@ -96,4 +96,25 @@ Public infrastructure accessibility не є application, legal, financial або
 - **Public infrastructure ingress:** `VERIFIED` за прямими DNS/TLS/HTTP probes; durability не перевірена.
 - **Staging:** `NOT VERIFIED`.
 - **Commercial production:** `BLOCKED / NOT READY`.
-- **Незалежний reviewer:** обов’язковий до merge; виконавець не сертифікує власну зміну.
+- **Незалежний reviewer:** обов’язковий до merge; виконавець не сертифікує власну зміну (для PR #65 діє формальний виняток `EXC-20260909-SINGLE-OWNER-P0-CONTAINMENT`, див. розділ 7).
+
+## 7. Реєстр офіційних винятків (Policy Exceptions)
+
+### EXC-20260909-SINGLE-OWNER-P0-CONTAINMENT
+- **Дата набрання чинності:** 2026-09-09
+- **Власник авторизації:** Georgekgk2 (репозиторний та технічний власник)
+- **Статус винятку:** `APPROVED / SINGLE-OWNER EXCEPTION`
+- **Підстава:** Репозиторій функціонує в режимі персонального розробницького середовища з єдиним зареєстрованим користувачем `Georgekgk2`. Незалежний рецензент провів аудит змін PR #65 поза інтерфейсом GitHub і надав позитивний вердикт `GO`, проте в інтерфейсі GitHub об'єкт `reviewDecision: "APPROVED"` технічно недоступний через відсутність другого акаунта.
+- **Точний обсяг винятку (Scope):** Поширюється виключно на злиття PR #65 (Phase P0 Containment Hardening).
+- **Компенсаційні контроли безпеки:**
+  1. Багатоетапний антагоністичний аудит двома незалежними системами (Pi та OMP), під час якого виявлено та повністю усунено 4 класи дефектів (symlink root/nested bypass, mandatory gates schema, shallow freeze RegExp, allowlist mutability).
+  2. 22/22 unit-тести у `@life/config`, включно з прямими спробами мутації frozen-колекцій та обходу через сімлінки.
+  3. 9/9 перевірок GitHub Actions пройшли з кодом 0 (`Verify`, `Storefront E2E`, `Catalog Provider Migrations`, `Catalog Provider Integration`, `CodeQL`, `Container Scan (storefront)`, `Container Scan (commerce)`, `Dependency Audit`, `Secret Detection`).
+  4. Ранній preflight-захист інтегровано у `ci.yml` (блокування важких джобів) та `security.yml` (блокування збірки образів до проходження політики).
+  5. Фізичне видалення скриптів віддаленого деплою (`scripts/deploy_prod.sh`) з репозиторію.
+- **Залишковий ризик:** Відсутність криптографічно підписаного схвалення в GitHub Reviews API для поточного PR.
+- **Незмінні обмеження та заборони (Strict Boundaries):**
+  - Виняток **НЕ авторизує** розгортання на продакшн-сервері (`34.139.21.224`);
+  - Комерційні функції (`allow_live_payment_gateway`, `allow_live_shipping_api`, `allow_live_fiscalization`) залишаються у суворому стані **`BLOCKED / NOT READY`**;
+  - Live сайт продовжує функціонувати виключно в режимі ізольованого публічного демо (`public-demo`) на статичних фікстурах;
+  - Повноцінний незалежний людський аудит обов'язково залишається передумовою комерційного запуску (Фаза P5).

@@ -897,7 +897,9 @@ jobs:
       const result = scanDeploymentContainment(tempDir);
       expect(result.valid).toBe(false);
       expect(
-        result.violations.some((v) => v.rule === "P2-TOPLEVEL-PACKAGES-WRITE"),
+        result.violations.some(
+          (v) => v.rule === "P2-TOPLEVEL-WRITE-PERMISSIONS",
+        ),
       ).toBe(true);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
@@ -979,7 +981,7 @@ jobs:
     }
   });
 
-  it("validates .trivyignore format and fails closed when entries are expired or unannotated", () => {
+  it("validates .trivyignore format and fails closed when entries are expired, invalid, or leak across blank lines", () => {
     const tempDir = mkdtempSync(
       join(tmpdir(), "life-containment-trivyignore-"),
     );
@@ -1012,6 +1014,28 @@ jobs:
         result.violations.some((v) => v.rule === "P0-TRIVYIGNORE-UNANNOTATED"),
       ).toBe(true);
 
+      // Metadata must NOT leak across blank lines to subsequent unannotated entries
+      writeFileSync(
+        join(tempDir, ".trivyignore"),
+        `# reason: test valid | owner: security | expires: 2099-12-31\nCVE-2025-9991\n\nCVE-2025-9992\n`,
+      );
+      result = scanDeploymentContainment(tempDir);
+      expect(result.valid).toBe(false);
+      expect(
+        result.violations.some((v) => v.rule === "P0-TRIVYIGNORE-UNANNOTATED"),
+      ).toBe(true);
+
+      // Invalid calendar date (e.g. 2099-99-99)
+      writeFileSync(
+        join(tempDir, ".trivyignore"),
+        `# reason: test invalid date | owner: security | expires: 2099-99-99\nCVE-2025-9993\n`,
+      );
+      result = scanDeploymentContainment(tempDir);
+      expect(result.valid).toBe(false);
+      expect(
+        result.violations.some((v) => v.rule === "P0-TRIVYIGNORE-INVALID-DATE"),
+      ).toBe(true);
+
       // Valid annotated entry
       writeFileSync(
         join(tempDir, ".trivyignore"),
@@ -1019,6 +1043,130 @@ jobs:
       );
       result = scanDeploymentContainment(tempDir);
       expect(result.valid).toBe(true);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails in Phase P2 if release-images.yml contains workflow_dispatch or schedule trigger", () => {
+    for (const triggerSnippet of [
+      "workflow_dispatch:",
+      "schedule:\n  - cron: '0 0 * * *'",
+    ]) {
+      const tempDir = mkdtempSync(
+        join(tmpdir(), "life-containment-p2-bad-trigger-"),
+      );
+      try {
+        mkdirSync(join(tempDir, "infra"), { recursive: true });
+        const p2Gates = createValidPolicyGates();
+        p2Gates["allow_ghcr_image_push"] = true;
+        writeFileSync(
+          join(tempDir, "infra", "deployment-policy.json"),
+          JSON.stringify({
+            status: "CONTAINED_PHASE_P2",
+            gates: p2Gates,
+          }),
+        );
+
+        mkdirSync(join(tempDir, ".github", "workflows"), { recursive: true });
+        writeFileSync(
+          join(tempDir, ".github", "workflows", "release-images.yml"),
+          `name: Release
+on:
+  ${triggerSnippet}
+`,
+        );
+
+        const result = scanDeploymentContainment(tempDir);
+        expect(result.valid).toBe(false);
+        expect(
+          result.violations.some((v) => v.rule === "P2-FORBIDDEN-TRIGGER"),
+        ).toBe(true);
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("fails in Phase P2 if a non-publish job inside release-images.yml has write permissions", () => {
+    const tempDir = mkdtempSync(
+      join(tmpdir(), "life-containment-p2-rogue-job-write-"),
+    );
+    try {
+      mkdirSync(join(tempDir, "infra"), { recursive: true });
+      const p2Gates = createValidPolicyGates();
+      p2Gates["allow_ghcr_image_push"] = true;
+      writeFileSync(
+        join(tempDir, "infra", "deployment-policy.json"),
+        JSON.stringify({
+          status: "CONTAINED_PHASE_P2",
+          gates: p2Gates,
+        }),
+      );
+
+      mkdirSync(join(tempDir, ".github", "workflows"), { recursive: true });
+      writeFileSync(
+        join(tempDir, ".github", "workflows", "release-images.yml"),
+        `name: Release
+on:
+  push:
+    branches: [main]
+jobs:
+  rogue:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+`,
+      );
+
+      const result = scanDeploymentContainment(tempDir);
+      expect(result.valid).toBe(false);
+      expect(
+        result.violations.some(
+          (v) => v.rule === "P2-JOB-FORBIDDEN-WRITE-PERMISSIONS",
+        ),
+      ).toBe(true);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails in Phase P2 if release-images.yml contains unpinned mutable action reference", () => {
+    const tempDir = mkdtempSync(
+      join(tmpdir(), "life-containment-p2-mutable-action-"),
+    );
+    try {
+      mkdirSync(join(tempDir, "infra"), { recursive: true });
+      const p2Gates = createValidPolicyGates();
+      p2Gates["allow_ghcr_image_push"] = true;
+      writeFileSync(
+        join(tempDir, "infra", "deployment-policy.json"),
+        JSON.stringify({
+          status: "CONTAINED_PHASE_P2",
+          gates: p2Gates,
+        }),
+      );
+
+      mkdirSync(join(tempDir, ".github", "workflows"), { recursive: true });
+      writeFileSync(
+        join(tempDir, ".github", "workflows", "release-images.yml"),
+        `name: Release
+on:
+  push:
+    branches: [main]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+`,
+      );
+
+      const result = scanDeploymentContainment(tempDir);
+      expect(result.valid).toBe(false);
+      expect(
+        result.violations.some((v) => v.rule === "P2-MUTABLE-ACTION-REF"),
+      ).toBe(true);
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

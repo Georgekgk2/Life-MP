@@ -104,6 +104,22 @@ export const FORBIDDEN_SCRIPT_FILENAMES: readonly string[] = Object.freeze([
   "deploy-colocated-prod.sh",
 ]);
 
+function isValidCalendarDate(dateStr: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
+  const parts = dateStr.split("-").map(Number);
+  const y = parts[0];
+  const m = parts[1];
+  const d = parts[2];
+  if (!y || !m || !d || y < 2020 || m < 1 || m > 12 || d < 1 || d > 31)
+    return false;
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return (
+    date.getUTCFullYear() === y &&
+    date.getUTCMonth() + 1 === m &&
+    date.getUTCDate() === d
+  );
+}
+
 export function scanDeploymentContainment(
   rootDir: string,
 ): DeploymentContainmentResult {
@@ -270,39 +286,112 @@ export function scanDeploymentContainment(
           }
         } else if (policyStatus === "CONTAINED_PHASE_P2") {
           if (file === "release-images.yml") {
-            // Validate release-images.yml strict P2 contract:
-            // 1. Must NOT have top-level packages: write
             const lines = content.split("\n");
             let inTopLevelPermissions = false;
+            let inJobs = false;
+            let currentJob = "";
+            let inJobPermissions = false;
+
             for (const line of lines) {
-              if (/^permissions:/.test(line)) {
+              if (/^permissions:\s*$/.test(line)) {
                 inTopLevelPermissions = true;
               } else if (/^[a-zA-Z0-9_-]+:/.test(line) && !/^\s+/.test(line)) {
                 inTopLevelPermissions = false;
               }
-              if (inTopLevelPermissions && /packages:\s*write/.test(line)) {
+              if (
+                inTopLevelPermissions &&
+                /(packages|attestations|id-token):\s*write/.test(line)
+              ) {
                 violations.push({
-                  rule: "P2-TOPLEVEL-PACKAGES-WRITE",
+                  rule: "P2-TOPLEVEL-WRITE-PERMISSIONS",
                   path: relPath,
-                  message: `Top-level "packages: write" is forbidden in ${relPath}. Permissions must be scoped strictly to the publish job.`,
+                  message: `Top-level write permission is forbidden in ${relPath}. Permissions must be scoped strictly to the publish job.`,
                 });
                 break;
               }
+
+              if (/^jobs:\s*$/.test(line)) {
+                inJobs = true;
+                continue;
+              }
+              if (inJobs && /^ {2}([a-zA-Z0-9_-]+):\s*$/.test(line)) {
+                const match = line.match(/^ {2}([a-zA-Z0-9_-]+):\s*$/);
+                currentJob = match && match[1] ? match[1] : "";
+                inJobPermissions = false;
+                continue;
+              }
+              if (inJobs && /^ {4}permissions:\s*$/.test(line)) {
+                inJobPermissions = true;
+                continue;
+              } else if (inJobs && /^ {4}[a-zA-Z0-9_-]+:/.test(line)) {
+                inJobPermissions = false;
+              }
+
+              if (
+                inJobs &&
+                inJobPermissions &&
+                /(packages|attestations|id-token):\s*write/.test(line)
+              ) {
+                if (currentJob !== "publish") {
+                  violations.push({
+                    rule: "P2-JOB-FORBIDDEN-WRITE-PERMISSIONS",
+                    path: relPath,
+                    message: `Job "${currentJob}" in ${relPath} is not permitted to have write permissions. Only job "publish" may have write permissions in Phase P2.`,
+                  });
+                }
+              }
             }
 
-            // 2. Trigger must be strictly push: branches: [main]
             if (
+              content.includes("workflow_dispatch") ||
+              content.includes("schedule:") ||
               content.includes("pull_request:") ||
               /pull_request\s*:/i.test(content)
             ) {
               violations.push({
                 rule: "P2-FORBIDDEN-TRIGGER",
                 path: relPath,
-                message: `Workflow ${relPath} must not trigger on pull_request. Triggers must be restricted strictly to push on main.`,
+                message: `Workflow ${relPath} contains unapproved trigger. In Phase P2, triggers must be restricted strictly to push on main.`,
               });
             }
 
-            // 3. Image repositories must be allowlisted
+            const usesMatches = content.matchAll(/uses:\s*([^\s#]+)/g);
+            for (const match of usesMatches) {
+              const actionRef = match[1];
+              if (
+                !actionRef ||
+                actionRef.startsWith("./") ||
+                actionRef.startsWith("docker://")
+              )
+                continue;
+              const isPinnedSha =
+                /^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+(?:\/[a-zA-Z0-9._-]+)*@[0-9a-f]{40}$/i.test(
+                  actionRef,
+                );
+              if (!isPinnedSha) {
+                violations.push({
+                  rule: "P2-MUTABLE-ACTION-REF",
+                  path: relPath,
+                  message: `Action reference "${actionRef}" in ${relPath} is not pinned to an immutable 40-character commit SHA.`,
+                });
+              }
+            }
+
+            if (!content.includes("ghcr.io/georgekgk2/life-commerce")) {
+              violations.push({
+                rule: "P2-MISSING-EXPECTED-IMAGE-PUSH",
+                path: relPath,
+                message: `Workflow ${relPath} is missing required push for "ghcr.io/georgekgk2/life-commerce".`,
+              });
+            }
+            if (!content.includes("ghcr.io/georgekgk2/life-storefront")) {
+              violations.push({
+                rule: "P2-MISSING-EXPECTED-IMAGE-PUSH",
+                path: relPath,
+                message: `Workflow ${relPath} is missing required push for "ghcr.io/georgekgk2/life-storefront".`,
+              });
+            }
+
             const repoMatches = content.matchAll(
               /ghcr\.io\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+/g,
             );
@@ -536,9 +625,6 @@ export function scanDeploymentContainment(
     const todayStr = new Date().toISOString().slice(0, 10);
 
     let lastComment = "";
-    let blockExpires: string | null = null;
-    let blockReason: string | null = null;
-    let blockOwner: string | null = null;
 
     for (let i = 0; i < lines.length; i++) {
       const rawLine = lines[i] ?? "";
@@ -551,14 +637,6 @@ export function scanDeploymentContainment(
 
       if (trimmed.startsWith("#")) {
         lastComment = trimmed;
-        const ttlMatch = trimmed.match(
-          /TTL\s*\/\s*Review\s*Date:\s*(\d{4}-\d{2}-\d{2})/i,
-        );
-        if (ttlMatch && ttlMatch[1]) blockExpires = ttlMatch[1];
-        const reasonMatch = trimmed.match(/Reason:\s*(.+)/i);
-        if (reasonMatch && reasonMatch[1]) blockReason = reasonMatch[1].trim();
-        const ownerMatch = trimmed.match(/Owner(?:\s*\/\s*Sign-off)?:\s*(.+)/i);
-        if (ownerMatch && ownerMatch[1]) blockOwner = ownerMatch[1].trim();
         continue;
       }
 
@@ -572,15 +650,16 @@ export function scanDeploymentContainment(
           path: ".trivyignore",
           message: `Invalid syntax in .trivyignore at line ${i + 1}: "${trimmed}". Expected "CVE-YYYY-XXXXX" or "CVE-YYYY-XXXXX exp:YYYY-MM-DD".`,
         });
+        lastComment = "";
         continue;
       }
 
       const cveId = cveMatch[1];
       const inlineExp = cveMatch[2] ?? null;
 
-      let itemExpires = inlineExp || blockExpires;
-      let itemReason = blockReason;
-      let itemOwner = blockOwner;
+      let itemExpires = inlineExp;
+      let itemReason: string | null = null;
+      let itemOwner: string | null = null;
 
       if (lastComment) {
         const commentExpMatch = lastComment.match(
@@ -602,6 +681,12 @@ export function scanDeploymentContainment(
           path: ".trivyignore",
           message: `Suppression entry "${cveId}" at line ${i + 1} is missing mandatory metadata (reason, owner, expires).`,
         });
+      } else if (!isValidCalendarDate(itemExpires)) {
+        violations.push({
+          rule: "P0-TRIVYIGNORE-INVALID-DATE",
+          path: ".trivyignore",
+          message: `Suppression entry "${cveId}" at line ${i + 1} has invalid calendar expiration date "${itemExpires}".`,
+        });
       } else if (itemExpires < todayStr) {
         violations.push({
           rule: "P0-TRIVYIGNORE-EXPIRED",
@@ -609,6 +694,8 @@ export function scanDeploymentContainment(
           message: `Suppression entry "${cveId}" at line ${i + 1} has expired on ${itemExpires}.`,
         });
       }
+
+      lastComment = ""; // Strictly reset after consuming for this entry!
     }
   }
 

@@ -6,6 +6,7 @@ import {
   realpathSync,
 } from "node:fs";
 import { join } from "node:path";
+import { load as loadYaml } from "js-yaml";
 
 export type DeploymentContainmentViolation = Readonly<{
   rule: string;
@@ -266,7 +267,33 @@ export function scanDeploymentContainment(
             message: `Forbidden skip_tests input found in ${relPath}.`,
           });
         }
-        if (content.includes("pull_request_target")) {
+
+        let doc: Record<string, unknown> | null;
+        try {
+          doc = loadYaml(content) as Record<string, unknown> | null;
+        } catch (err) {
+          violations.push({
+            rule: "P0-WORKFLOW-YAML-INVALID",
+            path: relPath,
+            message: `Failed to parse workflow YAML: ${String(err)}`,
+          });
+          if (/packages:\s*write/.test(content)) {
+            violations.push({
+              rule: "P0-NO-PACKAGES-WRITE",
+              path: relPath,
+              message: `Forbidden "packages: write" permission found in ${relPath}.`,
+            });
+          }
+          continue;
+        }
+
+        if (!doc || typeof doc !== "object") continue;
+        if (
+          doc["on"] &&
+          (doc["on"] === "pull_request_target" ||
+            (typeof doc["on"] === "object" &&
+              "pull_request_target" in (doc["on"] as Record<string, unknown>)))
+        ) {
           violations.push({
             rule: "P0-NO-PR-TARGET",
             path: relPath,
@@ -274,10 +301,43 @@ export function scanDeploymentContainment(
           });
         }
 
-        const hasPackagesWrite = /packages:\s*write/.test(content);
+        const hasWritePermission = (
+          permVal: unknown,
+          targetPerm?: string,
+        ): boolean => {
+          if (typeof permVal === "string") {
+            return permVal === "write-all";
+          }
+          if (permVal && typeof permVal === "object") {
+            const permObj = permVal as Record<string, unknown>;
+            if (targetPerm) {
+              return permObj[targetPerm] === "write";
+            }
+            return Object.values(permObj).some((v) => v === "write");
+          }
+          return false;
+        };
+
+        const topLevelHasPackagesWrite = hasWritePermission(
+          doc["permissions"],
+          "packages",
+        );
+        const docJobs = doc["jobs"] as Record<string, unknown> | undefined;
+        const anyJobHasPackagesWrite =
+          docJobs &&
+          typeof docJobs === "object" &&
+          Object.values(docJobs).some(
+            (j: unknown) =>
+              j &&
+              typeof j === "object" &&
+              hasWritePermission(
+                (j as Record<string, unknown>)["permissions"],
+                "packages",
+              ),
+          );
 
         if (policyStatus === "CONTAINED") {
-          if (hasPackagesWrite) {
+          if (topLevelHasPackagesWrite || anyJobHasPackagesWrite) {
             violations.push({
               rule: "P0-NO-PACKAGES-WRITE",
               path: relPath,
@@ -286,97 +346,175 @@ export function scanDeploymentContainment(
           }
         } else if (policyStatus === "CONTAINED_PHASE_P2") {
           if (file === "release-images.yml") {
-            const lines = content.split("\n");
-            let inTopLevelPermissions = false;
-            let inJobs = false;
-            let currentJob = "";
-            let inJobPermissions = false;
+            // 1. Top-level permissions check
+            if (hasWritePermission(doc["permissions"])) {
+              violations.push({
+                rule: "P2-TOPLEVEL-WRITE-PERMISSIONS",
+                path: relPath,
+                message: `Top-level write permission is forbidden in ${relPath}. Permissions must be scoped strictly to the publish job.`,
+              });
+            }
 
-            for (const line of lines) {
-              if (/^permissions:\s*$/.test(line)) {
-                inTopLevelPermissions = true;
-              } else if (/^[a-zA-Z0-9_-]+:/.test(line) && !/^\s+/.test(line)) {
-                inTopLevelPermissions = false;
-              }
-              if (
-                inTopLevelPermissions &&
-                /(packages|attestations|id-token):\s*write/.test(line)
-              ) {
+            // 2. Strict Trigger Validation
+            const docOn = doc["on"] as Record<string, unknown> | undefined;
+            if (!docOn || typeof docOn !== "object") {
+              violations.push({
+                rule: "P2-FORBIDDEN-TRIGGER",
+                path: relPath,
+                message: `Workflow ${relPath} trigger must be an object specifying push on main.`,
+              });
+            } else {
+              const triggerKeys = Object.keys(docOn);
+              if (triggerKeys.length !== 1 || triggerKeys[0] !== "push") {
                 violations.push({
-                  rule: "P2-TOPLEVEL-WRITE-PERMISSIONS",
+                  rule: "P2-FORBIDDEN-TRIGGER",
                   path: relPath,
-                  message: `Top-level write permission is forbidden in ${relPath}. Permissions must be scoped strictly to the publish job.`,
+                  message: `Workflow ${relPath} contains unapproved trigger (${triggerKeys.join(
+                    ", ",
+                  )}). In Phase P2, triggers must be restricted strictly to push on main.`,
                 });
-                break;
-              }
-
-              if (/^jobs:\s*$/.test(line)) {
-                inJobs = true;
-                continue;
-              }
-              if (inJobs && /^ {2}([a-zA-Z0-9_-]+):\s*$/.test(line)) {
-                const match = line.match(/^ {2}([a-zA-Z0-9_-]+):\s*$/);
-                currentJob = match && match[1] ? match[1] : "";
-                inJobPermissions = false;
-                continue;
-              }
-              if (inJobs && /^ {4}permissions:\s*$/.test(line)) {
-                inJobPermissions = true;
-                continue;
-              } else if (inJobs && /^ {4}[a-zA-Z0-9_-]+:/.test(line)) {
-                inJobPermissions = false;
-              }
-
-              if (
-                inJobs &&
-                inJobPermissions &&
-                /(packages|attestations|id-token):\s*write/.test(line)
-              ) {
-                if (currentJob !== "publish") {
+              } else {
+                const pushConfig = docOn["push"] as
+                  Record<string, unknown> | undefined;
+                if (
+                  !pushConfig ||
+                  typeof pushConfig !== "object" ||
+                  !Array.isArray(pushConfig["branches"])
+                ) {
                   violations.push({
-                    rule: "P2-JOB-FORBIDDEN-WRITE-PERMISSIONS",
+                    rule: "P2-FORBIDDEN-BRANCH",
                     path: relPath,
-                    message: `Job "${currentJob}" in ${relPath} is not permitted to have write permissions. Only job "publish" may have write permissions in Phase P2.`,
+                    message: `Workflow ${relPath} push trigger must specify branches: ["main"].`,
+                  });
+                } else if (
+                  pushConfig["branches"].length !== 1 ||
+                  pushConfig["branches"][0] !== "main"
+                ) {
+                  violations.push({
+                    rule: "P2-FORBIDDEN-BRANCH",
+                    path: relPath,
+                    message: `Workflow ${relPath} push trigger is configured for branches [${(
+                      pushConfig["branches"] as string[]
+                    ).join(", ")}]. Only ["main"] is permitted.`,
                   });
                 }
               }
             }
 
-            if (
-              content.includes("workflow_dispatch") ||
-              content.includes("schedule:") ||
-              content.includes("pull_request:") ||
-              /pull_request\s*:/i.test(content)
-            ) {
-              violations.push({
-                rule: "P2-FORBIDDEN-TRIGGER",
-                path: relPath,
-                message: `Workflow ${relPath} contains unapproved trigger. In Phase P2, triggers must be restricted strictly to push on main.`,
-              });
-            }
+            // 3. Job-Level Permissions & Steps Validation
+            if (docJobs && typeof docJobs === "object") {
+              for (const [jobId, rawJobData] of Object.entries(docJobs)) {
+                if (!rawJobData || typeof rawJobData !== "object") continue;
+                const jobData = rawJobData as Record<string, unknown>;
 
-            const usesMatches = content.matchAll(/uses:\s*([^\s#]+)/g);
-            for (const match of usesMatches) {
-              const actionRef = match[1];
-              if (
-                !actionRef ||
-                actionRef.startsWith("./") ||
-                actionRef.startsWith("docker://")
-              )
-                continue;
-              const isPinnedSha =
-                /^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+(?:\/[a-zA-Z0-9._-]+)*@[0-9a-f]{40}$/i.test(
-                  actionRef,
-                );
-              if (!isPinnedSha) {
-                violations.push({
-                  rule: "P2-MUTABLE-ACTION-REF",
-                  path: relPath,
-                  message: `Action reference "${actionRef}" in ${relPath} is not pinned to an immutable 40-character commit SHA.`,
-                });
+                if (jobId === "publish") {
+                  const jobPerms = jobData["permissions"] as
+                    Record<string, unknown> | undefined;
+                  if (jobPerms && typeof jobPerms === "object") {
+                    for (const [permKey, permVal] of Object.entries(jobPerms)) {
+                      if (
+                        permKey === "packages" ||
+                        permKey === "attestations" ||
+                        permKey === "id-token"
+                      ) {
+                        if (permVal !== "write") {
+                          violations.push({
+                            rule: "P2-PUBLISH-PERMISSION-MISMATCH",
+                            path: relPath,
+                            message: `Job "publish" permission "${permKey}" must be "write", got "${permVal}".`,
+                          });
+                        }
+                      } else if (permKey === "contents") {
+                        if (permVal !== "read") {
+                          violations.push({
+                            rule: "P2-PUBLISH-FORBIDDEN-PERMISSIONS",
+                            path: relPath,
+                            message: `Job "publish" permission "${permKey}" must be "read", got "${permVal}".`,
+                          });
+                        }
+                      } else {
+                        violations.push({
+                          rule: "P2-PUBLISH-FORBIDDEN-PERMISSIONS",
+                          path: relPath,
+                          message: `Job "publish" contains unapproved permission "${permKey}: ${permVal}".`,
+                        });
+                      }
+                    }
+                  }
+                } else {
+                  if (hasWritePermission(jobData["permissions"])) {
+                    violations.push({
+                      rule: "P2-JOB-FORBIDDEN-WRITE-PERMISSIONS",
+                      path: relPath,
+                      message: `Job "${jobId}" in ${relPath} is not permitted to have write permissions. Only job "publish" may have write permissions in Phase P2.`,
+                    });
+                  }
+                }
+
+                // 4. Action References Validation
+                const steps = jobData["steps"];
+                if (Array.isArray(steps)) {
+                  for (const step of steps) {
+                    if (!step || typeof step !== "object") continue;
+                    const stepObj = step as Record<string, unknown>;
+
+                    if (typeof stepObj["uses"] === "string") {
+                      const uses = stepObj["uses"].trim();
+                      if (uses.startsWith("./")) {
+                        violations.push({
+                          rule: "P2-FORBIDDEN-LOCAL-ACTION",
+                          path: relPath,
+                          message: `Local action "${uses}" is forbidden in ${relPath}. All actions must be pinned external GitHub Actions.`,
+                        });
+                      } else if (uses.startsWith("docker://")) {
+                        violations.push({
+                          rule: "P2-FORBIDDEN-DOCKER-ACTION",
+                          path: relPath,
+                          message: `Docker action "${uses}" is forbidden in ${relPath}.`,
+                        });
+                      } else {
+                        const isPinnedSha =
+                          /^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+(?:\/[a-zA-Z0-9._-]+)*@[0-9a-f]{40}$/i.test(
+                            uses,
+                          );
+                        if (!isPinnedSha) {
+                          violations.push({
+                            rule: "P2-MUTABLE-ACTION-REF",
+                            path: relPath,
+                            message: `Action reference "${uses}" in ${relPath} is not pinned to an immutable 40-character commit SHA.`,
+                          });
+                        }
+                      }
+                    }
+
+                    // 5. Inspect step.run for any docker push commands
+                    if (typeof stepObj["run"] === "string") {
+                      const pushMatches = stepObj["run"].matchAll(
+                        /docker\s+push\s+([^\s\n\r]+)/g,
+                      );
+                      for (const pushMatch of pushMatches) {
+                        const pushedTarget = pushMatch[1] ?? "";
+                        const repoName =
+                          pushedTarget.split(":")[0]?.split("@")[0] ?? "";
+                        if (
+                          !(
+                            PERMITTED_GHCR_REPOSITORIES as readonly string[]
+                          ).includes(repoName)
+                        ) {
+                          violations.push({
+                            rule: "P2-UNAUTHORIZED-IMAGE-REPO",
+                            path: relPath,
+                            message: `Unauthorized docker push to image repository "${repoName}" in ${relPath}. Only approved repositories are permitted.`,
+                          });
+                        }
+                      }
+                    }
+                  }
+                }
               }
             }
 
+            // 6. Verify required image pushes are both present
             if (!content.includes("ghcr.io/georgekgk2/life-commerce")) {
               violations.push({
                 rule: "P2-MISSING-EXPECTED-IMAGE-PUSH",
@@ -391,27 +529,9 @@ export function scanDeploymentContainment(
                 message: `Workflow ${relPath} is missing required push for "ghcr.io/georgekgk2/life-storefront".`,
               });
             }
-
-            const repoMatches = content.matchAll(
-              /ghcr\.io\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+/g,
-            );
-            for (const match of repoMatches) {
-              const repo = match[0];
-              if (
-                !(PERMITTED_GHCR_REPOSITORIES as readonly string[]).includes(
-                  repo,
-                )
-              ) {
-                violations.push({
-                  rule: "P2-UNAUTHORIZED-IMAGE-REPO",
-                  path: relPath,
-                  message: `Unauthorized GHCR image repository "${repo}" in ${relPath}. Only approved repositories are permitted.`,
-                });
-              }
-            }
           } else {
             // Any other workflow file must NOT contain packages: write
-            if (hasPackagesWrite) {
+            if (topLevelHasPackagesWrite || anyJobHasPackagesWrite) {
               violations.push({
                 rule: "P0-UNAUTHORIZED-PUBLISH-WORKFLOW",
                 path: relPath,

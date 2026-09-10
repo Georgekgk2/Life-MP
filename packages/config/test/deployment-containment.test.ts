@@ -1171,4 +1171,189 @@ jobs:
       rmSync(tempDir, { recursive: true, force: true });
     }
   });
+
+  it("fails in Phase P2 if release-images.yml targets a branch other than main", () => {
+    const tempDir = mkdtempSync(
+      join(tmpdir(), "life-containment-p2-dev-branch-"),
+    );
+    try {
+      mkdirSync(join(tempDir, "infra"), { recursive: true });
+      const p2Gates = createValidPolicyGates();
+      p2Gates["allow_ghcr_image_push"] = true;
+      writeFileSync(
+        join(tempDir, "infra", "deployment-policy.json"),
+        JSON.stringify({
+          status: "CONTAINED_PHASE_P2",
+          gates: p2Gates,
+        }),
+      );
+
+      mkdirSync(join(tempDir, ".github", "workflows"), { recursive: true });
+      writeFileSync(
+        join(tempDir, ".github", "workflows", "release-images.yml"),
+        `name: Release
+on:
+  push:
+    branches: [dev]
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-123
+      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-123
+`,
+      );
+
+      const result = scanDeploymentContainment(tempDir);
+      expect(result.valid).toBe(false);
+      expect(
+        result.violations.some((v) => v.rule === "P2-FORBIDDEN-BRANCH"),
+      ).toBe(true);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails in Phase P2 if release-images.yml pushes to an unauthorized additional registry", () => {
+    const tempDir = mkdtempSync(
+      join(tmpdir(), "life-containment-p2-bad-registry-"),
+    );
+    try {
+      mkdirSync(join(tempDir, "infra"), { recursive: true });
+      const p2Gates = createValidPolicyGates();
+      p2Gates["allow_ghcr_image_push"] = true;
+      writeFileSync(
+        join(tempDir, "infra", "deployment-policy.json"),
+        JSON.stringify({
+          status: "CONTAINED_PHASE_P2",
+          gates: p2Gates,
+        }),
+      );
+
+      mkdirSync(join(tempDir, ".github", "workflows"), { recursive: true });
+      writeFileSync(
+        join(tempDir, ".github", "workflows", "release-images.yml"),
+        `name: Release
+on:
+  push:
+    branches: [main]
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-123
+      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-123
+      - run: docker push docker.io/rogue/image:latest
+`,
+      );
+
+      const result = scanDeploymentContainment(tempDir);
+      expect(result.valid).toBe(false);
+      expect(
+        result.violations.some((v) => v.rule === "P2-UNAUTHORIZED-IMAGE-REPO"),
+      ).toBe(true);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails in Phase P2 if publish job contains excessive write permissions", () => {
+    for (const forbiddenPerm of ["contents: write", "actions: write"]) {
+      const tempDir = mkdtempSync(
+        join(tmpdir(), "life-containment-p2-excess-perms-"),
+      );
+      try {
+        mkdirSync(join(tempDir, "infra"), { recursive: true });
+        const p2Gates = createValidPolicyGates();
+        p2Gates["allow_ghcr_image_push"] = true;
+        writeFileSync(
+          join(tempDir, "infra", "deployment-policy.json"),
+          JSON.stringify({
+            status: "CONTAINED_PHASE_P2",
+            gates: p2Gates,
+          }),
+        );
+
+        mkdirSync(join(tempDir, ".github", "workflows"), { recursive: true });
+        writeFileSync(
+          join(tempDir, ".github", "workflows", "release-images.yml"),
+          `name: Release
+on:
+  push:
+    branches: [main]
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      ${forbiddenPerm}
+`,
+        );
+
+        const result = scanDeploymentContainment(tempDir);
+        expect(result.valid).toBe(false);
+        expect(
+          result.violations.some(
+            (v) => v.rule === "P2-PUBLISH-FORBIDDEN-PERMISSIONS",
+          ),
+        ).toBe(true);
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("fails in Phase P2 if release-images.yml uses local actions or docker actions", () => {
+    for (const actionSnippet of [
+      "uses: ./local-action",
+      "uses: docker://alpine:latest",
+    ]) {
+      const tempDir = mkdtempSync(
+        join(tmpdir(), "life-containment-p2-bad-action-type-"),
+      );
+      try {
+        mkdirSync(join(tempDir, "infra"), { recursive: true });
+        const p2Gates = createValidPolicyGates();
+        p2Gates["allow_ghcr_image_push"] = true;
+        writeFileSync(
+          join(tempDir, "infra", "deployment-policy.json"),
+          JSON.stringify({
+            status: "CONTAINED_PHASE_P2",
+            gates: p2Gates,
+          }),
+        );
+
+        mkdirSync(join(tempDir, ".github", "workflows"), { recursive: true });
+        writeFileSync(
+          join(tempDir, ".github", "workflows", "release-images.yml"),
+          `name: Release
+on:
+  push:
+    branches: [main]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - ${actionSnippet}
+`,
+        );
+
+        const result = scanDeploymentContainment(tempDir);
+        expect(result.valid).toBe(false);
+        expect(
+          result.violations.some(
+            (v) =>
+              v.rule === "P2-FORBIDDEN-LOCAL-ACTION" ||
+              v.rule === "P2-FORBIDDEN-DOCKER-ACTION",
+          ),
+        ).toBe(true);
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
+    }
+  });
 });

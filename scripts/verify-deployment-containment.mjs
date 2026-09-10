@@ -2,7 +2,7 @@
 /**
  * SECURITY NOTICE:
  * This script is a repository-local defense-in-depth preflight check.
- * It verifies Phase P0 containment policy invariants.
+ * It verifies Phase P0 and Phase P2 containment policy invariants.
  * It DOES NOT constitute sovereign security authorization.
  * Sovereign enforcement relies on branch protection, independent peer review, and isolated CI runners.
  */

@@ -121,6 +121,20 @@ function isValidCalendarDate(dateStr: string): boolean {
   );
 }
 
+function extractShellCommands(script: string): string[] {
+  const effectiveLines = script
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith("#"))
+    .map((l) => l.split(/\s+#\s+/)[0]?.trim() || "");
+
+  const normalizedScript = effectiveLines.join("\n");
+  return normalizedScript
+    .split(/(?:&&|\|\||[;\n&|])/)
+    .map((c) => c.trim())
+    .filter(Boolean);
+}
+
 export function scanDeploymentContainment(
   rootDir: string,
 ): DeploymentContainmentResult {
@@ -588,82 +602,93 @@ export function scanDeploymentContainment(
 
                     // 5. Inspect step.run for any container publishing commands
                     if (typeof stepObj["run"] === "string") {
-                      const runScript = stepObj["run"];
-
-                      // Check for forbidden container publishing commands
-                      const forbiddenPublishPatterns = [
-                        {
-                          pattern: /buildx\s+.*--push/i,
-                          name: "docker buildx ... --push",
-                        },
-                        {
-                          pattern: /--push\s+.*buildx/i,
-                          name: "docker buildx ... --push",
-                        },
-                        {
-                          pattern: /docker\s+image\s+push/i,
-                          name: "docker image push",
-                        },
-                        { pattern: /podman\s+push/i, name: "podman push" },
-                        { pattern: /crane\s+push/i, name: "crane push" },
-                        { pattern: /oras\s+push/i, name: "oras push" },
-                        { pattern: /skopeo\s+copy/i, name: "skopeo copy" },
-                      ];
-                      for (const forbidden of forbiddenPublishPatterns) {
-                        if (forbidden.pattern.test(runScript)) {
+                      const commands = extractShellCommands(stepObj["run"]);
+                      for (const cmd of commands) {
+                        // Check for forbidden container publishing commands
+                        if (
+                          /buildx\s+.*--push/i.test(cmd) ||
+                          /--push\s+.*buildx/i.test(cmd) ||
+                          /docker\s+image\s+push/i.test(cmd) ||
+                          /podman\s+push/i.test(cmd) ||
+                          /crane\s+push/i.test(cmd) ||
+                          /oras\s+push/i.test(cmd) ||
+                          /skopeo\s+copy/i.test(cmd)
+                        ) {
                           violations.push({
                             rule: "P2-FORBIDDEN-PUBLISH-COMMAND",
                             path: relPath,
-                            message: `Forbidden container publishing command "${forbidden.name}" detected in job "${jobId}" in ${relPath}. Only explicit docker push to approved repositories is permitted.`,
+                            message: `Forbidden container publishing command detected in job "${jobId}" in ${relPath}. Only explicit docker push to approved repositories is permitted.`,
                           });
                         }
-                      }
 
-                      // Check docker push commands
-                      const pushMatches = runScript.matchAll(
-                        /docker\s+push\s+([^\n\r;]+)/g,
-                      );
-                      for (const pushMatch of pushMatches) {
-                        const rawTarget = (pushMatch[1] ?? "").trim();
-                        const cleanTarget = rawTarget.replace(/['"]/g, "");
-                        const repoName =
-                          cleanTarget.split(":")[0]?.split("@")[0]?.trim() ??
-                          "";
+                        // Check docker push commands
+                        if (/\bdocker\s+push\b/.test(cmd)) {
+                          if (jobId !== "publish") {
+                            violations.push({
+                              rule: "P2-UNAUTHORIZED-PUBLISH-JOB",
+                              path: relPath,
+                              message: `Forbidden docker push in job "${jobId}" in ${relPath}. Container publishing is strictly restricted to job "publish".`,
+                            });
+                          }
 
-                        if (
-                          repoName.startsWith("$") ||
-                          repoName.includes("${") ||
-                          repoName.includes("$(")
-                        ) {
-                          violations.push({
-                            rule: "P2-UNAUTHORIZED-IMAGE-REPO",
-                            path: relPath,
-                            message: `docker push to dynamic or variable target "${rawTarget}" in ${relPath} is forbidden. Only static allowlisted image repositories may be targeted.`,
-                          });
-                          continue;
-                        }
+                          const tokens = cmd.split(/\s+/).filter(Boolean);
+                          const pushIdx = tokens.indexOf("push");
+                          const targetRaw = tokens
+                            .slice(pushIdx + 1)
+                            .join(" ")
+                            .trim();
+                          const cleanTarget = targetRaw.replace(/['"]/g, "");
+                          const repoName =
+                            cleanTarget.split(":")[0]?.split("@")[0]?.trim() ??
+                            "";
 
-                        if (
-                          !(
-                            PERMITTED_GHCR_REPOSITORIES as readonly string[]
-                          ).includes(repoName)
-                        ) {
-                          violations.push({
-                            rule: "P2-UNAUTHORIZED-IMAGE-REPO",
-                            path: relPath,
-                            message: `Unauthorized docker push to image repository "${repoName}" in ${relPath}. Only approved repositories are permitted.`,
-                          });
-                        } else {
-                          if (jobId === "publish") {
+                          if (
+                            repoName.startsWith("$") ||
+                            repoName.includes("${") ||
+                            repoName.includes("$(")
+                          ) {
+                            violations.push({
+                              rule: "P2-UNAUTHORIZED-IMAGE-REPO",
+                              path: relPath,
+                              message: `docker push to dynamic or variable target "${targetRaw}" in ${relPath} is forbidden. Only static allowlisted image repositories may be targeted.`,
+                            });
+                            continue;
+                          }
+
+                          if (
+                            !(
+                              PERMITTED_GHCR_REPOSITORIES as readonly string[]
+                            ).includes(repoName)
+                          ) {
+                            violations.push({
+                              rule: "P2-UNAUTHORIZED-IMAGE-REPO",
+                              path: relPath,
+                              message: `Unauthorized docker push to image repository "${repoName}" in ${relPath}. Only approved repositories are permitted.`,
+                            });
+                          } else {
+                            const tag = cleanTarget.split(":")[1]?.trim() ?? "";
                             if (
-                              repoName === "ghcr.io/georgekgk2/life-commerce"
+                              !tag ||
+                              (!tag.startsWith("sha-") &&
+                                tag !== "sha-${{ github.sha }}")
                             ) {
-                              foundCommercePush = true;
-                            }
-                            if (
-                              repoName === "ghcr.io/georgekgk2/life-storefront"
-                            ) {
-                              foundStorefrontPush = true;
+                              violations.push({
+                                rule: "P2-MUTABLE-IMAGE-TAG",
+                                path: relPath,
+                                message: `docker push to mutable or unapproved tag "${tag}" in ${relPath} is forbidden. Only immutable commit tags starting with "sha-" are permitted.`,
+                              });
+                            } else if (jobId === "publish") {
+                              if (
+                                repoName === "ghcr.io/georgekgk2/life-commerce"
+                              ) {
+                                foundCommercePush = true;
+                              }
+                              if (
+                                repoName ===
+                                "ghcr.io/georgekgk2/life-storefront"
+                              ) {
+                                foundStorefrontPush = true;
+                              }
                             }
                           }
                         }
@@ -690,13 +715,106 @@ export function scanDeploymentContainment(
               });
             }
           } else {
-            // Any other workflow file must NOT contain packages: write
-            if (topLevelHasPackagesWrite || anyJobHasPackagesWrite) {
+            // Secondary workflow checks in Phase P2
+            // 1. Top-level permissions check
+            if (hasWritePermission(docRecord["permissions"], "packages")) {
               violations.push({
                 rule: "P0-UNAUTHORIZED-PUBLISH-WORKFLOW",
                 path: relPath,
                 message: `Forbidden "packages: write" permission found in unauthorized workflow ${relPath}. Only .github/workflows/release-images.yml may publish in Phase P2.`,
               });
+            }
+            if (hasWritePermission(docRecord["permissions"])) {
+              violations.push({
+                rule: "P2-SECONDARY-WORKFLOW-WRITE-PERMISSIONS",
+                path: relPath,
+                message: `Workflow ${relPath} is not permitted to have top-level write permissions in Phase P2.`,
+              });
+            }
+
+            // 2. Job-level permissions, reusable workflows, and step commands check
+            if (
+              docJobs &&
+              typeof docJobs === "object" &&
+              !Array.isArray(docJobs)
+            ) {
+              const jobsObj = docJobs as Record<string, unknown>;
+              for (const [jobId, rawJobData] of Object.entries(jobsObj)) {
+                if (
+                  !rawJobData ||
+                  typeof rawJobData !== "object" ||
+                  Array.isArray(rawJobData)
+                ) {
+                  continue;
+                }
+                const jobData = rawJobData as Record<string, unknown>;
+
+                if ("uses" in jobData && typeof jobData["uses"] === "string") {
+                  violations.push({
+                    rule: "P2-FORBIDDEN-REUSABLE-WORKFLOW",
+                    path: relPath,
+                    message: `Job "${jobId}" in secondary workflow ${relPath} references reusable workflow "${jobData["uses"]}". Reusable workflows are strictly forbidden in Phase P2.`,
+                  });
+                }
+
+                if (hasWritePermission(jobData["permissions"], "packages")) {
+                  violations.push({
+                    rule: "P0-UNAUTHORIZED-PUBLISH-WORKFLOW",
+                    path: relPath,
+                    message: `Forbidden "packages: write" permission found in unauthorized workflow ${relPath}. Only .github/workflows/release-images.yml may publish in Phase P2.`,
+                  });
+                }
+
+                if (hasWritePermission(jobData["permissions"])) {
+                  violations.push({
+                    rule: "P2-SECONDARY-WORKFLOW-WRITE-PERMISSIONS",
+                    path: relPath,
+                    message: `Job "${jobId}" in secondary workflow ${relPath} is not permitted to have write permissions in Phase P2.`,
+                  });
+                }
+
+                const steps = jobData["steps"];
+                if (Array.isArray(steps)) {
+                  for (const step of steps) {
+                    if (
+                      !step ||
+                      typeof step !== "object" ||
+                      Array.isArray(step)
+                    ) {
+                      continue;
+                    }
+                    const stepObj = step as Record<string, unknown>;
+                    if (typeof stepObj["run"] === "string") {
+                      const commands = extractShellCommands(stepObj["run"]);
+                      for (const cmd of commands) {
+                        if (
+                          /buildx\s+.*--push/i.test(cmd) ||
+                          /--push\s+.*buildx/i.test(cmd) ||
+                          /docker\s+image\s+push/i.test(cmd) ||
+                          /podman\s+push/i.test(cmd) ||
+                          /crane\s+push/i.test(cmd) ||
+                          /oras\s+push/i.test(cmd) ||
+                          /skopeo\s+copy/i.test(cmd)
+                        ) {
+                          violations.push({
+                            rule: "P2-FORBIDDEN-PUBLISH-COMMAND",
+                            path: relPath,
+                            message: `Forbidden container publishing command detected in secondary workflow ${relPath}.`,
+                          });
+                        }
+
+                        if (/\bdocker\s+push\b/.test(cmd)) {
+                          violations.push({
+                            rule: "P2-UNAUTHORIZED-PUBLISH-WORKFLOW",
+                            path: relPath,
+                            message: `Forbidden docker push in secondary workflow ${relPath}. Only .github/workflows/release-images.yml may publish in Phase P2.`,
+                          });
+                        }
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
         }

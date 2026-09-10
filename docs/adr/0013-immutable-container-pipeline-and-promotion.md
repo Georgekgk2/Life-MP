@@ -23,51 +23,65 @@
 
 ## Рішення
 
-### 1. Модель єдиного артефакту та контролю цілісності (Build ➔ Checksum ➔ Scan ➔ Load ➔ Push)
+### 1. Модель єдиного артефакту та контролю цілісності (Build ➔ Checksum ➔ Scan ➔ Transfer ➔ Verify ➔ Load ➔ Push)
 
-Для гарантії того, що публікується саме той бінарний артефакт, який пройшов аудит безпеки, для кожного сервісу впроваджується ланцюжок роботи з окремим ізольованим архівом із контролем контрольних сум:
+Для гарантії того, що публікується саме той бінарний артефакт, який пройшов аудит безпеки, для кожного сервісу впроваджується ланцюжок роботи з окремим ізольованим архівом із контролем контрольних сум та безпечною передачею між джобами:
 
-1. **Збірка окремих архівів:** Docker BuildKit компілює образи під архітектуру `linux/amd64` та експортує їх у незалежні файли:
+1. **Збірка окремих архівів та розрахунок контрольних сум (у джобі `image-build-scan`):**
+   Docker BuildKit компілює образи під архітектуру `linux/amd64` та експортує їх у незалежні файли:
    - `/tmp/commerce.tar` (для бекенду `life-commerce`);
    - `/tmp/storefront.tar` (для фронтенду `life-storefront`).
-2. **Контроль цілісності (Checksum Invariant):**
-   Одразу після збірки обчислюється криптографічний хеш кожного архіву `sha256sum /tmp/<name>.tar`.
-   Пайплайн гарантує інваріант цілісності:
-   `archive_sha256_after_build == archive_sha256_before_scan == archive_sha256_before_load`.
-   Будь-яка розбіжність хешу між етапами перевірки та завантаження негайно абортує процес.
-3. **Сканування кожного архіву:** Сканер Trivy (`aquasecurity/trivy-action`, зафіксований за незмінним commit SHA) послідовно перевіряє безпосередньо експортовані файли архівів:
+     Одразу після збірки розраховується криптографічний маніфест контрольних сум:
+     `sha256sum /tmp/commerce.tar /tmp/storefront.tar > /tmp/checksums.txt`.
+2. **Сканування кожного архіву (у джобі `image-build-scan`):**
+   Сканер Trivy (`aquasecurity/trivy-action`, зафіксований за незмінним commit SHA) послідовно перевіряє саме експортовані файли архівів:
    - `input: /tmp/commerce.tar`;
    - `input: /tmp/storefront.tar`.
-4. **Політика вразливостей:** Встановлюється чіткий контракт сканування:
+3. **Політика вразливостей:** Встановлюється чіткий контракт сканування:
    - Будь-яка виправна (fixable) вразливість рівня HIGH або CRITICAL викликає негайну зупинку (fail-closed);
    - Невиправлені апстрімом вразливості (`ignore-unfixed: true`) дозволяються виключно як задокументований залишковий ризик;
-   - Винятки через `.trivyignore` дозволяються лише за умови машино-перевірюваного формату заголовка для кожного запису:
-     `# CVE-YYYY-XXXX | reason: <обґрунтування> | expires: YYYY-MM-DD | owner: <відповідальний>` (що перевіряється в preflight-перевірці).
-5. **Завантаження та Публікація:** Лише після успішного сканування та звірки контрольної суми виконується завантаження відповідного архіву в локальний Docker-демон (`docker load -i /tmp/<name>.tar`) і відправка в GitHub Container Registry:
+   - Винятки через `.trivyignore` дозволяються виключно в офіційному форматі Trivy із обов'язковим супровідним коментарем:
+     ```text
+     # reason: <обґрунтування> | owner: <відповідальний> | expires: YYYY-MM-DD
+     CVE-YYYY-XXXXX
+     ```
+     де ідентифікатор відповідає патерну `CVE-\d{4}-\d+`, а коментар містить причину, власника та термін перегляду (валідується автоматичним скриптом у preflight).
+4. **Безпечна передача артефактів між джобами (Artifact Transfer):**
+   Оскільки джоби GitHub Actions виконуються на різних ізольованих віртуальних машинах, файли `/tmp/commerce.tar`, `/tmp/storefront.tar` та `/tmp/checksums.txt` завантажуються як workflow-артефакт за допомогою `actions/upload-artifact` із терміном зберігання 1 день (`retention-days: 1`).
+5. **Верифікація цілісності перед завантаженням (у джобі `publish`):**
+   Джоба `publish` завантажує артефакти через `actions/download-artifact` і перед будь-якою взаємодією з Docker обов'язково виконує повну повторну верифікацію контрольних сум:
+   `sha256sum -c checksums.txt`.
+   Пайплайн гарантує інваріант цілісності:
+   `archive_sha256_after_build == archive_sha256_before_scan == archive_sha256_before_load`.
+   У разі найменшої розбіжності хешу процес негайно абортується з кодом 1 (Fail-Closed).
+6. **Завантаження та Публікація (у джобі `publish`):**
+   Лише після успішної перевірки контрольних сум виконується завантаження відповідного архіву в локальний Docker-демон (`docker load -i commerce.tar` та `docker load -i storefront.tar`) і відправка в GitHub Container Registry під інформаційним commit-тегом:
    - `ghcr.io/georgekgk2/life-commerce:sha-<github_sha>`;
    - `ghcr.io/georgekgk2/life-storefront:sha-<github_sha>`.
-6. **Фіксація дайджестів та атестація:**
+7. **Фіксація дайджестів та атестація:**
    З реєстру отримується канонічний `sha256`-хеш образу (remote manifest digest). Окремо фіксуються:
    - локальний SHA-256 хеш tar-архіву;
    - локальний Image ID / config digest;
    - фінальний registry manifest digest.
      Ці дані формують звіт `IMAGE_DIGESTS.json`, що зберігається як завантажуваний артефакт workflow.
+8. **Статус тегів та дайджестів:**
+   Інформаційний тег `sha-<github_sha>` призначений виключно для зручності аудиту та пошуку в інтерфейсі GHCR і не є криптографічно незмінним (теги в реєстрах можуть перезаписуватися). Єдиним авторитетним, юридично та технічно незмінним ідентифікатором є **канонічний registry manifest digest (`@sha256:...`)**, що повертається реєстром під час публікації. Усі подальші кроки (compose, promotion, перевірки) використовують **виключно дайджест**.
 
 ### 2. Модель тригерів, дозволів та повний граф перевірок у CI
 
 - **Тригер:** Виключно `push: branches: [main]` (post-merge). Запуск на подію `pull_request` суворо заборонено, що унеможливлює доступ неперевіреного коду із форків чи робочих гілок до прав публікації.
 - **Прив'язка до Commit SHA:** Перевірки на гілці PR не замінюють перевірку результуючого комміту в `main`. Збірка та публікація артефактів виконуються суворо для точного `github.sha`, який злито в `main`.
-- **Автономний релізний граф (Release Workflow):**
-  Оскільки джоби не можуть мати міжфайлових залежностей `needs` між окремими workflow-файлами, релізний пайплайн `.github/workflows/release-images.yml` реалізується як єдиний самодостатній граф, що покриває всі обов'язкові виміри якості до запуску публікації:
+- **Автономний релізний граф (Release Workflow Target Design):**
+  Оскільки джоби не можуть мати міжфайлових залежностей `needs` між окремими workflow-файлами, релізний пайплайн `.github/workflows/release-images.yml` проектується як єдиний самодостатній граф, що охоплює дев'ять обов'язкових вимірів якості та безпеки на фактичному `github.sha` після злиття в `main`:
   1. `verify-and-test` (permissions: `contents: read`) — збірка workspace, lint, typecheck, модульні тести (`vitest`) та перевірка документації (`check-docs.mjs`);
   2. `integration-and-e2e` (permissions: `contents: read`) — запуск тестової бази даних, міграцій, інтеграційних тестів та Playwright E2E;
   3. `security-audit` (permissions: `contents: read`) — Secret Detection (Gitleaks) та аудит виробничих залежностей (`pnpm audit --prod --audit-level=high`);
-  4. `codeql-analysis` (permissions: `contents: read`, `actions: read`, `security-events: write`) — семантичний статичний аналіз CodeQL для `javascript-typescript`;
-  5. `image-build-scan` (permissions: `contents: read`) — компіляція образів у tar-архіви, розрахунок контрольних сум та fail-closed сканування Trivy;
-  6. `publish` (permissions: `contents: read`, `packages: write`, `attestations: write`, `id-token: write`; залежність `needs: [verify-and-test, integration-and-e2e, security-audit, codeql-analysis, image-build-scan]`) — завантаження, пуш у GHCR, генерація маніфесту та атестація.
-     Це гарантує, що публікація виконується **виключно за умови проходження повного комплексу з усіх обов'язкових перевірок** саме для того комміту, який потрапив у `main`.
-- **Мінімальні права (Least Privilege):** Дозволи `packages: write`, `attestations: write` та `id-token: write` надаються суворо ізольовано на рівні джоби `publish`. Джоба `codeql-analysis` має `security-events: write` та `actions: read`. Усі інші джоби мають виключно `contents: read`.
-- **Незмінні посилання на GitHub Actions:** Усі екшени у workflow фіксуються виключно за точними 40-символьними immutable commit SHAs (checkout, buildx, login, trivy-action, upload-artifact, attest-build-provenance).
+  4. `codeql-analysis` (permissions: `contents: read`, `actions: read`) — статичний аналіз CodeQL для `javascript-typescript` зі збереженням SARIF-артефакту (`upload: "never"`, згідно з ADR 0011; дозвіл `security-events: write` не вимагається);
+  5. `image-build-scan` (permissions: `contents: read`) — компіляція образів у tar-архіви, розрахунок контрольних сум, fail-closed сканування Trivy та збереження артефактів;
+  6. `publish` (permissions: `contents: read`, `packages: write`, `attestations: write`, `id-token: write`; залежність `needs: [verify-and-test, integration-and-e2e, security-audit, codeql-analysis, image-build-scan]`) — завантаження артефактів, перевірка хешів, пуш у GHCR, генерація маніфесту та атестація.
+     Джоба `publish` виконується **виключно за умови, що всі 5 попередніх обов'язкових джоб завершилися з результатом `success`** (використання `always()` чи слабких умов суворо заборонено).
+- **Мінімальні права (Least Privilege):** Дозволи `packages: write`, `attestations: write` та `id-token: write` надаються суворо ізольовано на рівні джоби `publish`. Джоба `codeql-analysis` має `actions: read`. Усі інші джоби мають виключно `contents: read`.
+- **Незмінні посилання на GitHub Actions:** Усі екшени у workflow фіксуються виключно за точними 40-символьними immutable commit SHAs (checkout, buildx, login, trivy-action, upload-artifact, download-artifact, attest-build-provenance).
 - **Атестація збірки:** Застосовується `actions/attest-build-provenance` для кожного опублікованого образу (`subject-name: ghcr.io/georgekgk2/life-commerce` та `life-storefront`). Параметр `subject-digest` береться **суворо з результату push у реєстр** (канонічний remote manifest digest, наприклад `sha256:...`), а не з локального Image ID чи хешу tar-архіву.
 - **Аутентифікація:** Використовується виключно системний короткоживучий `GITHUB_TOKEN`, жодних персональних токенів доступу (PAT) або постійних секретів.
 
@@ -100,7 +114,7 @@
 ### 5. Межі дозволу розгортання
 
 - **Цей ADR НЕ дозволяє розгортання на продакшні.**
-- Будь-які майбутні дії з розгортання чи промоції можливі виключно після окремого проходження процедури обстеження сервера (server discovery), перевірки безпеки інфраструктури та закриття всіх COM/LOG/FSC воріт готовності згідно з `production-readiness-gate.md`.
+- Будь-які майбутні дії з розгортання чи промоції можливі виключно після окремого проходження процедури обстеження сервера (server discovery), інфраструктурного аудиту та закриття всіх обов'язкових воріт готовності (COM-1..5, LOG-1, CAT-1..5, FSC-1) згідно з `production-readiness-gate.md`.
 
 ## Наслідки
 
@@ -121,7 +135,7 @@
 
 Фазу P2 можна вважати завершеною лише за умови виконання наступних критеріїв:
 
-1. Створено та верифіковано автономний workflow `.github/workflows/release-images.yml` із ланцюжком Single-Artifact та контролем контрольних сум для кожного образу (`/tmp/commerce.tar`, `/tmp/storefront.tar` ➔ Checksum ➔ Trivy ➔ GHCR);
+1. Створено та верифіковано автономний workflow `.github/workflows/release-images.yml` із ланцюжком Single-Artifact, контролем контрольних сум та передачею артефактів для кожного образу (`/tmp/commerce.tar`, `/tmp/storefront.tar` ➔ Checksum ➔ Trivy ➔ Transfer ➔ Verify ➔ Load ➔ GHCR);
 2. Сканер безпеки `deployment-containment.ts` оновлено з підтримкою дозволеної GHCR-публікації на `main` та покрито unit-тестами;
 3. У результаті роботи workflow формується завантажуваний workflow-артефакт `IMAGE_DIGESTS.json`;
 4. `deploy/docker-compose.prod.yml` очищено від секцій `build:` та переведено на незмінні дайджести;

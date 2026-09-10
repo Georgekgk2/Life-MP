@@ -6,7 +6,6 @@ import {
   realpathSync,
 } from "node:fs";
 import { join } from "node:path";
-import { load as loadYaml } from "js-yaml";
 
 export type DeploymentContainmentViolation = Readonly<{
   rule: string;
@@ -29,7 +28,7 @@ export type DeploymentPolicyFile = Readonly<{
 /**
  * SECURITY NOTICE & BOUNDARY SPECIFICATION:
  * This deployment containment scanner is a repository-local static defense-in-depth preflight control.
- * It verifies repository invariants, files, and scripts against Phase P0 containment policy constraints.
+ * It verifies repository invariants, files, and scripts against Phase P0/P2 containment policy constraints.
  * It DOES NOT constitute an autonomous security boundary or sovereign authorization.
  * Sovereign containment and authorization rely upon:
  * 1. Protected branch enforcement (disallowing unreviewed merges);
@@ -104,6 +103,187 @@ export const FORBIDDEN_SCRIPT_FILENAMES: readonly string[] = Object.freeze([
   "rollback.sh",
   "deploy-colocated-prod.sh",
 ]);
+
+type ParsedWorkflowStep = {
+  uses?: string | undefined;
+  run?: string | undefined;
+};
+
+type ParsedWorkflowJob = {
+  id: string;
+  permissions?: Record<string, string> | string | undefined;
+  steps: ParsedWorkflowStep[];
+};
+
+type ParsedWorkflowDoc = {
+  on?: Record<string, unknown> | string | undefined;
+  permissions?: Record<string, string> | string | undefined;
+  jobs: Record<string, ParsedWorkflowJob>;
+};
+
+function parseWorkflowYaml(content: string): ParsedWorkflowDoc {
+  const lines = content.split("\n");
+  const doc: ParsedWorkflowDoc = { jobs: {} };
+  let currentSection: "on" | "permissions" | "jobs" | null = null;
+  let currentJob: ParsedWorkflowJob | null = null;
+  let inJobSteps = false;
+  let currentStep: ParsedWorkflowStep | null = null;
+  let inJobPermissions = false;
+  let inPushBranches = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i] ?? "";
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+
+    const indent = raw.search(/\S/);
+
+    if (indent === 0) {
+      currentSection = null;
+      currentJob = null;
+      inJobSteps = false;
+      inJobPermissions = false;
+      inPushBranches = false;
+
+      if (trimmed.startsWith("on:")) {
+        currentSection = "on";
+        const inline = trimmed.slice(3).trim();
+        if (inline) {
+          doc.on = inline;
+        } else {
+          doc.on = {};
+        }
+      } else if (trimmed.startsWith("permissions:")) {
+        currentSection = "permissions";
+        const inline = trimmed.slice(12).trim();
+        if (inline) doc.permissions = inline;
+      } else if (trimmed.startsWith("jobs:")) {
+        currentSection = "jobs";
+      }
+      continue;
+    }
+
+    if (currentSection === "on") {
+      if (typeof doc.on !== "object" || doc.on === null) doc.on = {};
+      const onObj = doc.on as Record<string, unknown>;
+
+      if (indent === 2) {
+        inPushBranches = false;
+        const colonIdx = trimmed.indexOf(":");
+        const trigger =
+          colonIdx > -1 ? trimmed.slice(0, colonIdx).trim() : trimmed;
+        onObj[trigger] = {};
+        if (colonIdx > -1) {
+          const rest = trimmed.slice(colonIdx + 1).trim();
+          if (rest) onObj[trigger] = rest;
+        }
+      } else if (indent === 4) {
+        if (trimmed.startsWith("branches:")) {
+          inPushBranches = true;
+          const rest = trimmed.slice(9).trim();
+          if (rest.startsWith("[") && rest.endsWith("]")) {
+            const branches = rest
+              .slice(1, -1)
+              .split(",")
+              .map((s) => s.trim().replace(/['"]/g, ""))
+              .filter(Boolean);
+            const pushObj = (onObj["push"] as Record<string, unknown>) || {};
+            pushObj["branches"] = branches;
+            onObj["push"] = pushObj;
+          } else {
+            const pushObj = (onObj["push"] as Record<string, unknown>) || {};
+            pushObj["branches"] = [];
+            onObj["push"] = pushObj;
+          }
+        }
+      } else if (indent === 6 && inPushBranches) {
+        if (trimmed.startsWith("- ")) {
+          const pushObj = (onObj["push"] as Record<string, unknown>) || {};
+          const branches = (pushObj["branches"] as string[]) || [];
+          branches.push(trimmed.slice(2).trim().replace(/['"]/g, ""));
+          pushObj["branches"] = branches;
+          onObj["push"] = pushObj;
+        }
+      }
+    } else if (currentSection === "permissions") {
+      if (indent === 2) {
+        const colonIdx = trimmed.indexOf(":");
+        if (colonIdx > -1) {
+          const k = trimmed.slice(0, colonIdx).trim();
+          const v = trimmed.slice(colonIdx + 1).trim();
+          if (typeof doc.permissions !== "object" || doc.permissions === null) {
+            doc.permissions = {};
+          }
+          (doc.permissions as Record<string, string>)[k] = v;
+        }
+      }
+    } else if (currentSection === "jobs") {
+      if (indent === 2) {
+        const colonIdx = trimmed.indexOf(":");
+        const jobName =
+          colonIdx > -1 ? trimmed.slice(0, colonIdx).trim() : trimmed;
+        currentJob = { id: jobName, steps: [] };
+        doc.jobs[jobName] = currentJob;
+        inJobSteps = false;
+        inJobPermissions = false;
+      } else if (indent === 4 && currentJob) {
+        if (trimmed.startsWith("permissions:")) {
+          inJobPermissions = true;
+          inJobSteps = false;
+          const inline = trimmed.slice(12).trim();
+          if (inline) currentJob.permissions = inline;
+        } else if (trimmed.startsWith("steps:")) {
+          inJobSteps = true;
+          inJobPermissions = false;
+        }
+      } else if (indent === 6 && currentJob) {
+        if (inJobPermissions) {
+          const colonIdx = trimmed.indexOf(":");
+          if (colonIdx > -1) {
+            const k = trimmed.slice(0, colonIdx).trim();
+            const v = trimmed.slice(colonIdx + 1).trim();
+            if (
+              typeof currentJob.permissions !== "object" ||
+              currentJob.permissions === null
+            ) {
+              currentJob.permissions = {};
+            }
+            (currentJob.permissions as Record<string, string>)[k] = v;
+          }
+        } else if (inJobSteps) {
+          if (trimmed.startsWith("- uses:")) {
+            const rawUses = trimmed.slice(7).trim();
+            const uses = rawUses.split("#")[0]?.trim();
+            const newStep: ParsedWorkflowStep = { uses };
+            currentStep = newStep;
+            currentJob.steps.push(newStep);
+          } else if (trimmed.startsWith("- run:")) {
+            const newStep: ParsedWorkflowStep = {
+              run: trimmed.slice(6).trim(),
+            };
+            currentStep = newStep;
+            currentJob.steps.push(newStep);
+          } else if (trimmed.startsWith("- name:")) {
+            const newStep: ParsedWorkflowStep = {};
+            currentStep = newStep;
+            currentJob.steps.push(newStep);
+          }
+        }
+      } else if (indent > 6 && currentJob && inJobSteps && currentStep) {
+        if (trimmed.startsWith("uses:")) {
+          const rawUses = trimmed.slice(5).trim();
+          const uses = rawUses.split("#")[0]?.trim();
+          currentStep.uses = uses ?? undefined;
+        } else if (trimmed.startsWith("run:")) {
+          currentStep.run = trimmed.slice(4).trim();
+        } else if (currentStep.run && trimmed) {
+          currentStep.run += "\n" + trimmed;
+        }
+      }
+    }
+  }
+  return doc;
+}
 
 function isValidCalendarDate(dateStr: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
@@ -268,24 +448,7 @@ export function scanDeploymentContainment(
           });
         }
 
-        let doc: Record<string, unknown> | null;
-        try {
-          doc = loadYaml(content) as Record<string, unknown> | null;
-        } catch (err) {
-          violations.push({
-            rule: "P0-WORKFLOW-YAML-INVALID",
-            path: relPath,
-            message: `Failed to parse workflow YAML: ${String(err)}`,
-          });
-          if (/packages:\s*write/.test(content)) {
-            violations.push({
-              rule: "P0-NO-PACKAGES-WRITE",
-              path: relPath,
-              message: `Forbidden "packages: write" permission found in ${relPath}.`,
-            });
-          }
-          continue;
-        }
+        const doc = parseWorkflowYaml(content);
 
         if (!doc || typeof doc !== "object") continue;
         if (
@@ -337,7 +500,11 @@ export function scanDeploymentContainment(
           );
 
         if (policyStatus === "CONTAINED") {
-          if (topLevelHasPackagesWrite || anyJobHasPackagesWrite) {
+          if (
+            topLevelHasPackagesWrite ||
+            anyJobHasPackagesWrite ||
+            /packages:\s*write/.test(content)
+          ) {
             violations.push({
               rule: "P0-NO-PACKAGES-WRITE",
               path: relPath,

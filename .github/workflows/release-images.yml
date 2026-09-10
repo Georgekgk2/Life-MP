@@ -284,13 +284,13 @@ jobs:
         uses: github/codeql-action/analyze@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3
         with:
           upload: "never"
-          output: ../results
+          output: results
 
       - name: Archive CodeQL SARIF report
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: codeql-sarif-release
-          path: ../results/javascript-typescript.sarif
+          path: results
           retention-days: 14
 
   # ===========================================================================

@@ -170,42 +170,44 @@ export function CatalogBrowser({
 
         {/* Filters Grid */}
         <div className="catalog-filters-grid">
-          {/* Category Filter */}
-          <div className="catalog-filter-group">
-            <span className="catalog-filter-title">Категорія:</span>
-            <div
-              className="catalog-pills"
-              role="radiogroup"
-              aria-label="Фільтр за категорією"
-            >
-              <button
-                type="button"
-                className={`catalog-pill ${selectedCategory === "all" ? "catalog-pill--active" : ""}`}
-                onClick={() => setSelectedCategory("all")}
-                aria-checked={selectedCategory === "all"}
-                role="radio"
+          {/* Category Filter — hidden in scoped category mode to avoid dead pills */}
+          {!initialCategorySlug && (
+            <div className="catalog-filter-group">
+              <span className="catalog-filter-title">Категорія:</span>
+              <div
+                className="catalog-pills"
+                role="radiogroup"
+                aria-label="Фільтр за категорією"
               >
-                Усі напрями ({products.length})
-              </button>
-              {categories.map((c) => {
-                const count = products.filter(
-                  (p) => p.categorySlug === c.slug,
-                ).length;
-                return (
-                  <button
-                    type="button"
-                    key={c.id}
-                    className={`catalog-pill ${selectedCategory === c.slug ? "catalog-pill--active" : ""}`}
-                    onClick={() => setSelectedCategory(c.slug)}
-                    aria-checked={selectedCategory === c.slug}
-                    role="radio"
-                  >
-                    {c.name} ({count})
-                  </button>
-                );
-              })}
+                <button
+                  type="button"
+                  className={`catalog-pill ${selectedCategory === "all" ? "catalog-pill--active" : ""}`}
+                  onClick={() => setSelectedCategory("all")}
+                  aria-checked={selectedCategory === "all"}
+                  role="radio"
+                >
+                  Усі напрями ({products.length})
+                </button>
+                {categories.map((c) => {
+                  const count = products.filter(
+                    (p) => p.categorySlug === c.slug,
+                  ).length;
+                  return (
+                    <button
+                      type="button"
+                      key={c.id}
+                      className={`catalog-pill ${selectedCategory === c.slug ? "catalog-pill--active" : ""}`}
+                      onClick={() => setSelectedCategory(c.slug)}
+                      aria-checked={selectedCategory === c.slug}
+                      role="radio"
+                    >
+                      {c.name} ({count})
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Provider Filter */}
           {providers.length > 1 && (

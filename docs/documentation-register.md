@@ -52,6 +52,7 @@
 | `docs/adr/0012-vendor-verification-and-compliance.md`            | ADR                     | Прийнятий sandbox ADR    | Технічний + compliance-власник        | Модель verification/evidence; не юридичний висновок        |
 | `docs/adr/0013-immutable-container-pipeline-and-promotion.md`    | ADR                     | Прийнятий технічний ADR  | Технічний та інфраструктурний власник | Незмінний конвеєр збірки контейнерів і GHCR promotion      |
 | `docs/runbooks/local-development.md`                             | Runbook                 | Робочий посібник         | Технічний власник                     | Локальні сервіси, міграції та тести                        |
+| `docs/runbooks/disaster-recovery.md`                             | Runbook                 | Робочий посібник         | Технічний власник + інфраструктура    | Резервне копіювання, контрольні суми та аварійне відновлення БД |
 | `docs/runbooks/repository-bootstrap.md`                          | Runbook                 | Робочий посібник         | Технічний власник                     | Безпечний імпорт і Git/CI hygiene                          |
 | `docs/runbooks/security-and-containment.md`                      | Runbook                 | Робочий посібник         | Security-власник                      | Локальні security/containment перевірки                    |
 | `docs/runbooks/transactional-sandbox-runbook.md`                 | Runbook                 | Робочий sandbox-посібник | Технічний власник                     | Draft-only кошик/замовлення без реальних операцій          |

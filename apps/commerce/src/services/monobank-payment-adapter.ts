@@ -3,13 +3,20 @@ import { z } from "zod";
 
 /**
  * ============================================================================
- * Monobank Acquiring Sandbox Payment Adapter (ADR 0014 Hardened)
+ * Monobank Acquiring Sandbox Payment Adapter (ADR 0014 Contract Core)
  * ============================================================================
- * Implements two-stage authorization hold orchestration, fail-closed ECDSA
- * webhook verification with forced public-key cache busting and 24h TTL,
- * strict Zod runtime payload validation, durable idempotency with payloadHash
- * conflict detection, typed error paths (400/401/409/422/503), atomic command
- * execution, and strict Finite State Machine (FSM) status transitions.
+ * Local sandbox contract layer for two-stage authorization hold orchestration:
+ * - Fail-closed ECDSA webhook verification with forced public-key cache busting,
+ *   24h TTL, and DoS amplification rate-limiting (60s cooldown);
+ * - Strict Zod runtime payload and transport response schemas (.strip());
+ * - Durable idempotency model with payloadHash conflict rejection (409);
+ * - Sanitized external error reporting (503 without internal leak);
+ * - Atomic command execution with per-invoice mutex locking;
+ * - No-retry policy on mutating POST requests;
+ * - Strict Finite State Machine (FSM) status transitions.
+ *
+ * NOTE: This is the local sandbox contract layer. Production deployment
+ * requires PostgreSQL persistence (payment_webhook_events) and Redis mutex.
  * ============================================================================
  */
 
@@ -31,7 +38,7 @@ export type CreateInvoiceInput = Readonly<{
   description: string;
   redirectUrl?: string;
   webhookUrl?: string;
-  paymentType?: "hold" | "debit";
+  paymentType?: "hold"; // Fixed to hold-only in initial sandbox slice
 }>;
 
 export type CreateInvoiceResult = Readonly<{
@@ -51,29 +58,44 @@ const webhookDateSchema = z
     { message: "Must be a valid ISO 8601 or standard API datetime string" },
   );
 
-export const MonobankWebhookPayloadSchema = z.object({
-  invoiceId: z.string().min(1),
-  status: z.enum([
-    "created",
-    "processing",
-    "hold",
-    "success",
-    "failure",
-    "reversed",
-    "expired",
-  ]),
-  amount: z.number().int().positive(),
-  ccy: z.literal(980),
-  finalAmount: z.number().int().positive().optional(),
-  createdDate: webhookDateSchema,
-  modifiedDate: webhookDateSchema,
-  reference: z.string().min(1),
-  failureReason: z.string().optional(),
-});
+export const MonobankWebhookPayloadSchema = z
+  .object({
+    invoiceId: z.string().min(1),
+    status: z.enum([
+      "created",
+      "processing",
+      "hold",
+      "success",
+      "failure",
+      "reversed",
+      "expired",
+    ]),
+    amount: z.number().int().positive(),
+    ccy: z.literal(980),
+    finalAmount: z.number().int().positive().optional(),
+    createdDate: webhookDateSchema,
+    modifiedDate: webhookDateSchema,
+    reference: z.string().min(1),
+    failureReason: z.string().optional(),
+  })
+  .strip();
 
 export type MonobankWebhookPayload = z.infer<
   typeof MonobankWebhookPayloadSchema
 >;
+
+export const MonobankPublicKeyResponseSchema = z.object({
+  key: z.string().min(1),
+});
+
+export const MonobankCreateInvoiceResponseSchema = z.object({
+  invoiceId: z.string().min(1),
+  pageUrl: z.string().url(),
+});
+
+export const MonobankSuccessResponseSchema = z.object({
+  status: z.literal("success"),
+});
 
 export type MonobankWebhookProcessResult =
   | Readonly<{
@@ -103,6 +125,7 @@ export type LedgerInvoiceRecord = Readonly<{
   orderId: string;
   amountKopecks: number;
   currency: number;
+  paymentType: "hold";
   status: MedusaPaymentStatus;
   createdAt: Date;
   updatedAt: Date;
@@ -139,7 +162,7 @@ export type MonobankCreateInvoiceRequest = Readonly<{
   redirectUrl?: string;
   webHookUrl?: string;
   validity?: number;
-  paymentType?: "hold" | "debit";
+  paymentType: "hold";
 }>;
 
 export type MonobankCreateInvoiceResponse = Readonly<{
@@ -149,7 +172,7 @@ export type MonobankCreateInvoiceResponse = Readonly<{
 
 export type MonobankFinalizeHoldRequest = Readonly<{
   invoiceId: string;
-  amount?: number;
+  amount: number;
 }>;
 
 export type MonobankFinalizeHoldResponse = Readonly<{
@@ -504,7 +527,11 @@ export type StructuredLogEntry = Readonly<{
 }>;
 
 /**
- * Real HTTP Transport for Monobank Acquiring API (isolated, timeout-bounded, structured logging, retries).
+ * Real HTTP Transport for Monobank Acquiring API:
+ * - Timeout-bounded;
+ * - Idempotency-safe: retries ONLY idempotent GET requests (status/pubkey);
+ * - POST requests (invoice creation, hold finalization, cancellation) are NEVER automatically retried;
+ * - Validates provider responses via Zod schemas.
  */
 export class MonobankHttpTransport implements MonobankTransport {
   private readonly baseUrl: string;
@@ -527,12 +554,18 @@ export class MonobankHttpTransport implements MonobankTransport {
 
   private async request<T>(
     path: string,
-    options: { method: "GET" | "POST"; body?: unknown },
+    options: {
+      method: "GET" | "POST";
+      body?: unknown;
+      schema?: z.ZodType<T>;
+    },
   ): Promise<T> {
     const correlationId = `req_${crypto.randomUUID().slice(0, 8)}`;
+    // Only retry GET requests. Mutating POST requests must fail closed without blind retries.
+    const maxAttempts = options.method === "GET" ? this.maxRetries + 1 : 1;
     let attempt = 0;
 
-    while (attempt <= this.maxRetries) {
+    while (attempt < maxAttempts) {
       attempt++;
       const startTime = Date.now();
       const controller = new AbortController();
@@ -562,8 +595,11 @@ export class MonobankHttpTransport implements MonobankTransport {
 
         if (!response.ok) {
           const errorText = await response.text().catch(() => "");
-          // Retry on 5xx server errors
-          if (response.status >= 500 && attempt <= this.maxRetries) {
+          if (
+            options.method === "GET" &&
+            response.status >= 500 &&
+            attempt < maxAttempts
+          ) {
             await new Promise((r) => setTimeout(r, 100 * attempt));
             continue;
           }
@@ -572,7 +608,18 @@ export class MonobankHttpTransport implements MonobankTransport {
           );
         }
 
-        return (await response.json()) as T;
+        const rawJson: unknown = await response.json();
+        if (options.schema) {
+          const parseResult = options.schema.safeParse(rawJson);
+          if (!parseResult.success) {
+            throw new Error(
+              `Monobank response validation failed: ${parseResult.error.message}`,
+            );
+          }
+          return parseResult.data;
+        }
+
+        return rawJson as T;
       } catch (err) {
         const durationMs = Date.now() - startTime;
         const errorMessage = err instanceof Error ? err.message : String(err);
@@ -586,7 +633,7 @@ export class MonobankHttpTransport implements MonobankTransport {
           error: errorMessage,
         });
 
-        if (attempt <= this.maxRetries) {
+        if (options.method === "GET" && attempt < maxAttempts) {
           await new Promise((r) => setTimeout(r, 100 * attempt));
           continue;
         }
@@ -596,12 +643,15 @@ export class MonobankHttpTransport implements MonobankTransport {
       }
     }
 
-    throw new Error(`Monobank request failed after ${this.maxRetries} retries`);
+    throw new Error(
+      `Monobank ${options.method} ${path} failed after ${maxAttempts} attempts`,
+    );
   }
 
   async getPublicKey(): Promise<string> {
     const res = await this.request<{ key: string }>("/api/merchant/pubkey", {
       method: "GET",
+      schema: MonobankPublicKeyResponseSchema,
     });
     return res.key;
   }
@@ -614,6 +664,7 @@ export class MonobankHttpTransport implements MonobankTransport {
       {
         method: "POST",
         body: request,
+        schema: MonobankCreateInvoiceResponseSchema,
       },
     );
   }
@@ -626,6 +677,7 @@ export class MonobankHttpTransport implements MonobankTransport {
       {
         method: "POST",
         body: request,
+        schema: MonobankSuccessResponseSchema,
       },
     );
   }
@@ -638,6 +690,7 @@ export class MonobankHttpTransport implements MonobankTransport {
       {
         method: "POST",
         body: request,
+        schema: MonobankSuccessResponseSchema,
       },
     );
   }
@@ -648,6 +701,8 @@ export class MonobankSandboxPaymentAdapter {
   private readonly ledger: WebhookEventLedger;
   private cachedKey: { key: string; expiresAtMs: number } | null = null;
   private readonly keyTtlMs = 24 * 60 * 60 * 1000; // 24 hours per ADR 0014
+  private lastForceRefreshMs = 0;
+  private readonly minForceRefreshIntervalMs = 60_000; // 60s cooldown to prevent amplification DoS
 
   constructor(options: {
     transport: MonobankTransport;
@@ -662,7 +717,7 @@ export class MonobankSandboxPaymentAdapter {
   }
 
   /**
-   * Creates a sandbox payment invoice (holding funds for up to 9 days per ADR 0014).
+   * Creates a sandbox payment invoice with hold funds (up to 9 days per ADR 0014).
    */
   async createInvoice(input: CreateInvoiceInput): Promise<CreateInvoiceResult> {
     if (
@@ -686,7 +741,7 @@ export class MonobankSandboxPaymentAdapter {
       },
       redirectUrl: input.redirectUrl,
       webHookUrl: input.webhookUrl,
-      paymentType: input.paymentType ?? "hold",
+      paymentType: "hold",
     });
 
     // Save record to durable ledger
@@ -695,6 +750,7 @@ export class MonobankSandboxPaymentAdapter {
       orderId: input.orderId,
       amountKopecks: input.amountKopecks,
       currency: 980,
+      paymentType: "hold",
       status: "pending",
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -707,28 +763,37 @@ export class MonobankSandboxPaymentAdapter {
   }
 
   /**
-   * Fetches public key with 24h TTL and forced cache-busting on signature failure.
+   * Fetches public key with 24h TTL, forced cache-busting, and amplification cooldown.
    */
   async getPublicKey(forceRefresh = false): Promise<string> {
     const now = Date.now();
-    if (!this.cachedKey || forceRefresh || now >= this.cachedKey.expiresAtMs) {
+    const isTtlExpired = !this.cachedKey || now >= this.cachedKey.expiresAtMs;
+    const canForceRefresh =
+      forceRefresh &&
+      now - this.lastForceRefreshMs >= this.minForceRefreshIntervalMs;
+
+    if (isTtlExpired || canForceRefresh || !this.cachedKey) {
+      if (canForceRefresh) {
+        this.lastForceRefreshMs = now;
+      }
       const key = await this.transport.getPublicKey(forceRefresh);
       this.cachedKey = {
         key,
         expiresAtMs: now + this.keyTtlMs,
       };
+      return key;
     }
     return this.cachedKey.key;
   }
 
   /**
    * Processes Monobank Webhook according to ADR 0014:
-   * 1. Cryptographic ECDSA signature verification with forced refresh on failure;
-   * 2. Strict Zod runtime schema validation directly on rawBody (no detached payload);
+   * 1. Cryptographic ECDSA signature verification with forced refresh on failure (amplification-protected);
+   * 2. Strict Zod runtime schema validation directly on rawBody (.strip());
    * 3. Business invariant checks against ledger record (currency 980, amount, reference);
    * 4. Durable idempotency via atomic ledger with payloadHash conflict rejection (409);
    * 5. FSM forward-only transition enforcement;
-   * 6. Typed internal error handling returning 503 on system/ledger exceptions.
+   * 6. Sanitized internal error handling returning 503 on system/ledger exceptions.
    */
   async processWebhook(options: {
     rawBody: string | Buffer;
@@ -749,7 +814,7 @@ export class MonobankSandboxPaymentAdapter {
       let pubKey = await this.getPublicKey(false);
       let isSigValid = verifyEcdsaSignature(rawBody, signatureHeader, pubKey);
 
-      // Forced cache-busting on initial failure
+      // Forced cache-busting on initial failure (with cooldown protection)
       if (!isSigValid) {
         pubKey = await this.getPublicKey(true);
         isSigValid = verifyEcdsaSignature(rawBody, signatureHeader, pubKey);
@@ -762,12 +827,11 @@ export class MonobankSandboxPaymentAdapter {
           error: "Invalid ECDSA signature",
         };
       }
-    } catch (err) {
+    } catch {
       return {
         valid: false,
         statusCode: 503,
-        error:
-          err instanceof Error ? err.message : "Public key resolution failed",
+        error: "Temporary public key resolution failure. Please retry later.",
       };
     }
 
@@ -785,7 +849,7 @@ export class MonobankSandboxPaymentAdapter {
       };
     }
 
-    // 3. Strict Zod schema validation
+    // 3. Strict Zod schema validation (.strip())
     const parsed = MonobankWebhookPayloadSchema.safeParse(unvalidatedJson);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
@@ -807,7 +871,7 @@ export class MonobankSandboxPaymentAdapter {
         };
       }
 
-      // 4. Look up invoice in ledger to validate amount and reference
+      // 4. Look up invoice in ledger to validate amount, reference, and hold type
       const invoiceRecord = await this.ledger.getInvoice(payload.invoiceId);
       if (!invoiceRecord) {
         return {
@@ -888,14 +952,12 @@ export class MonobankSandboxPaymentAdapter {
         providerStatus: payload.status,
         medusaStatus: mappedMedusaStatus,
       };
-    } catch (err) {
+    } catch {
+      // Return sanitized 503 to avoid internal infrastructure leakage
       return {
         valid: false,
         statusCode: 503,
-        error:
-          err instanceof Error
-            ? err.message
-            : "Internal ledger processing error",
+        error: "Temporary infrastructure failure. Please retry later.",
       };
     }
   }
@@ -924,6 +986,12 @@ export class MonobankSandboxPaymentAdapter {
         return { success: true, invoiceId }; // Idempotent success
       }
 
+      if (invoice.paymentType !== "hold") {
+        throw new Error(
+          `Cannot finalize non-hold invoice (type: ${invoice.paymentType})`,
+        );
+      }
+
       if (amountKopecks !== invoice.amountKopecks) {
         throw new Error(
           `Partial hold finalization is not supported in the initial sandbox slice. Exactly full amount (${invoice.amountKopecks}) must be finalized.`,
@@ -950,7 +1018,8 @@ export class MonobankSandboxPaymentAdapter {
 
   /**
    * Cancels (voids) authorization hold if artisan declines or order is canceled.
-   * Race-free via per-invoice mutex lock. Prohibits cancel after captured.
+   * Race-free via per-invoice mutex lock.
+   * Allows ONLY pending or authorized holds. Prohibits cancel on failed, captured, or refunded.
    * Fails closed without local status mutation if transport fails.
    */
   async cancelHold(
@@ -967,9 +1036,9 @@ export class MonobankSandboxPaymentAdapter {
         return { success: true, invoiceId }; // Idempotent
       }
 
-      if (invoice.status === "captured" || invoice.status === "refunded") {
+      if (invoice.status !== "pending" && invoice.status !== "authorized") {
         throw new Error(
-          `Cannot cancel invoice in status ${invoice.status}. Reversals of captured funds require refunds.`,
+          `Cannot cancel invoice in status ${invoice.status}. Only pending or authorized holds can be canceled.`,
         );
       }
 

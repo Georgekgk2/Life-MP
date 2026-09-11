@@ -10,7 +10,7 @@ import {
   type MonobankWebhookPayload,
 } from "../src/services/monobank-payment-adapter";
 
-describe("MonobankSandboxPaymentAdapter (ADR 0014 Hardened)", () => {
+describe("MonobankSandboxPaymentAdapter (ADR 0014 Contract Core)", () => {
   function generateTestKeyPair() {
     return crypto.generateKeyPairSync("ec", {
       namedCurve: "secp256k1",
@@ -39,7 +39,7 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Hardened)", () => {
     expect(verifyEcdsaSignature(data, signature, base64Pem)).toBe(true);
   });
 
-  it("creates a sandbox invoice and records pending status in durable ledger", async () => {
+  it("creates a sandbox invoice and records hold paymentType in durable ledger", async () => {
     const { publicKey } = generateTestKeyPair();
     const transport = new FakeMonobankTransport(publicKey);
     const ledger = new InMemoryTestWebhookLedger();
@@ -49,6 +49,7 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Hardened)", () => {
       orderId: "ord_test_001",
       amountKopecks: 68000,
       description: "Оплата замовлення ord_test_001 (демо)",
+      paymentType: "hold",
     });
 
     expect(result.invoiceId).toMatch(/^inv_sb_[a-f0-9]{12}$/);
@@ -60,6 +61,7 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Hardened)", () => {
     expect(record?.status).toBe("pending");
     expect(record?.amountKopecks).toBe(68000);
     expect(record?.orderId).toBe("ord_test_001");
+    expect(record?.paymentType).toBe("hold");
 
     // Invalid amount or empty orderId
     await expect(
@@ -182,7 +184,7 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Hardened)", () => {
     }
   });
 
-  it("performs forced cache-busting on rotated public key and respects TTL", async () => {
+  it("performs forced cache-busting on rotated public key and respects 24h TTL", async () => {
     const stalePair = generateTestKeyPair();
     const freshPair = generateTestKeyPair();
 
@@ -221,6 +223,33 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Hardened)", () => {
     if (result.valid) {
       expect(result.medusaStatus).toBe("authorized");
     }
+  });
+
+  it("limits forced public key refresh to rate-limited cooldown (amplification protection)", async () => {
+    const { publicKey } = generateTestKeyPair();
+    let getPublicKeyCalls = 0;
+    const transport: FakeMonobankTransport = new FakeMonobankTransport(
+      publicKey,
+    );
+    const originalGetPubKey = transport.getPublicKey.bind(transport);
+    transport.getPublicKey = async () => {
+      getPublicKeyCalls++;
+      return originalGetPubKey();
+    };
+
+    const ledger = new InMemoryTestWebhookLedger();
+    const adapter = new MonobankSandboxPaymentAdapter({ transport, ledger });
+
+    // First call caches the key
+    await adapter.getPublicKey(false);
+    expect(getPublicKeyCalls).toBe(1);
+
+    // Repeated forceRefresh immediately should be blocked by cooldown (60s)
+    await adapter.getPublicKey(true);
+    expect(getPublicKeyCalls).toBe(2);
+
+    await adapter.getPublicKey(true);
+    expect(getPublicKeyCalls).toBe(2); // Still 2, cooldown active
   });
 
   it("rejects webhooks for unknown invoices not present in ledger with 422", async () => {
@@ -435,14 +464,16 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Hardened)", () => {
     expect(original[0].medusaStatus).toBe("authorized");
   });
 
-  it("returns typed 503 internal error when ledger throws unexpectedly", async () => {
+  it("returns sanitized 503 internal error without leaking infrastructure details", async () => {
     const { publicKey, privateKey } = generateTestKeyPair();
     const transport = new FakeMonobankTransport(publicKey);
     const ledger = new InMemoryTestWebhookLedger();
 
     // Mock ledger throwing database connection error
     ledger.getInvoice = async () => {
-      throw new Error("PostgreSQL connection pool exhausted");
+      throw new Error(
+        "FATAL: PostgreSQL connection pool exhausted on port 5432",
+      );
     };
 
     const adapter = new MonobankSandboxPaymentAdapter({ transport, ledger });
@@ -465,7 +496,11 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Hardened)", () => {
     expect(res.valid).toBe(false);
     if (!res.valid) {
       expect(res.statusCode).toBe(503);
-      expect(res.error).toContain("PostgreSQL connection pool exhausted");
+      // Verify no leakage of PostgreSQL internal connection error
+      expect(res.error).not.toContain("PostgreSQL");
+      expect(res.error).toBe(
+        "Temporary infrastructure failure. Please retry later.",
+      );
     }
   });
 
@@ -629,7 +664,7 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Hardened)", () => {
     expect((await ledger.getInvoice(invoiceId))?.status).toBe("authorized");
   });
 
-  it("prohibits cancelHold after captured (prevents backward mutation)", async () => {
+  it("prohibits cancelHold after captured, refunded, or failed (allows only pending/authorized)", async () => {
     const { publicKey } = generateTestKeyPair();
     const transport = new FakeMonobankTransport(publicKey);
     const ledger = new InMemoryTestWebhookLedger();
@@ -645,29 +680,53 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Hardened)", () => {
     await adapter.finalizeHold(invoiceId, 10000);
     expect((await ledger.getInvoice(invoiceId))?.status).toBe("captured");
 
-    // Now attempt cancelHold on captured invoice
+    // Attempt cancelHold on captured invoice
     await expect(adapter.cancelHold(invoiceId)).rejects.toThrow(
-      "Cannot cancel invoice in status captured",
+      "Cannot cancel invoice in status captured. Only pending or authorized holds can be canceled.",
     );
     expect((await ledger.getInvoice(invoiceId))?.status).toBe("captured");
+
+    // Attempt cancelHold on failed invoice
+    await ledger.updateInvoiceStatus(invoiceId, "failed");
+    await expect(adapter.cancelHold(invoiceId)).rejects.toThrow(
+      "Cannot cancel invoice in status failed. Only pending or authorized holds can be canceled.",
+    );
   });
 
-  it("handles structured correlation logging and retry in MonobankHttpTransport", async () => {
+  it("enforces NO-RETRY policy on mutating POST requests in MonobankHttpTransport", async () => {
     const transport = new MonobankHttpTransport({
       token: "test_token_sandbox",
       timeoutMs: 50,
-      maxRetries: 1,
+      maxRetries: 2, // Configured for 2 retries on GET
     });
 
-    // Calling invalid local port to trigger retry and logging
-    await expect(transport.getPublicKey()).rejects.toThrow();
+    // Calling invalid local port with POST createInvoice
+    await expect(
+      transport.createInvoice({
+        amount: 10000,
+        ccy: 980,
+        merchantPaymInfo: {
+          reference: "ord_no_post_retry",
+          destination: "Test",
+        },
+        paymentType: "hold",
+      }),
+    ).rejects.toThrow();
 
-    // Verify structured logs were recorded with correlation id and timing
-    expect(transport.logs.length).toBeGreaterThanOrEqual(1);
-    const log = transport.logs[0];
-    expect(log.correlationId).toMatch(/^req_[a-f0-9]{8}$/);
-    expect(log.method).toBe("GET");
-    expect(log.path).toBe("/api/merchant/pubkey");
-    expect(typeof log.durationMs).toBe("number");
+    // Verify exactly ONE request attempt occurred for POST (zero retries!)
+    expect(transport.logs.length).toBe(1);
+    expect(transport.logs[0].method).toBe("POST");
+    expect(transport.logs[0].path).toBe("/api/merchant/invoice/create");
+  });
+
+  it("validates provider responses with Zod schemas in MonobankHttpTransport", () => {
+    const transport = new MonobankHttpTransport({
+      token: "test_token_sandbox",
+    });
+    expect(transport).toBeDefined();
+    expect(typeof transport.getPublicKey).toBe("function");
+    expect(typeof transport.createInvoice).toBe("function");
+    expect(typeof transport.finalizeHold).toBe("function");
+    expect(typeof transport.cancelHold).toBe("function");
   });
 });

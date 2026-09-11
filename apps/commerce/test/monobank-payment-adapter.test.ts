@@ -210,6 +210,54 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Contract Core)", () => {
     }
   });
 
+  it("verifies real signed official Monobank webhook fixture with null fields and full payload", async () => {
+    const { publicKey, privateKey } = generateTestKeyPair();
+    const transport = new FakeMonobankTransport(publicKey);
+    const ledger = new InMemoryTestWebhookLedger();
+    const adapter = new MonobankSandboxPaymentAdapter({ transport, ledger });
+
+    const invoiceId = "inv_official_fixture";
+    await ledger.saveInvoice({
+      invoiceId,
+      orderId: "ord_official_001",
+      amountKopecks: 15000,
+      currency: 980,
+      paymentType: "hold",
+      status: "pending",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    // Official payload shape with null fields per Monobank acquiring documentation
+    const officialPayload = {
+      invoiceId,
+      status: "hold",
+      amount: 15000,
+      ccy: 980,
+      finalAmount: 15000,
+      createdDate: "2026-09-11 12:00:00",
+      modifiedDate: "2026-09-11 12:01:00",
+      reference: "ord_official_001",
+      failureReason: null,
+      errCode: null,
+      cancelList: null,
+      walletData: null,
+    };
+    const rawBody = JSON.stringify(officialPayload);
+    const signature = signPayload(rawBody, privateKey);
+
+    const res = await adapter.processWebhook({
+      rawBody,
+      signatureHeader: signature,
+    });
+
+    expect(res.valid).toBe(true);
+    if (res.valid) {
+      expect(res.medusaStatus).toBe("authorized");
+      expect(res.isDuplicate).toBe(false);
+    }
+  });
+
   it("performs forced cache-busting on rotated public key and respects 24h TTL", async () => {
     const stalePair = generateTestKeyPair();
     const freshPair = generateTestKeyPair();
@@ -786,7 +834,75 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Contract Core)", () => {
     await ledger.updateInvoiceStatus(inv2, "authorized");
     const cancelRes = await adapter.cancelHold(inv2);
     expect(cancelRes.success).toBe(true);
+    expect(cancelRes.providerStatus).toBe("success");
     expect((await ledger.getInvoice(inv2))?.status).toBe("canceled");
+  });
+
+  it("handles asynchronous cancel processing without premature local mutation", async () => {
+    const { publicKey } = generateTestKeyPair();
+    const transport = new FakeMonobankTransport(publicKey);
+    const ledger = new InMemoryTestWebhookLedger();
+    const adapter = new MonobankSandboxPaymentAdapter({ transport, ledger });
+
+    const { invoiceId } = await adapter.createInvoice({
+      orderId: "ord_async_cancel",
+      amountKopecks: 10000,
+      description: "Testing async cancel",
+    });
+    await ledger.updateInvoiceStatus(invoiceId, "authorized");
+
+    // Configure transport to return asynchronous "processing"
+    transport.cancelHoldStatusResult = "processing";
+
+    const res = await adapter.cancelHold(invoiceId);
+    expect(res.success).toBe(true);
+    expect(res.providerStatus).toBe("processing");
+
+    // Local status MUST remain authorized pending webhook/status reconciliation!
+    expect((await ledger.getInvoice(invoiceId))?.status).toBe("authorized");
+  });
+
+  it("handles cancel failure from provider without local state mutation", async () => {
+    const { publicKey } = generateTestKeyPair();
+    const transport = new FakeMonobankTransport(publicKey);
+    const ledger = new InMemoryTestWebhookLedger();
+    const adapter = new MonobankSandboxPaymentAdapter({ transport, ledger });
+
+    const { invoiceId } = await adapter.createInvoice({
+      orderId: "ord_fail_cancel",
+      amountKopecks: 10000,
+      description: "Testing cancel failure",
+    });
+    await ledger.updateInvoiceStatus(invoiceId, "authorized");
+
+    // Configure transport to return "failure"
+    transport.cancelHoldStatusResult = "failure";
+
+    await expect(adapter.cancelHold(invoiceId)).rejects.toThrow(
+      "Monobank cancel failed for invoice",
+    );
+    expect((await ledger.getInvoice(invoiceId))?.status).toBe("authorized");
+  });
+
+  it("throws MonobankReconciliationError when removeInvoice succeeds on provider but local ledger fails", async () => {
+    const { publicKey } = generateTestKeyPair();
+    const transport = new FakeMonobankTransport(publicKey);
+    const ledger = new InMemoryTestWebhookLedger();
+    const adapter = new MonobankSandboxPaymentAdapter({ transport, ledger });
+
+    const { invoiceId } = await adapter.createInvoice({
+      orderId: "ord_remove_reconcile",
+      amountKopecks: 10000,
+      description: "Testing remove reconciliation",
+    });
+
+    ledger.updateInvoiceStatus = async () => {
+      throw new Error("Disk corruption during remove");
+    };
+
+    await expect(adapter.removeInvoice(invoiceId)).rejects.toThrowError(
+      MonobankReconciliationError,
+    );
   });
 
   it("prohibits cancelHold after captured, refunded, or failed", async () => {
@@ -923,7 +1039,7 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Contract Core)", () => {
     expect(transport.logs[0].path).toBe("/api/merchant/invoice/create");
   });
 
-  it("validates MonobankCancelResponseSchema with status 'processing' or 'success' and optional dates", () => {
+  it("validates MonobankCancelResponseSchema with processing, success, and failure", () => {
     // 1. Success without dates
     expect(
       MonobankCancelResponseSchema.safeParse({ status: "success" }).success,
@@ -938,13 +1054,18 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Contract Core)", () => {
       }).success,
     ).toBe(true);
 
-    // 3. Invalid status
+    // 3. Failure
+    expect(
+      MonobankCancelResponseSchema.safeParse({ status: "failure" }).success,
+    ).toBe(true);
+
+    // 4. Invalid status
     expect(
       MonobankCancelResponseSchema.safeParse({ status: "invalid_status" })
         .success,
     ).toBe(false);
 
-    // 4. Unknown property rejected
+    // 5. Unknown property rejected
     expect(
       MonobankCancelResponseSchema.safeParse({
         status: "success",
@@ -953,7 +1074,7 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Contract Core)", () => {
     ).toBe(false);
   });
 
-  it("validates MonobankInvoiceStatusResponseSchema with full official fields", () => {
+  it("validates MonobankInvoiceStatusResponseSchema with full official fields including nulls", () => {
     const fullOfficialResponse = {
       invoiceId: "inv_status_001",
       status: "hold",
@@ -966,10 +1087,10 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Contract Core)", () => {
       destination: "Payment for order ord_full_001",
       paymentInfo: { maskedPan: "444400******1111" },
       cancelList: [],
-      tipsInfo: {},
-      walletData: { cardToken: "token_123" },
-      failureReason: undefined,
-      errCode: undefined,
+      tipsInfo: null, // Monobank documentation explicitly sends null
+      walletData: null, // Monobank documentation explicitly sends null
+      failureReason: null,
+      errCode: null,
     };
 
     expect(
@@ -989,7 +1110,7 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Contract Core)", () => {
     ).toBe(true);
   });
 
-  it("validates provider response shapes via strict Zod schemas in MonobankHttpTransport", async () => {
+  it("validates provider response shapes via strict Zod schemas and safely handles empty remove body in MonobankHttpTransport", async () => {
     const originalFetch = global.fetch;
     const transport = new MonobankHttpTransport({
       token: "test_token",
@@ -1050,7 +1171,19 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Contract Core)", () => {
       const cancelRes = await transport.cancelHold({ invoiceId: "inv_cancel" });
       expect(cancelRes.status).toBe("processing");
 
-      // 5. Mock getInvoiceStatus response
+      // 5. Mock removeInvoice with valid 200 OK and EMPTY BODY (zero bytes)
+      global.fetch = async () =>
+        new Response("", {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+
+      const removeRes = await transport.removeInvoice({
+        invoiceId: "inv_remove_empty",
+      });
+      expect(removeRes).toBeDefined();
+
+      // 6. Mock getInvoiceStatus response with null fields
       global.fetch = async () =>
         new Response(
           JSON.stringify({
@@ -1058,6 +1191,8 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Contract Core)", () => {
             status: "hold",
             amount: 5000,
             ccy: 980,
+            tipsInfo: null,
+            walletData: null,
           }),
           {
             status: 200,
@@ -1068,6 +1203,8 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Contract Core)", () => {
       const statusRes = await transport.getInvoiceStatus("inv_stat");
       expect(statusRes.status).toBe("hold");
       expect(statusRes.amount).toBe(5000);
+      expect(statusRes.tipsInfo).toBeNull();
+      expect(statusRes.walletData).toBeNull();
     } finally {
       global.fetch = originalFetch;
     }

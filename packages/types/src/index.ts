@@ -71,6 +71,7 @@ export type StorefrontCatalogProduct = Readonly<{
   provider: Readonly<{
     handle: string;
     name: string;
+    region?: string;
   }>;
   isSynthetic: boolean;
   verifiedVendorBadge?: string;
@@ -115,6 +116,7 @@ export type Person<
   name: string;
   role: string;
   description: string;
+  region?: string;
   imageSrc?: string;
   featuredProductSlugs: readonly ProductSlug[];
 }>;

@@ -81,6 +81,12 @@ export default async function PersonPage({ params }: PersonPageProps) {
                 <dt className="data-list__label">Роль у добірці</dt>
                 <dd className="data-list__value">{person.role}</dd>
               </div>
+              {person.region && (
+                <div className="data-list__item">
+                  <dt className="data-list__label">Регіон (демо)</dt>
+                  <dd className="data-list__value">{person.region}</dd>
+                </div>
+              )}
             </dl>
           </div>
           <aside className="notice" aria-label="Статус профілю">

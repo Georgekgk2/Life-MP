@@ -201,6 +201,7 @@ export const people = [
     role: "Авторка майстерні",
     description:
       "Вигадана учасниця демо-спільноти, яка ділиться ідеями для читання.",
+    region: "Київ",
     featuredProductSlugs: ["notatnyk-istorii", "zbirka-opovidan"],
   },
   {
@@ -211,6 +212,7 @@ export const people = [
     role: "Куратор творчих занять",
     description:
       "Вигаданий учасник демо-спільноти, який збирає прості творчі формати.",
+    region: "Полтавщина",
     featuredProductSlugs: ["olivtsi-kolir", "nabor-tvorchist"],
   },
   {
@@ -221,7 +223,12 @@ export const people = [
     role: "Редакторка історій",
     description:
       "Вигадана учасниця демо-спільноти, яка допомагає оформлювати короткі оповіді.",
-    featuredProductSlugs: ["chashka-ranok", "zakladka-hvylya"],
+    region: "Львів",
+    featuredProductSlugs: [
+      "chashka-ranok",
+      "svichka-vechir",
+      "zakladka-hvylya",
+    ],
   },
   {
     id: "person-taras",
@@ -230,6 +237,7 @@ export const people = [
     role: "Ведучий відкритих зустрічей",
     description:
       "Вигаданий учасник демо-спільноти, який запрошує до неквапливого діалогу.",
+    region: "Карпати",
     featuredProductSlugs: ["futbolka-svitlo", "plakat-spilnota"],
   },
   {
@@ -239,7 +247,8 @@ export const people = [
     role: "Координаторка добрих ініціатив",
     description:
       "Вигадана учасниця демо-спільноти, яка поєднує партнерські ідеї та творчість.",
-    featuredProductSlugs: ["shoper-razom", "lystivka-teplo"],
+    region: "Поділля",
+    featuredProductSlugs: ["shoper-razom", "lystivka-teplo", "nabor-podarunok"],
   },
 ] as const satisfies readonly Person<ProductSlug>[];
 

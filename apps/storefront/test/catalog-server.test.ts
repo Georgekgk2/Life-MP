@@ -1,4 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { existsSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { resolve } from "node:path";
 import {
   getCatalogSnapshot,
   getCatalogProductsBySlugs,
@@ -54,6 +57,49 @@ describe("storefront src/catalog/server.ts", () => {
         // 3. Provider handle must map to a known person slug
         expect(validPersonSlugs).toContain(product.provider.handle);
       }
+    }
+  });
+
+  it("enforces strict image uniqueness, physical file existence, and distinct content hashes", async () => {
+    process.env["CATALOG_SOURCE"] = "fixtures";
+    const result = await getCatalogSnapshot();
+
+    expect(result.kind).toBe("ready");
+    if (result.kind === "ready") {
+      const { products } = result.snapshot;
+      expect(products.length).toBe(12);
+
+      const imagePaths = new Set<string>();
+      const contentHashes = new Set<string>();
+
+      for (const product of products) {
+        expect(product.imageSrc).toBeDefined();
+        const imageSrc = product.imageSrc!;
+
+        // 1. Must be a .webp image
+        expect(imageSrc.endsWith(".webp")).toBe(true);
+
+        // 2. Must not be a duplicate imageSrc path
+        expect(imagePaths.has(imageSrc)).toBe(false);
+        imagePaths.add(imageSrc);
+
+        // 3. Physical file must exist on disk under public/
+        const absolutePath = resolve(
+          process.cwd(),
+          "public",
+          imageSrc.replace(/^\//, ""),
+        );
+        expect(existsSync(absolutePath)).toBe(true);
+
+        // 4. SHA-256 hash must be non-empty and unique across products
+        const buffer = readFileSync(absolutePath);
+        const hash = createHash("sha256").update(buffer).digest("hex");
+        expect(contentHashes.has(hash)).toBe(false);
+        contentHashes.add(hash);
+      }
+
+      expect(imagePaths.size).toBe(12);
+      expect(contentHashes.size).toBe(12);
     }
   });
 

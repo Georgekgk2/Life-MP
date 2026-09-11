@@ -174,7 +174,6 @@ export default async function ProductDetailPage({
               >
                 <CardImage
                   src={product.imageSrc}
-                  fallbackSrc="/images/products/chashka-ranok.webp"
                   alt={`Фото виробу «${product.name}»`}
                   loading="eager"
                   priority

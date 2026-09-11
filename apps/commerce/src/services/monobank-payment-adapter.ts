@@ -8,12 +8,16 @@ import { z } from "zod";
  * Local sandbox contract layer for two-stage authorization hold orchestration:
  * - Fail-closed ECDSA webhook verification with forced public-key cache busting,
  *   24h TTL, and DoS amplification rate-limiting (60s cooldown);
- * - Strict Zod runtime payload and transport response schemas (.strict());
+ * - Strict Zod runtime payload and transport response schemas (.strict())
+ *   with full official Monobank Acquiring API field definitions and nullable support;
  * - Durable idempotency model with payloadHash conflict rejection (409);
  * - Sanitized external error reporting (503 without internal leak);
  * - Atomic command execution with per-invoice mutex locking;
  * - No-retry policy on mutating POST requests;
- * - Status query & reconciliation via GET /api/merchant/invoice/status;
+ * - Safe response handling for empty body (e.g. 200 OK from /invoice/remove);
+ * - Proper handling of asynchronous cancel: "processing" keeps local authorized state;
+ * - Semantic differentiation: cancelHold (authorized hold) vs removeInvoice (unpaid pending);
+ * - Status query & strict FSM-compliant reconciliation via GET /api/merchant/invoice/status;
  * - Strict Finite State Machine (FSM) status transitions: capture requires hold.
  *
  * NOTE: This is Slice 1 (local sandbox contract layer).
@@ -84,14 +88,14 @@ export const MonobankWebhookPayloadSchema = z
     ]),
     amount: z.number().int().positive(),
     ccy: z.literal(980),
-    finalAmount: z.number().int().positive().optional(),
+    finalAmount: z.number().int().positive().nullable().optional(),
     createdDate: webhookDateSchema,
     modifiedDate: webhookDateSchema,
     reference: z.string().min(1),
-    failureReason: z.string().optional(),
-    errCode: z.string().optional(),
-    cancelList: z.array(z.unknown()).optional(),
-    walletData: z.record(z.unknown()).optional(),
+    failureReason: z.string().nullable().optional(),
+    errCode: z.string().nullable().optional(),
+    cancelList: z.array(z.unknown()).nullable().optional(),
+    walletData: z.record(z.unknown()).nullable().optional(),
   })
   .strict();
 
@@ -118,6 +122,20 @@ export const MonobankSuccessResponseSchema = z
   })
   .strict();
 
+export const MonobankCancelResponseSchema = z
+  .object({
+    status: z.enum(["success", "processing", "failure"]),
+    createdDate: webhookDateSchema.nullable().optional(),
+    modifiedDate: webhookDateSchema.nullable().optional(),
+  })
+  .strict();
+
+export const MonobankRemoveInvoiceResponseSchema = z
+  .object({
+    status: z.string().optional(),
+  })
+  .passthrough();
+
 export const MonobankInvoiceStatusResponseSchema = z
   .object({
     invoiceId: z.string().min(1),
@@ -132,12 +150,17 @@ export const MonobankInvoiceStatusResponseSchema = z
     ]),
     amount: z.number().int().positive(),
     ccy: z.literal(980),
-    finalAmount: z.number().int().positive().optional(),
-    createdDate: webhookDateSchema,
-    modifiedDate: webhookDateSchema,
-    reference: z.string().min(1),
-    failureReason: z.string().optional(),
-    errCode: z.string().optional(),
+    finalAmount: z.number().int().positive().nullable().optional(),
+    createdDate: webhookDateSchema.nullable().optional(),
+    modifiedDate: webhookDateSchema.nullable().optional(),
+    reference: z.string().nullable().optional(),
+    destination: z.string().nullable().optional(),
+    paymentInfo: z.record(z.unknown()).nullable().optional(),
+    cancelList: z.array(z.unknown()).nullable().optional(),
+    tipsInfo: z.record(z.unknown()).nullable().optional(),
+    walletData: z.record(z.unknown()).nullable().optional(),
+    failureReason: z.string().nullable().optional(),
+    errCode: z.string().nullable().optional(),
   })
   .strict();
 
@@ -229,8 +252,12 @@ export type MonobankCancelHoldRequest = Readonly<{
   amount?: number;
 }>;
 
-export type MonobankCancelHoldResponse = Readonly<{
-  status: "success";
+export type MonobankCancelHoldResponse = z.infer<
+  typeof MonobankCancelResponseSchema
+>;
+
+export type MonobankRemoveInvoiceRequest = Readonly<{
+  invoiceId: string;
 }>;
 
 export type MonobankInvoiceStatusResponse = z.infer<
@@ -248,6 +275,9 @@ export interface MonobankTransport {
   cancelHold(
     request: MonobankCancelHoldRequest,
   ): Promise<MonobankCancelHoldResponse>;
+  removeInvoice(
+    request: MonobankRemoveInvoiceRequest,
+  ): Promise<{ status?: string }>;
   getInvoiceStatus(invoiceId: string): Promise<MonobankInvoiceStatusResponse>;
 }
 
@@ -468,6 +498,8 @@ export class FakeMonobankTransport implements MonobankTransport {
   private invoices = new Map<string, MonobankInvoiceStatusResponse>();
   public shouldFailRequests = false;
   public failureErrorMessage = "Simulated Monobank network error";
+  public cancelHoldStatusResult: "success" | "processing" | "failure" =
+    "success";
 
   constructor(initialPublicKey: string) {
     this.currentPublicKey = initialPublicKey;
@@ -532,9 +564,35 @@ export class FakeMonobankTransport implements MonobankTransport {
     if (!inv) {
       throw new Error(`Monobank: invoice ${request.invoiceId} not found`);
     }
+
+    if (this.cancelHoldStatusResult === "success") {
+      this.invoices.set(request.invoiceId, {
+        ...inv,
+        status: "reversed",
+        modifiedDate: new Date().toISOString(),
+      });
+    }
+
+    return {
+      status: this.cancelHoldStatusResult,
+      createdDate: new Date().toISOString(),
+      modifiedDate: new Date().toISOString(),
+    };
+  }
+
+  async removeInvoice(
+    request: MonobankRemoveInvoiceRequest,
+  ): Promise<{ status?: string }> {
+    if (this.shouldFailRequests) {
+      throw new Error(this.failureErrorMessage);
+    }
+    const inv = this.invoices.get(request.invoiceId);
+    if (!inv) {
+      throw new Error(`Monobank: invoice ${request.invoiceId} not found`);
+    }
     this.invoices.set(request.invoiceId, {
       ...inv,
-      status: "reversed",
+      status: "expired",
       modifiedDate: new Date().toISOString(),
     });
     return { status: "success" };
@@ -569,6 +627,7 @@ export type StructuredLogEntry = Readonly<{
  * - Timeout-bounded;
  * - Idempotency-safe: retries ONLY idempotent GET requests (status/pubkey);
  * - POST requests (invoice creation, hold finalization, cancellation) are NEVER automatically retried;
+ * - Safely handles 200 OK responses with empty bodies (e.g. /invoice/remove);
  * - Validates provider responses via strict Zod schemas.
  */
 export class MonobankHttpTransport implements MonobankTransport {
@@ -646,7 +705,11 @@ export class MonobankHttpTransport implements MonobankTransport {
           );
         }
 
-        const rawJson: unknown = await response.json();
+        // Safe JSON extraction handling valid 200 OK responses with empty bodies
+        const text = await response.text();
+        const rawJson: unknown =
+          text && text.trim().length > 0 ? JSON.parse(text) : {};
+
         if (options.schema) {
           const parseResult = options.schema.safeParse(rawJson);
           if (!parseResult.success) {
@@ -728,9 +791,19 @@ export class MonobankHttpTransport implements MonobankTransport {
       {
         method: "POST",
         body: request,
-        schema: MonobankSuccessResponseSchema,
+        schema: MonobankCancelResponseSchema,
       },
     );
+  }
+
+  async removeInvoice(
+    request: MonobankRemoveInvoiceRequest,
+  ): Promise<{ status?: string }> {
+    return this.request<{ status?: string }>("/api/merchant/invoice/remove", {
+      method: "POST",
+      body: request,
+      schema: MonobankRemoveInvoiceResponseSchema,
+    });
   }
 
   async getInvoiceStatus(
@@ -837,16 +910,70 @@ export class MonobankSandboxPaymentAdapter {
   }
 
   /**
-   * Syncs invoice status directly from Monobank via GET /api/merchant/invoice/status
+   * Syncs invoice status directly from Monobank via GET /api/merchant/invoice/status.
+   * Strictly validates invoice existence, amount, currency, reference, and FSM transition
+   * before applying any local status updates.
    */
   async syncInvoiceStatus(invoiceId: string): Promise<{
     status: MedusaPaymentStatus;
     providerStatus: MonobankInvoiceStatus;
   }> {
-    const remote = await this.transport.getInvoiceStatus(invoiceId);
-    const mapped = MONOBANK_TO_MEDUSA_STATUS[remote.status];
-    await this.ledger.updateInvoiceStatus(invoiceId, mapped);
-    return { status: mapped, providerStatus: remote.status };
+    const release = await this.ledger.acquireLock(invoiceId);
+    try {
+      const invoice = await this.ledger.getInvoice(invoiceId);
+      if (!invoice) {
+        throw new Error(`Invoice ${invoiceId} not found in ledger`);
+      }
+
+      const remote = await this.transport.getInvoiceStatus(invoiceId);
+
+      // Validate business invariants against ledger record
+      if (remote.invoiceId !== invoice.invoiceId) {
+        throw new Error(
+          `Invoice ID mismatch: expected ${invoice.invoiceId}, got ${remote.invoiceId}`,
+        );
+      }
+      if (remote.amount !== invoice.amountKopecks) {
+        throw new Error(
+          `Amount mismatch: expected ${invoice.amountKopecks}, got ${remote.amount}`,
+        );
+      }
+      if (remote.ccy !== 980) {
+        throw new Error(`Currency mismatch: expected 980, got ${remote.ccy}`);
+      }
+      if (remote.reference && remote.reference !== invoice.orderId) {
+        throw new Error(
+          `Reference mismatch: expected ${invoice.orderId}, got ${remote.reference}`,
+        );
+      }
+
+      const nextStatus = MONOBANK_TO_MEDUSA_STATUS[remote.status];
+      if (!nextStatus) {
+        throw new Error(`Unknown Monobank status: ${remote.status}`);
+      }
+
+      // FSM transition check: cannot make illegal state transitions
+      if (!isValidStatusTransition(invoice.status, nextStatus)) {
+        throw new Error(
+          `Invalid status transition from ${invoice.status} to ${nextStatus} during status sync`,
+        );
+      }
+
+      // Hold-only constraint: cannot transition pending -> captured directly
+      if (invoice.status === "pending" && nextStatus === "captured") {
+        throw new Error(
+          `Invalid status transition from pending to captured: invoice must be in authorized (hold) state before capture`,
+        );
+      }
+
+      if (invoice.status !== nextStatus) {
+        await this.ledger.updateInvoiceStatus(invoiceId, nextStatus);
+      }
+
+      return { status: nextStatus, providerStatus: remote.status };
+    } finally {
+      release();
+    }
   }
 
   /**
@@ -1097,10 +1224,78 @@ export class MonobankSandboxPaymentAdapter {
   /**
    * Cancels (voids) authorization hold if artisan declines or order is canceled.
    * Race-free via per-invoice mutex lock.
-   * Allows ONLY pending or authorized holds. Prohibits cancel on failed, captured, or refunded.
+   * Allows ONLY authorized holds (funds held on card).
+   * For unpaid pending invoices, use removeInvoice().
+   * Prohibits cancel on pending, failed, captured, or refunded.
+   * Handles asynchronous processing: if status === "processing", local state remains authorized!
    * Fails closed without local status mutation if transport fails.
    */
-  async cancelHold(
+  async cancelHold(invoiceId: string): Promise<{
+    success: boolean;
+    invoiceId: string;
+    providerStatus: "success" | "processing";
+  }> {
+    const release = await this.ledger.acquireLock(invoiceId);
+    try {
+      const invoice = await this.ledger.getInvoice(invoiceId);
+      if (!invoice) {
+        throw new Error(`Invoice ${invoiceId} not found in ledger`);
+      }
+
+      if (invoice.status === "canceled") {
+        return { success: true, invoiceId, providerStatus: "success" }; // Idempotent
+      }
+
+      if (invoice.status === "pending") {
+        throw new Error(
+          `Cannot cancel hold for pending invoice. Use removeInvoice() to void unpaid invoices.`,
+        );
+      }
+
+      if (invoice.status !== "authorized") {
+        throw new Error(
+          `Cannot cancel invoice in status ${invoice.status}. Only authorized holds can be canceled.`,
+        );
+      }
+
+      // Call provider transport first
+      const cancelRes = await this.transport.cancelHold({ invoiceId });
+
+      if (cancelRes.status === "failure") {
+        throw new Error(
+          `Monobank cancel failed for invoice ${invoiceId}. Status remains authorized.`,
+        );
+      }
+
+      if (cancelRes.status === "processing") {
+        // Asynchronous cancellation in progress: do NOT prematurely mutate local state to canceled!
+        // Local state remains authorized pending webhook or status reconciliation.
+        return { success: true, invoiceId, providerStatus: "processing" };
+      }
+
+      // Provider returned success: update local ledger status
+      try {
+        await this.ledger.updateInvoiceStatus(invoiceId, "canceled");
+      } catch (ledgerErr) {
+        throw new MonobankReconciliationError(
+          invoiceId,
+          "canceled",
+          `Monobank canceled invoice ${invoiceId} successfully, but local ledger update failed: ${ledgerErr instanceof Error ? ledgerErr.message : String(ledgerErr)}. Status must be reconciled from provider.`,
+        );
+      }
+
+      return { success: true, invoiceId, providerStatus: "success" };
+    } finally {
+      release();
+    }
+  }
+
+  /**
+   * Voids an unpaid pending invoice before customer completes payment.
+   * Calls /invoice/remove on provider (mandatory, fail-closed).
+   * Updates local status to canceled only after provider succeeds.
+   */
+  async removeInvoice(
     invoiceId: string,
   ): Promise<{ success: boolean; invoiceId: string }> {
     const release = await this.ledger.acquireLock(invoiceId);
@@ -1114,23 +1309,22 @@ export class MonobankSandboxPaymentAdapter {
         return { success: true, invoiceId }; // Idempotent
       }
 
-      if (invoice.status !== "pending" && invoice.status !== "authorized") {
+      if (invoice.status !== "pending") {
         throw new Error(
-          `Cannot cancel invoice in status ${invoice.status}. Only pending or authorized holds can be canceled.`,
+          `Cannot remove invoice in status ${invoice.status}. Only pending invoices can be removed.`,
         );
       }
 
-      // Call provider transport first
-      await this.transport.cancelHold({ invoiceId });
+      // Transport call is mandatory
+      await this.transport.removeInvoice({ invoiceId });
 
-      // Update local ledger status only after provider succeeds
       try {
         await this.ledger.updateInvoiceStatus(invoiceId, "canceled");
       } catch (ledgerErr) {
         throw new MonobankReconciliationError(
           invoiceId,
           "canceled",
-          `Monobank canceled invoice ${invoiceId} successfully, but local ledger update failed: ${ledgerErr instanceof Error ? ledgerErr.message : String(ledgerErr)}. Status must be reconciled from provider.`,
+          `Monobank removed invoice ${invoiceId} successfully, but local ledger update failed: ${ledgerErr instanceof Error ? ledgerErr.message : String(ledgerErr)}. Status must be reconciled from provider.`,
         );
       }
 

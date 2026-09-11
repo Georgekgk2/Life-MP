@@ -10,3 +10,5 @@ export const commerceCapabilitiesAwaitingDecisions = {
 
 export type CommerceImplementationBoundary =
   typeof commerceCapabilitiesAwaitingDecisions;
+
+export * from "./services/monobank-payment-adapter";

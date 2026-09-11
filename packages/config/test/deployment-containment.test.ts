@@ -768,7 +768,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      attestations: write
       id-token: write
     steps:
       - run: docker push ghcr.io/georgekgk2/life-commerce:sha-\${{ github.sha }}
@@ -1452,7 +1451,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      attestations: write
       id-token: write
     steps:
       - run: docker push ghcr.io/georgekgk2/life-commerce:sha-\${{ github.sha }}
@@ -1500,7 +1498,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      attestations: write
       id-token: write
     steps:
       - run: echo "ghcr.io/georgekgk2/life-commerce and ghcr.io/georgekgk2/life-storefront"
@@ -1550,7 +1547,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      attestations: write
       id-token: write
     steps:
       - run: docker push ghcr.io/georgekgk2/life-commerce:sha-\${{ github.sha }}
@@ -1607,7 +1603,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      attestations: write
       id-token: write
     steps:
       - run: ${forbiddenCommand}
@@ -1663,7 +1658,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      attestations: write
       id-token: write
     steps:
       - run: ${dynamicTarget}
@@ -1718,7 +1712,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      attestations: write
       id-token: write
     steps:
       - run: docker push ghcr.io/georgekgk2/life-commerce:sha-\${{ github.sha }}
@@ -1770,7 +1763,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      attestations: write
       id-token: write
     steps:
       - run: ${chainedCmd}
@@ -1820,7 +1812,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      attestations: write
       id-token: write
     steps:
       - run: |
@@ -1980,7 +1971,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      attestations: write
       id-token: write
     steps:
       - run: ${mutableTag}
@@ -2033,7 +2023,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      attestations: write
       id-token: write
     steps:
       - run: ${badTag}
@@ -2081,7 +2070,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      attestations: write
       id-token: write
     steps:
       - run: |
@@ -2131,7 +2119,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      attestations: write
       id-token: write
     steps:
       - uses: evil-org/steal-token@0123456789abcdef0123456789abcdef01234567
@@ -2184,7 +2171,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      attestations: write
       id-token: write
     steps:
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
@@ -2204,6 +2190,55 @@ jobs:
       } finally {
         rmSync(tempDir, { recursive: true, force: true });
       }
+    }
+  });
+
+  it("fails in Phase P2 if publish job contains deprecated attestations: write permission", () => {
+    const tempDir = mkdtempSync(
+      join(tmpdir(), "life-containment-p2-deprecated-attestations-perm-"),
+    );
+    try {
+      mkdirSync(join(tempDir, "infra"), { recursive: true });
+      const p2Gates = createValidPolicyGates();
+      p2Gates["allow_ghcr_image_push"] = true;
+      writeFileSync(
+        join(tempDir, "infra", "deployment-policy.json"),
+        JSON.stringify({
+          status: "CONTAINED_PHASE_P2",
+          gates: p2Gates,
+        }),
+      );
+
+      mkdirSync(join(tempDir, ".github", "workflows"), { recursive: true });
+      writeFileSync(
+        join(tempDir, ".github", "workflows", "release-images.yml"),
+        `name: Release
+on:
+  push:
+    branches: [main]
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    steps:
+      - run: docker push ghcr.io/georgekgk2/life-commerce:sha-\${{ github.sha }}
+      - run: docker push ghcr.io/georgekgk2/life-storefront:sha-\${{ github.sha }}
+`,
+      );
+
+      const result = scanDeploymentContainment(tempDir);
+      expect(result.valid).toBe(false);
+      expect(
+        result.violations.some(
+          (v) => v.rule === "P2-PUBLISH-FORBIDDEN-PERMISSIONS",
+        ),
+      ).toBe(true);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
     }
   });
 });

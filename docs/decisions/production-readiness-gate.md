@@ -92,9 +92,10 @@ Public infrastructure accessibility не є application, legal, financial або
 
 ### 5.1 Інваріант промоції контейнерних образів GHCR (Фаза P2)
 
-- Будь-який образ у GHCR вважається **суворо непридатним та неавторитетним для промоції (`STRICT NO-GO`)**, якщо процес криптографічної атестації походження (`actions/attest-build-provenance`) не відбувся або завершився аварією, а також за відсутності згенерованого маніфесту `IMAGE_DIGESTS.json`.
-- Публікація в реєстр (`docker push`) передує атестації. Наявність контейнера в GHCR без валідної пари (manifest digest + provenance attestation) кваліфікується як осиротілий артефакт (orphaned artifact) і підлягає безумовній дискваліфікації.
+- Будь-який образ у GHCR вважається **суворо непридатним та неавторитетним для промоції (`STRICT NO-GO`)**, якщо процес криптографічної атестації походження Cosign (`cosign attest` / `cosign verify-attestation`) не відбувся або завершився аварією, а також за відсутності згенерованого маніфесту `IMAGE_DIGESTS.json`.
+- Публікація в реєстр (`docker push`) передує атестації. Наявність контейнера в GHCR без валідної пари (manifest digest + verified Cosign provenance attestation) кваліфікується як осиротілий артефакт (orphaned artifact) і підлягає безумовній дискваліфікації.
 - Єдиним авторитетним ідентифікатором для Compose promotion (Фаза P2b) є **канонічний registry manifest digest (`@sha256:...`)** з верифікованого маніфесту `IMAGE_DIGESTS.json`.
+- *Privacy Trade-off*: Відкритий запис у Rekor transparency log назви репозиторію та ідентичності workflow (`Georgekgk2/Life-MP/.github/workflows/release-images.yml@refs/heads/main`) явно зафіксовано та прийнято як допустимий компроміс для збереження приватності репозиторію без додаткових витрат на корпоративні плани GitHub.
 
 ## 6. Підсумок
 

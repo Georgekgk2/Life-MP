@@ -1,19 +1,15 @@
 import crypto from "node:crypto";
-import type {
-  MarketplacePaymentAdapter,
-  PaymentSessionInput,
-  PaymentSessionResult,
-  WebhookProcessInput,
-  WebhookProcessResult as DomainWebhookProcessResult,
-} from "./payment-adapter";
+import { z } from "zod";
 
 /**
  * ============================================================================
- * Monobank Acquiring Sandbox Payment Adapter (ADR 0014)
+ * Monobank Acquiring Sandbox Payment Adapter (ADR 0014 Hardened)
  * ============================================================================
  * Implements two-stage authorization hold orchestration, fail-closed ECDSA
- * webhook verification with forced public-key cache busting, durable
- * idempotency, and strict Finite State Machine (FSM) status transitions.
+ * webhook verification with forced public-key cache busting and 24h TTL,
+ * strict Zod runtime payload validation, durable idempotency with payloadHash
+ * conflict detection, typed error paths (400/401/409/422/503), atomic command
+ * execution, and strict Finite State Machine (FSM) status transitions.
  * ============================================================================
  */
 
@@ -43,19 +39,43 @@ export type CreateInvoiceResult = Readonly<{
   pageUrl: string;
 }>;
 
-export type MonobankWebhookPayload = Readonly<{
-  invoiceId: string;
-  status: MonobankInvoiceStatus;
-  amount: number;
-  ccy: number;
-  finalAmount?: number;
-  createdDate: string;
-  modifiedDate: string;
-  reference: string;
-  failureReason?: string;
-}>;
+const webhookDateRegex =
+  /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$/;
 
-export type WebhookProcessResult =
+const webhookDateSchema = z
+  .string()
+  .refine(
+    (val) =>
+      webhookDateRegex.test(val) &&
+      !Number.isNaN(Date.parse(val.replace(" ", "T"))),
+    { message: "Must be a valid ISO 8601 or standard API datetime string" },
+  );
+
+export const MonobankWebhookPayloadSchema = z.object({
+  invoiceId: z.string().min(1),
+  status: z.enum([
+    "created",
+    "processing",
+    "hold",
+    "success",
+    "failure",
+    "reversed",
+    "expired",
+  ]),
+  amount: z.number().int().positive(),
+  ccy: z.literal(980),
+  finalAmount: z.number().int().positive().optional(),
+  createdDate: webhookDateSchema,
+  modifiedDate: webhookDateSchema,
+  reference: z.string().min(1),
+  failureReason: z.string().optional(),
+});
+
+export type MonobankWebhookPayload = z.infer<
+  typeof MonobankWebhookPayloadSchema
+>;
+
+export type MonobankWebhookProcessResult =
   | Readonly<{
       valid: true;
       isDuplicate: boolean;
@@ -65,7 +85,7 @@ export type WebhookProcessResult =
     }>
   | Readonly<{
       valid: false;
-      statusCode: 400 | 401 | 422;
+      statusCode: 400 | 401 | 409 | 422 | 500 | 503;
       error: string;
     }>;
 
@@ -95,12 +115,14 @@ export interface WebhookEventLedger {
     invoiceId: string,
     newStatus: MedusaPaymentStatus,
   ): Promise<void>;
+  acquireLock(invoiceId: string): Promise<() => void>;
   atomicApplyWebhook(
     event: LedgerEventRecord,
     nextStatus: MedusaPaymentStatus,
   ): Promise<{
     applied: boolean;
     isDuplicate: boolean;
+    isHashConflict?: boolean;
     currentStatus: MedusaPaymentStatus;
     error?: string;
   }>;
@@ -255,14 +277,17 @@ export function verifyEcdsaSignature(
 }
 
 /**
- * In-memory ledger with concurrency lock serialization for isolated tests and local development.
+ * In-memory test ledger implementation with per-invoice mutex locking.
+ * STRICTLY for unit tests, offline drills, and local sandbox verification.
+ * Production deployment requires persistent PostgreSQL table (payment_webhook_events)
+ * and distributed Redis mutex.
  */
-export class InMemoryWebhookLedger implements WebhookEventLedger {
+export class InMemoryTestWebhookLedger implements WebhookEventLedger {
   private invoices = new Map<string, LedgerInvoiceRecord>();
   private events = new Map<string, LedgerEventRecord>();
   private locks = new Map<string, Promise<void>>();
 
-  private async acquireLock(invoiceId: string): Promise<() => void> {
+  async acquireLock(invoiceId: string): Promise<() => void> {
     while (this.locks.has(invoiceId)) {
       await this.locks.get(invoiceId);
     }
@@ -305,13 +330,27 @@ export class InMemoryWebhookLedger implements WebhookEventLedger {
   ): Promise<{
     applied: boolean;
     isDuplicate: boolean;
+    isHashConflict?: boolean;
     currentStatus: MedusaPaymentStatus;
     error?: string;
   }> {
     const release = await this.acquireLock(event.invoiceId);
     try {
       const eventKey = `${event.invoiceId}:${event.status}:${event.modifiedDate}`;
-      if (this.events.has(eventKey)) {
+      const existing = this.events.get(eventKey);
+
+      if (existing) {
+        if (existing.payloadHash !== event.payloadHash) {
+          const inv = this.invoices.get(event.invoiceId);
+          return {
+            applied: false,
+            isDuplicate: false,
+            isHashConflict: true,
+            currentStatus: inv?.status ?? nextStatus,
+            error: `Payload hash conflict detected for event key ${eventKey}`,
+          };
+        }
+
         const inv = this.invoices.get(event.invoiceId);
         return {
           applied: false,
@@ -357,6 +396,8 @@ export class InMemoryWebhookLedger implements WebhookEventLedger {
     }
   }
 }
+
+export { InMemoryTestWebhookLedger as InMemoryWebhookLedger };
 
 /**
  * Fake in-memory transport for unit tests and local offline development.
@@ -452,52 +493,110 @@ export class FakeMonobankTransport implements MonobankTransport {
   }
 }
 
+export type StructuredLogEntry = Readonly<{
+  timestamp: string;
+  correlationId: string;
+  method: string;
+  path: string;
+  durationMs: number;
+  status?: number;
+  error?: string;
+}>;
+
 /**
- * Real HTTP Transport for Monobank Acquiring API (isolated, timeout-bounded).
+ * Real HTTP Transport for Monobank Acquiring API (isolated, timeout-bounded, structured logging, retries).
  */
 export class MonobankHttpTransport implements MonobankTransport {
   private readonly baseUrl: string;
   private readonly token: string;
   private readonly timeoutMs: number;
+  private readonly maxRetries: number;
+  public logs: StructuredLogEntry[] = [];
 
   constructor(options: {
     token: string;
     baseUrl?: string;
     timeoutMs?: number;
+    maxRetries?: number;
   }) {
     this.token = options.token;
     this.baseUrl = options.baseUrl ?? "https://api.monobank.ua";
     this.timeoutMs = options.timeoutMs ?? 15000;
+    this.maxRetries = options.maxRetries ?? 2;
   }
 
   private async request<T>(
     path: string,
     options: { method: "GET" | "POST"; body?: unknown },
   ): Promise<T> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
-    try {
-      const response = await fetch(`${this.baseUrl}${path}`, {
-        method: options.method,
-        headers: {
-          "X-Token": this.token,
-          "Content-Type": "application/json",
-        },
-        body: options.body ? JSON.stringify(options.body) : undefined,
-        signal: controller.signal,
-      });
+    const correlationId = `req_${crypto.randomUUID().slice(0, 8)}`;
+    let attempt = 0;
 
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => "");
-        throw new Error(
-          `Monobank API error (${response.status}): ${errorText || response.statusText}`,
-        );
+    while (attempt <= this.maxRetries) {
+      attempt++;
+      const startTime = Date.now();
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+
+      try {
+        const response = await fetch(`${this.baseUrl}${path}`, {
+          method: options.method,
+          headers: {
+            "X-Token": this.token,
+            "Content-Type": "application/json",
+            "X-Correlation-Id": correlationId,
+          },
+          body: options.body ? JSON.stringify(options.body) : undefined,
+          signal: controller.signal,
+        });
+
+        const durationMs = Date.now() - startTime;
+        this.logs.push({
+          timestamp: new Date().toISOString(),
+          correlationId,
+          method: options.method,
+          path,
+          durationMs,
+          status: response.status,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => "");
+          // Retry on 5xx server errors
+          if (response.status >= 500 && attempt <= this.maxRetries) {
+            await new Promise((r) => setTimeout(r, 100 * attempt));
+            continue;
+          }
+          throw new Error(
+            `Monobank API error (${response.status}): ${errorText || response.statusText}`,
+          );
+        }
+
+        return (await response.json()) as T;
+      } catch (err) {
+        const durationMs = Date.now() - startTime;
+        const errorMessage = err instanceof Error ? err.message : String(err);
+
+        this.logs.push({
+          timestamp: new Date().toISOString(),
+          correlationId,
+          method: options.method,
+          path,
+          durationMs,
+          error: errorMessage,
+        });
+
+        if (attempt <= this.maxRetries) {
+          await new Promise((r) => setTimeout(r, 100 * attempt));
+          continue;
+        }
+        throw err;
+      } finally {
+        clearTimeout(timeout);
       }
-
-      return (await response.json()) as T;
-    } finally {
-      clearTimeout(timeout);
     }
+
+    throw new Error(`Monobank request failed after ${this.maxRetries} retries`);
   }
 
   async getPublicKey(): Promise<string> {
@@ -547,7 +646,8 @@ export class MonobankHttpTransport implements MonobankTransport {
 export class MonobankSandboxPaymentAdapter {
   private readonly transport: MonobankTransport;
   private readonly ledger: WebhookEventLedger;
-  private cachedKey: string | null = null;
+  private cachedKey: { key: string; expiresAtMs: number } | null = null;
+  private readonly keyTtlMs = 24 * 60 * 60 * 1000; // 24 hours per ADR 0014
 
   constructor(options: {
     transport: MonobankTransport;
@@ -607,30 +707,36 @@ export class MonobankSandboxPaymentAdapter {
   }
 
   /**
-   * Fetches public key with forced cache-busting when initial verification fails.
+   * Fetches public key with 24h TTL and forced cache-busting on signature failure.
    */
   async getPublicKey(forceRefresh = false): Promise<string> {
-    if (!this.cachedKey || forceRefresh) {
-      this.cachedKey = await this.transport.getPublicKey(forceRefresh);
+    const now = Date.now();
+    if (!this.cachedKey || forceRefresh || now >= this.cachedKey.expiresAtMs) {
+      const key = await this.transport.getPublicKey(forceRefresh);
+      this.cachedKey = {
+        key,
+        expiresAtMs: now + this.keyTtlMs,
+      };
     }
-    return this.cachedKey;
+    return this.cachedKey.key;
   }
 
   /**
    * Processes Monobank Webhook according to ADR 0014:
    * 1. Cryptographic ECDSA signature verification with forced refresh on failure;
-   * 2. Parse payload directly from verified rawBody (no detached/unverified payload);
-   * 3. Business invariant checks (currency 980, matching amount & reference);
-   * 4. Durable idempotency via atomic ledger;
-   * 5. FSM forward-only transition enforcement.
+   * 2. Strict Zod runtime schema validation directly on rawBody (no detached payload);
+   * 3. Business invariant checks against ledger record (currency 980, amount, reference);
+   * 4. Durable idempotency via atomic ledger with payloadHash conflict rejection (409);
+   * 5. FSM forward-only transition enforcement;
+   * 6. Typed internal error handling returning 503 on system/ledger exceptions.
    */
   async processWebhook(options: {
     rawBody: string | Buffer;
     signatureHeader?: string | undefined;
-  }): Promise<WebhookProcessResult> {
+  }): Promise<MonobankWebhookProcessResult> {
     const { rawBody, signatureHeader } = options;
 
-    // 1. Fail-closed signature validation
+    // 1. Fail-closed signature presence check
     if (!signatureHeader) {
       return {
         valid: false,
@@ -639,29 +745,38 @@ export class MonobankSandboxPaymentAdapter {
       };
     }
 
-    let pubKey = await this.getPublicKey(false);
-    let isSigValid = verifyEcdsaSignature(rawBody, signatureHeader, pubKey);
+    try {
+      let pubKey = await this.getPublicKey(false);
+      let isSigValid = verifyEcdsaSignature(rawBody, signatureHeader, pubKey);
 
-    // Forced cache-busting on initial failure
-    if (!isSigValid) {
-      pubKey = await this.getPublicKey(true);
-      isSigValid = verifyEcdsaSignature(rawBody, signatureHeader, pubKey);
-    }
+      // Forced cache-busting on initial failure
+      if (!isSigValid) {
+        pubKey = await this.getPublicKey(true);
+        isSigValid = verifyEcdsaSignature(rawBody, signatureHeader, pubKey);
+      }
 
-    if (!isSigValid) {
+      if (!isSigValid) {
+        return {
+          valid: false,
+          statusCode: 401,
+          error: "Invalid ECDSA signature",
+        };
+      }
+    } catch (err) {
       return {
         valid: false,
-        statusCode: 401,
-        error: "Invalid ECDSA signature",
+        statusCode: 503,
+        error:
+          err instanceof Error ? err.message : "Public key resolution failed",
       };
     }
 
     // 2. Parse payload directly from verified rawBody
-    let payload: MonobankWebhookPayload;
+    const rawString =
+      typeof rawBody === "string" ? rawBody : rawBody.toString("utf-8");
+    let unvalidatedJson: unknown;
     try {
-      const rawString =
-        typeof rawBody === "string" ? rawBody : rawBody.toString("utf-8");
-      payload = JSON.parse(rawString);
+      unvalidatedJson = JSON.parse(rawString);
     } catch {
       return {
         valid: false,
@@ -670,119 +785,125 @@ export class MonobankSandboxPaymentAdapter {
       };
     }
 
-    // 3. Validate payload shape and basic invariants
-    if (!payload.invoiceId || !payload.status) {
+    // 3. Strict Zod schema validation
+    const parsed = MonobankWebhookPayloadSchema.safeParse(unvalidatedJson);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0];
       return {
         valid: false,
         statusCode: 400,
-        error: "Missing invoiceId or status in payload",
+        error: `Payload validation failed: ${issue.path.join(".") || "payload"} - ${issue.message}`,
       };
     }
+    const payload = parsed.data;
 
-    if (!Number.isSafeInteger(payload.amount) || payload.amount <= 0) {
-      return {
-        valid: false,
-        statusCode: 400,
-        error: `Invalid amount ${payload.amount}. Expected positive integer in kopecks`,
+    try {
+      const mappedMedusaStatus = MONOBANK_TO_MEDUSA_STATUS[payload.status];
+      if (!mappedMedusaStatus) {
+        return {
+          valid: false,
+          statusCode: 400,
+          error: `Unknown Monobank status: ${payload.status}`,
+        };
+      }
+
+      // 4. Look up invoice in ledger to validate amount and reference
+      const invoiceRecord = await this.ledger.getInvoice(payload.invoiceId);
+      if (!invoiceRecord) {
+        return {
+          valid: false,
+          statusCode: 422,
+          error: `Invoice ${payload.invoiceId} not found in ledger`,
+        };
+      }
+
+      if (payload.amount !== invoiceRecord.amountKopecks) {
+        return {
+          valid: false,
+          statusCode: 422,
+          error: `Amount mismatch: expected ${invoiceRecord.amountKopecks}, got ${payload.amount}`,
+        };
+      }
+
+      if (payload.reference && payload.reference !== invoiceRecord.orderId) {
+        return {
+          valid: false,
+          statusCode: 422,
+          error: `Reference mismatch: expected ${invoiceRecord.orderId}, got ${payload.reference}`,
+        };
+      }
+
+      // 5. Compute payload hash and build event record
+      const payloadHash = crypto
+        .createHash("sha256")
+        .update(rawString)
+        .digest("hex");
+
+      const eventRecord: LedgerEventRecord = {
+        invoiceId: payload.invoiceId,
+        status: payload.status,
+        modifiedDate: payload.modifiedDate,
+        payloadHash,
+        rawPayload: rawString,
+        receivedAt: new Date(),
       };
-    }
 
-    if (payload.ccy !== 980) {
-      return {
-        valid: false,
-        statusCode: 400,
-        error: `Invalid currency code ${payload.ccy}. Expected 980 (UAH)`,
-      };
-    }
+      // 6. Atomic application with mutex/lock in ledger
+      const applyResult = await this.ledger.atomicApplyWebhook(
+        eventRecord,
+        mappedMedusaStatus,
+      );
 
-    const mappedMedusaStatus = MONOBANK_TO_MEDUSA_STATUS[payload.status];
-    if (!mappedMedusaStatus) {
-      return {
-        valid: false,
-        statusCode: 400,
-        error: `Unknown Monobank status: ${payload.status}`,
-      };
-    }
+      if (applyResult.isHashConflict) {
+        return {
+          valid: false,
+          statusCode: 409,
+          error:
+            applyResult.error ?? "Payload hash conflict for existing event key",
+        };
+      }
 
-    // 4. Look up invoice in ledger to validate amount and reference
-    const invoiceRecord = await this.ledger.getInvoice(payload.invoiceId);
-    if (!invoiceRecord) {
-      return {
-        valid: false,
-        statusCode: 422,
-        error: `Invoice ${payload.invoiceId} not found in ledger`,
-      };
-    }
+      if (applyResult.isDuplicate) {
+        return {
+          valid: true,
+          isDuplicate: true,
+          invoiceId: payload.invoiceId,
+          providerStatus: payload.status,
+          medusaStatus: applyResult.currentStatus,
+        };
+      }
 
-    if (payload.amount !== invoiceRecord.amountKopecks) {
-      return {
-        valid: false,
-        statusCode: 422,
-        error: `Amount mismatch: expected ${invoiceRecord.amountKopecks}, got ${payload.amount}`,
-      };
-    }
+      if (!applyResult.applied) {
+        return {
+          valid: false,
+          statusCode: 422,
+          error: applyResult.error ?? "Failed to apply webhook transition",
+        };
+      }
 
-    if (payload.reference && payload.reference !== invoiceRecord.orderId) {
-      return {
-        valid: false,
-        statusCode: 422,
-        error: `Reference mismatch: expected ${invoiceRecord.orderId}, got ${payload.reference}`,
-      };
-    }
-
-    // 5. Compute payload hash and build event record
-    const rawString =
-      typeof rawBody === "string" ? rawBody : rawBody.toString("utf-8");
-    const payloadHash = crypto
-      .createHash("sha256")
-      .update(rawString)
-      .digest("hex");
-
-    const eventRecord: LedgerEventRecord = {
-      invoiceId: payload.invoiceId,
-      status: payload.status,
-      modifiedDate: payload.modifiedDate || new Date().toISOString(),
-      payloadHash,
-      rawPayload: rawString,
-      receivedAt: new Date(),
-    };
-
-    // 6. Atomic application with mutex/lock in ledger
-    const applyResult = await this.ledger.atomicApplyWebhook(
-      eventRecord,
-      mappedMedusaStatus,
-    );
-
-    if (applyResult.isDuplicate) {
       return {
         valid: true,
-        isDuplicate: true,
+        isDuplicate: false,
         invoiceId: payload.invoiceId,
         providerStatus: payload.status,
-        medusaStatus: applyResult.currentStatus,
+        medusaStatus: mappedMedusaStatus,
       };
-    }
-
-    if (!applyResult.applied) {
+    } catch (err) {
       return {
         valid: false,
-        statusCode: 422,
-        error: applyResult.error ?? "Failed to apply webhook transition",
+        statusCode: 503,
+        error:
+          err instanceof Error
+            ? err.message
+            : "Internal ledger processing error",
       };
     }
-
-    return {
-      valid: true,
-      isDuplicate: false,
-      invoiceId: payload.invoiceId,
-      providerStatus: payload.status,
-      medusaStatus: mappedMedusaStatus,
-    };
   }
 
   /**
    * Finalizes hold funds (capture) after artisan confirms fulfillment.
-   * Fails closed without mutating local state if transport fails.
+   * Race-free via per-invoice mutex lock. Fails closed without local status mutation if transport fails.
+   * Prohibits partial finalization in the initial sandbox slice.
    */
   async finalizeHold(
     invoiceId: string,
@@ -791,95 +912,75 @@ export class MonobankSandboxPaymentAdapter {
     if (!Number.isSafeInteger(amountKopecks) || amountKopecks <= 0) {
       throw new Error("Finalize amount must be a positive safe integer");
     }
-    const invoice = await this.ledger.getInvoice(invoiceId);
-    if (!invoice) {
-      throw new Error(`Invoice ${invoiceId} not found in ledger`);
+
+    const release = await this.ledger.acquireLock(invoiceId);
+    try {
+      const invoice = await this.ledger.getInvoice(invoiceId);
+      if (!invoice) {
+        throw new Error(`Invoice ${invoiceId} not found in ledger`);
+      }
+
+      if (invoice.status === "captured") {
+        return { success: true, invoiceId }; // Idempotent success
+      }
+
+      if (amountKopecks !== invoice.amountKopecks) {
+        throw new Error(
+          `Partial hold finalization is not supported in the initial sandbox slice. Exactly full amount (${invoice.amountKopecks}) must be finalized.`,
+        );
+      }
+
+      if (invoice.status !== "authorized" && invoice.status !== "pending") {
+        throw new Error(`Cannot finalize invoice in status ${invoice.status}`);
+      }
+
+      // Call provider transport first (if provider fails, local state remains unmutated)
+      await this.transport.finalizeHold({
+        invoiceId,
+        amount: amountKopecks,
+      });
+
+      // Update local ledger status only after provider succeeds
+      await this.ledger.updateInvoiceStatus(invoiceId, "captured");
+      return { success: true, invoiceId };
+    } finally {
+      release();
     }
-
-    if (amountKopecks > invoice.amountKopecks) {
-      throw new Error(
-        `Cannot finalize amount ${amountKopecks} greater than hold amount ${invoice.amountKopecks}`,
-      );
-    }
-
-    if (invoice.status !== "authorized" && invoice.status !== "pending") {
-      throw new Error(`Cannot finalize invoice in status ${invoice.status}`);
-    }
-
-    // Call provider transport first (if provider fails, local state remains unmutated)
-    await this.transport.finalizeHold({
-      invoiceId,
-      amount: amountKopecks,
-    });
-
-    // Update local ledger status only after provider succeeds
-    await this.ledger.updateInvoiceStatus(invoiceId, "captured");
-    return { success: true, invoiceId };
   }
 
   /**
    * Cancels (voids) authorization hold if artisan declines or order is canceled.
-   * Fails closed without mutating local state if transport fails.
+   * Race-free via per-invoice mutex lock. Prohibits cancel after captured.
+   * Fails closed without local status mutation if transport fails.
    */
   async cancelHold(
     invoiceId: string,
   ): Promise<{ success: boolean; invoiceId: string }> {
-    const invoice = await this.ledger.getInvoice(invoiceId);
-    if (!invoice) {
-      throw new Error(`Invoice ${invoiceId} not found in ledger`);
+    const release = await this.ledger.acquireLock(invoiceId);
+    try {
+      const invoice = await this.ledger.getInvoice(invoiceId);
+      if (!invoice) {
+        throw new Error(`Invoice ${invoiceId} not found in ledger`);
+      }
+
+      if (invoice.status === "canceled") {
+        return { success: true, invoiceId }; // Idempotent
+      }
+
+      if (invoice.status === "captured" || invoice.status === "refunded") {
+        throw new Error(
+          `Cannot cancel invoice in status ${invoice.status}. Reversals of captured funds require refunds.`,
+        );
+      }
+
+      // Call provider transport first
+      await this.transport.cancelHold({ invoiceId });
+
+      // Update local ledger status only after provider succeeds
+      await this.ledger.updateInvoiceStatus(invoiceId, "canceled");
+      return { success: true, invoiceId };
+    } finally {
+      release();
     }
-
-    if (invoice.status === "captured" || invoice.status === "refunded") {
-      throw new Error(
-        `Cannot cancel invoice in status ${invoice.status}. Reversals of captured funds require refunds.`,
-      );
-    }
-
-    if (invoice.status === "canceled") {
-      return { success: true, invoiceId }; // Idempotent
-    }
-
-    // Call provider transport first
-    await this.transport.cancelHold({ invoiceId });
-
-    // Update local ledger status only after provider succeeds
-    await this.ledger.updateInvoiceStatus(invoiceId, "canceled");
-    return { success: true, invoiceId };
-  }
-}
-
-/**
- * Bridges MonobankSandboxPaymentAdapter to the domain MarketplacePaymentAdapter interface.
- */
-export class MonobankCommercePaymentAdapter implements MarketplacePaymentAdapter {
-  constructor(private readonly core: MonobankSandboxPaymentAdapter) {}
-
-  async createPaymentSession(
-    input: PaymentSessionInput,
-  ): Promise<PaymentSessionResult> {
-    const result = await this.core.createInvoice({
-      orderId: input.orderId,
-      amountKopecks: Math.round(input.amountUah * 100),
-      description: `Оплата замовлення ${input.orderId}`,
-      paymentType: "hold",
-    });
-    return {
-      transactionId: result.invoiceId,
-      paymentUrl: result.pageUrl,
-    };
-  }
-
-  async processWebhook(
-    input: WebhookProcessInput,
-  ): Promise<DomainWebhookProcessResult> {
-    const invoice = await this.core.getInvoice(input.transactionId);
-    if (!invoice) {
-      return { success: false, isDuplicate: false };
-    }
-    const isSuccess = input.status === "success";
-    return {
-      success: isSuccess,
-      isDuplicate: invoice.status === (isSuccess ? "captured" : "failed"),
-    };
   }
 }

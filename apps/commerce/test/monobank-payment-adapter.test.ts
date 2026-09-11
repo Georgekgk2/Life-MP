@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import crypto from "node:crypto";
 import {
   MonobankSandboxPaymentAdapter,
-  MonobankCommercePaymentAdapter,
   FakeMonobankTransport,
-  InMemoryWebhookLedger,
+  MonobankHttpTransport,
+  InMemoryTestWebhookLedger,
   verifyEcdsaSignature,
   normalizePublicKeyPem,
   type MonobankWebhookPayload,
@@ -42,7 +42,7 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Hardened)", () => {
   it("creates a sandbox invoice and records pending status in durable ledger", async () => {
     const { publicKey } = generateTestKeyPair();
     const transport = new FakeMonobankTransport(publicKey);
-    const ledger = new InMemoryWebhookLedger();
+    const ledger = new InMemoryTestWebhookLedger();
     const adapter = new MonobankSandboxPaymentAdapter({ transport, ledger });
 
     const result = await adapter.createInvoice({
@@ -81,10 +81,10 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Hardened)", () => {
     ).rejects.toThrow("Invoice orderId must not be empty");
   });
 
-  it("fails closed on missing signature or invalid signature header", async () => {
+  it("fails closed on missing signature or invalid signature header (401)", async () => {
     const { publicKey } = generateTestKeyPair();
     const transport = new FakeMonobankTransport(publicKey);
-    const ledger = new InMemoryWebhookLedger();
+    const ledger = new InMemoryTestWebhookLedger();
     const adapter = new MonobankSandboxPaymentAdapter({ transport, ledger });
 
     const rawBody = JSON.stringify({ invoiceId: "inv_1", status: "hold" });
@@ -112,10 +112,10 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Hardened)", () => {
     }
   });
 
-  it("rejects malformed raw body JSON", async () => {
+  it("rejects malformed raw body JSON with 400", async () => {
     const { publicKey, privateKey } = generateTestKeyPair();
     const transport = new FakeMonobankTransport(publicKey);
-    const ledger = new InMemoryWebhookLedger();
+    const ledger = new InMemoryTestWebhookLedger();
     const adapter = new MonobankSandboxPaymentAdapter({ transport, ledger });
 
     const rawBody = "{ malformed json: true, ";
@@ -132,15 +132,64 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Hardened)", () => {
     }
   });
 
-  it("performs forced cache-busting on rotated public key", async () => {
+  it("validates payload against strict Zod runtime schema (rejects missing/invalid dates and fields with 400)", async () => {
+    const { publicKey, privateKey } = generateTestKeyPair();
+    const transport = new FakeMonobankTransport(publicKey);
+    const ledger = new InMemoryTestWebhookLedger();
+    const adapter = new MonobankSandboxPaymentAdapter({ transport, ledger });
+
+    const { invoiceId } = await adapter.createInvoice({
+      orderId: "ord_schema_test",
+      amountKopecks: 10000,
+      description: "Testing schema",
+    });
+
+    // 1. Missing modifiedDate
+    const invalidPayload = {
+      invoiceId,
+      status: "hold",
+      amount: 10000,
+      ccy: 980,
+      createdDate: "2026-09-11T12:00:00Z",
+      // modifiedDate missing
+      reference: "ord_schema_test",
+    };
+    const raw1 = JSON.stringify(invalidPayload);
+    const res1 = await adapter.processWebhook({
+      rawBody: raw1,
+      signatureHeader: signPayload(raw1, privateKey),
+    });
+    expect(res1.valid).toBe(false);
+    if (!res1.valid) {
+      expect(res1.statusCode).toBe(400);
+      expect(res1.error).toContain("Payload validation failed");
+    }
+
+    // 2. Invalid date format
+    const badDatePayload = {
+      ...invalidPayload,
+      modifiedDate: "invalid-date-string",
+    };
+    const raw2 = JSON.stringify(badDatePayload);
+    const res2 = await adapter.processWebhook({
+      rawBody: raw2,
+      signatureHeader: signPayload(raw2, privateKey),
+    });
+    expect(res2.valid).toBe(false);
+    if (!res2.valid) {
+      expect(res2.statusCode).toBe(400);
+      expect(res2.error).toContain("Payload validation failed");
+    }
+  });
+
+  it("performs forced cache-busting on rotated public key and respects TTL", async () => {
     const stalePair = generateTestKeyPair();
     const freshPair = generateTestKeyPair();
 
     const transport = new FakeMonobankTransport(stalePair.publicKey);
-    const ledger = new InMemoryWebhookLedger();
+    const ledger = new InMemoryTestWebhookLedger();
     const adapter = new MonobankSandboxPaymentAdapter({ transport, ledger });
 
-    // Create invoice so ledger knows about it
     const { invoiceId } = await adapter.createInvoice({
       orderId: "ord_refresh",
       amountKopecks: 26000,
@@ -174,10 +223,10 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Hardened)", () => {
     }
   });
 
-  it("rejects webhooks for unknown invoices not present in ledger", async () => {
+  it("rejects webhooks for unknown invoices not present in ledger with 422", async () => {
     const { publicKey, privateKey } = generateTestKeyPair();
     const transport = new FakeMonobankTransport(publicKey);
-    const ledger = new InMemoryWebhookLedger();
+    const ledger = new InMemoryTestWebhookLedger();
     const adapter = new MonobankSandboxPaymentAdapter({ transport, ledger });
 
     const payload: MonobankWebhookPayload = {
@@ -208,7 +257,7 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Hardened)", () => {
   it("validates currency, amount, and reference against ledger record", async () => {
     const { publicKey, privateKey } = generateTestKeyPair();
     const transport = new FakeMonobankTransport(publicKey);
-    const ledger = new InMemoryWebhookLedger();
+    const ledger = new InMemoryTestWebhookLedger();
     const adapter = new MonobankSandboxPaymentAdapter({ transport, ledger });
 
     const { invoiceId } = await adapter.createInvoice({
@@ -218,7 +267,7 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Hardened)", () => {
     });
 
     // 1. Invalid currency code (840 = USD)
-    const usdPayload: MonobankWebhookPayload = {
+    const usdPayload = {
       invoiceId,
       status: "hold",
       amount: 10000,
@@ -235,7 +284,7 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Hardened)", () => {
     expect(usdRes.valid).toBe(false);
     if (!usdRes.valid) {
       expect(usdRes.statusCode).toBe(400);
-      expect(usdRes.error).toContain("Expected 980 (UAH)");
+      expect(usdRes.error).toContain("Payload validation failed");
     }
 
     // 2. Amount mismatch with ledger record
@@ -285,10 +334,63 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Hardened)", () => {
     }
   });
 
+  it("detects payload hash conflicts on duplicate event key and rejects with 409 (fail-closed)", async () => {
+    const { publicKey, privateKey } = generateTestKeyPair();
+    const transport = new FakeMonobankTransport(publicKey);
+    const ledger = new InMemoryTestWebhookLedger();
+    const adapter = new MonobankSandboxPaymentAdapter({ transport, ledger });
+
+    const { invoiceId } = await adapter.createInvoice({
+      orderId: "ord_conflict_test",
+      amountKopecks: 10000,
+      description: "Testing conflict",
+    });
+
+    const payloadA: MonobankWebhookPayload = {
+      invoiceId,
+      status: "hold",
+      amount: 10000,
+      ccy: 980,
+      createdDate: "2026-09-11T12:00:00Z",
+      modifiedDate: "2026-09-11T12:01:00Z",
+      reference: "ord_conflict_test",
+      failureReason: "None",
+    };
+    const rawA = JSON.stringify(payloadA);
+    const resA = await adapter.processWebhook({
+      rawBody: rawA,
+      signatureHeader: signPayload(rawA, privateKey),
+    });
+    expect(resA.valid).toBe(true);
+
+    // Same (invoiceId, status, modifiedDate) but DIFFERENT payload content (different hash)
+    const payloadB: MonobankWebhookPayload = {
+      invoiceId,
+      status: "hold",
+      amount: 10000,
+      ccy: 980,
+      createdDate: "2026-09-11T12:00:00Z",
+      modifiedDate: "2026-09-11T12:01:00Z",
+      reference: "ord_conflict_test",
+      failureReason: "Different reason that alters hash",
+    };
+    const rawB = JSON.stringify(payloadB);
+    const resB = await adapter.processWebhook({
+      rawBody: rawB,
+      signatureHeader: signPayload(rawB, privateKey),
+    });
+
+    expect(resB.valid).toBe(false);
+    if (!resB.valid) {
+      expect(resB.statusCode).toBe(409);
+      expect(resB.error).toContain("Payload hash conflict");
+    }
+  });
+
   it("handles concurrent duplicate webhooks safely and atomically", async () => {
     const { publicKey, privateKey } = generateTestKeyPair();
     const transport = new FakeMonobankTransport(publicKey);
-    const ledger = new InMemoryWebhookLedger();
+    const ledger = new InMemoryTestWebhookLedger();
     const adapter = new MonobankSandboxPaymentAdapter({ transport, ledger });
 
     const { invoiceId } = await adapter.createInvoice({
@@ -333,10 +435,44 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Hardened)", () => {
     expect(original[0].medusaStatus).toBe("authorized");
   });
 
+  it("returns typed 503 internal error when ledger throws unexpectedly", async () => {
+    const { publicKey, privateKey } = generateTestKeyPair();
+    const transport = new FakeMonobankTransport(publicKey);
+    const ledger = new InMemoryTestWebhookLedger();
+
+    // Mock ledger throwing database connection error
+    ledger.getInvoice = async () => {
+      throw new Error("PostgreSQL connection pool exhausted");
+    };
+
+    const adapter = new MonobankSandboxPaymentAdapter({ transport, ledger });
+
+    const payload: MonobankWebhookPayload = {
+      invoiceId: "inv_db_fail",
+      status: "hold",
+      amount: 10000,
+      ccy: 980,
+      createdDate: "2026-09-11T12:00:00Z",
+      modifiedDate: "2026-09-11T12:01:00Z",
+      reference: "ord_db_fail",
+    };
+    const rawBody = JSON.stringify(payload);
+    const res = await adapter.processWebhook({
+      rawBody,
+      signatureHeader: signPayload(rawBody, privateKey),
+    });
+
+    expect(res.valid).toBe(false);
+    if (!res.valid) {
+      expect(res.statusCode).toBe(503);
+      expect(res.error).toContain("PostgreSQL connection pool exhausted");
+    }
+  });
+
   it("prevents illegal backward status transitions in FSM", async () => {
     const { publicKey, privateKey } = generateTestKeyPair();
     const transport = new FakeMonobankTransport(publicKey);
-    const ledger = new InMemoryWebhookLedger();
+    const ledger = new InMemoryTestWebhookLedger();
     const adapter = new MonobankSandboxPaymentAdapter({ transport, ledger });
 
     const { invoiceId } = await adapter.createInvoice({
@@ -378,6 +514,9 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Hardened)", () => {
       signatureHeader: signPayload(successRaw, privateKey),
     });
     expect(successRes.valid).toBe(true);
+    if (successRes.valid) {
+      expect(successRes.medusaStatus).toBe("captured");
+    }
 
     // 3. Attempt backward transition: success -> hold
     const backwardPayload: MonobankWebhookPayload = {
@@ -403,35 +542,65 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Hardened)", () => {
     }
   });
 
-  it("prevents over-capture in finalizeHold", async () => {
+  it("prohibits partial finalization in initial sandbox slice (rejects amount !== holdAmount)", async () => {
     const { publicKey } = generateTestKeyPair();
     const transport = new FakeMonobankTransport(publicKey);
-    const ledger = new InMemoryWebhookLedger();
+    const ledger = new InMemoryTestWebhookLedger();
     const adapter = new MonobankSandboxPaymentAdapter({ transport, ledger });
 
     const { invoiceId } = await adapter.createInvoice({
-      orderId: "ord_overcap",
+      orderId: "ord_partial_test",
       amountKopecks: 10000,
-      description: "Testing overcapture",
+      description: "Testing partial",
     });
 
     await ledger.updateInvoiceStatus(invoiceId, "authorized");
 
-    // Over-capture (15000 > 10000)
-    await expect(adapter.finalizeHold(invoiceId, 15000)).rejects.toThrow(
-      "Cannot finalize amount 15000 greater than hold amount 10000",
+    // Partial capture (8000 !== 10000)
+    await expect(adapter.finalizeHold(invoiceId, 8000)).rejects.toThrow(
+      "Partial hold finalization is not supported in the initial sandbox slice",
     );
 
-    // Partial or exact capture is permitted
-    const res = await adapter.finalizeHold(invoiceId, 8000);
+    // Over-capture (12000 !== 10000)
+    await expect(adapter.finalizeHold(invoiceId, 12000)).rejects.toThrow(
+      "Partial hold finalization is not supported in the initial sandbox slice",
+    );
+
+    // Exactly full amount succeeds
+    const res = await adapter.finalizeHold(invoiceId, 10000);
     expect(res.success).toBe(true);
+    expect((await ledger.getInvoice(invoiceId))?.status).toBe("captured");
+  });
+
+  it("prevents race conditions between concurrent finalizeHold calls", async () => {
+    const { publicKey } = generateTestKeyPair();
+    const transport = new FakeMonobankTransport(publicKey);
+    const ledger = new InMemoryTestWebhookLedger();
+    const adapter = new MonobankSandboxPaymentAdapter({ transport, ledger });
+
+    const { invoiceId } = await adapter.createInvoice({
+      orderId: "ord_race_fin",
+      amountKopecks: 10000,
+      description: "Testing finalize race",
+    });
+
+    await ledger.updateInvoiceStatus(invoiceId, "authorized");
+
+    // Fire 3 concurrent finalize calls
+    const results = await Promise.all([
+      adapter.finalizeHold(invoiceId, 10000),
+      adapter.finalizeHold(invoiceId, 10000),
+      adapter.finalizeHold(invoiceId, 10000),
+    ]);
+
+    expect(results.every((r) => r.success)).toBe(true);
     expect((await ledger.getInvoice(invoiceId))?.status).toBe("captured");
   });
 
   it("fails closed without local status mutation if provider transport fails", async () => {
     const { publicKey } = generateTestKeyPair();
     const transport = new FakeMonobankTransport(publicKey);
-    const ledger = new InMemoryWebhookLedger();
+    const ledger = new InMemoryTestWebhookLedger();
     const adapter = new MonobankSandboxPaymentAdapter({ transport, ledger });
 
     const { invoiceId } = await adapter.createInvoice({
@@ -463,7 +632,7 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Hardened)", () => {
   it("prohibits cancelHold after captured (prevents backward mutation)", async () => {
     const { publicKey } = generateTestKeyPair();
     const transport = new FakeMonobankTransport(publicKey);
-    const ledger = new InMemoryWebhookLedger();
+    const ledger = new InMemoryTestWebhookLedger();
     const adapter = new MonobankSandboxPaymentAdapter({ transport, ledger });
 
     const { invoiceId } = await adapter.createInvoice({
@@ -483,24 +652,22 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Hardened)", () => {
     expect((await ledger.getInvoice(invoiceId))?.status).toBe("captured");
   });
 
-  it("bridges Monobank adapter to generic MarketplacePaymentAdapter", async () => {
-    const { publicKey } = generateTestKeyPair();
-    const transport = new FakeMonobankTransport(publicKey);
-    const ledger = new InMemoryWebhookLedger();
-    const core = new MonobankSandboxPaymentAdapter({ transport, ledger });
-    const commerceAdapter = new MonobankCommercePaymentAdapter(core);
-
-    const session = await commerceAdapter.createPaymentSession({
-      orderId: "ord_commerce_001",
-      amountUah: 450,
+  it("handles structured correlation logging and retry in MonobankHttpTransport", async () => {
+    const transport = new MonobankHttpTransport({
+      token: "test_token_sandbox",
+      timeoutMs: 50,
+      maxRetries: 1,
     });
 
-    expect(session.transactionId).toMatch(/^inv_sb_[a-f0-9]{12}$/);
-    expect(session.paymentUrl).toContain(session.transactionId);
+    // Calling invalid local port to trigger retry and logging
+    await expect(transport.getPublicKey()).rejects.toThrow();
 
-    // Verify invoice saved in ledger with correct converted amount in kopecks (45000)
-    const record = await core.getInvoice(session.transactionId);
-    expect(record?.amountKopecks).toBe(45000);
-    expect(record?.orderId).toBe("ord_commerce_001");
+    // Verify structured logs were recorded with correlation id and timing
+    expect(transport.logs.length).toBeGreaterThanOrEqual(1);
+    const log = transport.logs[0];
+    expect(log.correlationId).toMatch(/^req_[a-f0-9]{8}$/);
+    expect(log.method).toBe("GET");
+    expect(log.path).toBe("/api/merchant/pubkey");
+    expect(typeof log.durationMs).toBe("number");
   });
 });

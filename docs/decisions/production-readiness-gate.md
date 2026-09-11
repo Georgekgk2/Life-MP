@@ -35,15 +35,15 @@
 
 ## 3. Статус локальних capability
 
-| Область                              | Статус                       | Обмеження доказу                                                           |
-| ------------------------------------ | ---------------------------- | -------------------------------------------------------------------------- |
-| Monorepo quality scripts             | Частково підтверджено        | Локальний результат не замінює GitHub CI для конкретного commit.           |
+| Область                              | Статус                       | Обмеження доказу                                                                         |
+| ------------------------------------ | ---------------------------- | ---------------------------------------------------------------------------------------- |
+| Monorepo quality scripts             | Частково підтверджено        | Локальний результат не замінює GitHub CI для конкретного commit.                         |
 | Catalog/provider/moderation          | Частково підтверджено        | Покриває local/test Medusa, synthetic fixtures та public-demo, не commercial onboarding. |
-| Tenant/customer isolation            | Частково підтверджено        | Потрібні свіжі HTTP/E2E докази та незалежний review.                       |
-| Synthetic order/review boundary      | Частково підтверджено        | `ALLOW_SYNTHETIC_*` та `NODE_ENV` guards не є live integration.            |
-| Payment/fiscalization/carrier/payout | Не реалізовано для live      | Жодні sandbox types або adapters не є бойовим провайдером.                 |
-| CMS runtime                          | Заблоковано                  | Payload не встановлений і не є authority для каталогу.                     |
-| Remote server/deployment             | Не перевірено та заблоковано | Потрібен авторизований discovery і незалежний infrastructure gate.         |
+| Tenant/customer isolation            | Частково підтверджено        | Потрібні свіжі HTTP/E2E докази та незалежний review.                                     |
+| Synthetic order/review boundary      | Частково підтверджено        | `ALLOW_SYNTHETIC_*` та `NODE_ENV` guards не є live integration.                          |
+| Payment/fiscalization/carrier/payout | Не реалізовано для live      | Жодні sandbox types або adapters не є бойовим провайдером.                               |
+| CMS runtime                          | Заблоковано                  | Payload не встановлений і не є authority для каталогу.                                   |
+| Remote server/deployment             | Не перевірено та заблоковано | Потрібен авторизований discovery і незалежний infrastructure gate.                       |
 
 ## 4. Обов’язкові зовнішні блокери
 
@@ -67,15 +67,15 @@
 
 Поточний evidence-bound статус:
 
-| Gate | Статус | Межа |
-| --- | --- | --- |
-| Public apex HTTPS | `VERIFIED` | HTTP `200` через Cloudflare Edge. |
-| `www` canonical redirect | `VERIFIED` | HTTP `301` на `https://life-mp.pp.ua/`. |
-| Public API health | `VERIFIED` | `/api/health` повертає HTTP `200`. |
-| Edge certificate | `VERIFIED` | SAN містить apex і wildcard host. |
-| Tunnel restart/recreation durability | `NOT VERIFIED` | Потрібен контрольований restart/recreation test. |
-| Direct-origin fallback TLS | `NOT VERIFIED / FAILED HISTORICAL PATH` | Попередній direct-origin шлях мав TLS/522 failure. |
-| Commercial production | `BLOCKED / NOT READY` | COM/LOG/CAT gates залишаються обов’язковими. |
+| Gate                                 | Статус                                  | Межа                                               |
+| ------------------------------------ | --------------------------------------- | -------------------------------------------------- |
+| Public apex HTTPS                    | `VERIFIED`                              | HTTP `200` через Cloudflare Edge.                  |
+| `www` canonical redirect             | `VERIFIED`                              | HTTP `301` на `https://life-mp.pp.ua/`.            |
+| Public API health                    | `VERIFIED`                              | `/api/health` повертає HTTP `200`.                 |
+| Edge certificate                     | `VERIFIED`                              | SAN містить apex і wildcard host.                  |
+| Tunnel restart/recreation durability | `NOT VERIFIED`                          | Потрібен контрольований restart/recreation test.   |
+| Direct-origin fallback TLS           | `NOT VERIFIED / FAILED HISTORICAL PATH` | Попередній direct-origin шлях мав TLS/522 failure. |
+| Commercial production                | `BLOCKED / NOT READY`                   | COM/LOG/CAT gates залишаються обов’язковими.       |
 
 Public infrastructure accessibility не є application, legal, financial або commercial production sign-off. Цей розділ не дозволяє remote mutation, promotion або real transactions.
 
@@ -95,7 +95,7 @@ Public infrastructure accessibility не є application, legal, financial або
 - Будь-який образ у GHCR вважається **суворо непридатним та неавторитетним для промоції (`STRICT NO-GO`)**, якщо процес криптографічної атестації походження Cosign (`cosign attest` / `cosign verify-attestation`) не відбувся або завершився аварією, а також за відсутності згенерованого маніфесту `IMAGE_DIGESTS.json`.
 - Публікація в реєстр (`docker push`) передує атестації. Наявність контейнера в GHCR без валідної пари (manifest digest + verified Cosign provenance attestation) кваліфікується як осиротілий артефакт (orphaned artifact) і підлягає безумовній дискваліфікації.
 - Єдиним авторитетним ідентифікатором для Compose promotion (Фаза P2b) є **канонічний registry manifest digest (`@sha256:...`)** з верифікованого маніфесту `IMAGE_DIGESTS.json`.
-- *Privacy Trade-off*: Відкритий запис у Rekor transparency log назви репозиторію та ідентичності workflow (`Georgekgk2/Life-MP/.github/workflows/release-images.yml@refs/heads/main`) явно зафіксовано та прийнято як допустимий компроміс для збереження приватності репозиторію без додаткових витрат на корпоративні плани GitHub.
+- _Privacy Trade-off_: Відкритий запис у Rekor transparency log назви репозиторію та ідентичності workflow (`Georgekgk2/Life-MP/.github/workflows/release-images.yml@refs/heads/main`) явно зафіксовано та прийнято як допустимий компроміс для збереження приватності репозиторію без додаткових витрат на корпоративні плани GitHub.
 
 ## 6. Підсумок
 
@@ -108,6 +108,7 @@ Public infrastructure accessibility не є application, legal, financial або
 ## 7. Реєстр офіційних винятків (Policy Exceptions)
 
 ### EXC-20260909-SINGLE-OWNER-P0-CONTAINMENT
+
 - **Дата набрання чинності:** 2026-09-09
 - **Власник авторизації:** Georgekgk2 (репозиторний та технічний власник)
 - **Статус винятку:** `APPROVED / SINGLE-OWNER EXCEPTION`
@@ -127,6 +128,7 @@ Public infrastructure accessibility не є application, legal, financial або
   - Повноцінний незалежний людський аудит обов'язково залишається передумовою комерційного запуску (Фаза P5).
 
 ### EXC-20260911-SINGLE-OWNER-P2-COMPOSE
+
 - **Дата набрання чинності:** 2026-09-11
 - **Власник авторизації:** Georgekgk2 (репозиторний та технічний власник)
 - **Статус винятку:** `RETROSPECTIVE EXCEPTION RECORD / NOT A PRIORI APPROVAL`
@@ -151,3 +153,24 @@ Public infrastructure accessibility не є application, legal, financial або
   - Комерційні гейти (COM-1..6, LOG-1, CAT-1..5, FSC-1) залишаються заблокованими;
   - Поточна конфігурація залишається суворо в режимі ізольованого публічного демо (`public-demo`) на фікстурах;
   - Цільовий сервер `34.139.21.224`, його топологія, ресурси та бекапи залишаються неперевіреними згідно з ADR 0004 і вимагають окремого sanitized discovery report перед будь-якою реальною промоцією.
+
+### EXC-20260911-RETROSPECTIVE-SANDBOX-CORE
+
+- **Дата набрання чинності:** 2026-09-11
+- **Власник авторизації:** Georgekgk2 (репозиторний та технічний власник)
+- **Статус винятку:** `RETROSPECTIVE EXCEPTION RECORD / NOT A PRIORI APPROVAL`
+- **Хронологія та факт відхилення від регламенту:**
+  - 17:07:28Z: PR #80 злито (комміт `ae23947`) при `reviewDecision: ""` (порушення вимоги обов'язкового незалежного review до злиття).
+  - 17:46:37Z: PR #81 злито (комміт `243f8ba`) при `reviewDecision: ""` без формального peer review approval у GitHub API.
+  - **Висновок аудиту:** Даний запис є ретроспективною фіксацією факту злиття коду тестового ядра адаптера пісочниці без попереднього peer approval у GitHub API.
+- **Підстава та контекст середовища:** Одноосібний репозиторій розробки (`Georgekgk2`). Зміни стосувалися виключно внутрішнього контрактного ядра адаптера `MonobankSandboxPaymentAdapter` (`apps/commerce`), unit-тестів та ADR 0014 (Slice 1). Вітрина (`apps/storefront`), бойові налаштування та хост не змінювалися.
+- **Компенсаційні контроли безпеки та технічний стан:**
+  1. 29/29 контрактних тестів платіжного ядра пройшли зі 100% успіхом (73/73 у `@life/commerce`).
+  2. Усі 9 обов'язкових перевірок GitHub Actions у PR #80 та PR #81 завершилися кодом 0.
+  3. `verify-deployment-containment.mjs` підтвердив: `allow_live_payment_gateway: false`, жодних бойових токенів чи витоків секретів.
+  4. Пост-мердж релізи пройшли в CI.
+  5. Бойовий сервер `34.139.21.224` залишився повністю недоторканим і замороженим на верифікованому релізі `rel-20260911T125545Z`.
+- **Незмінні обмеження та заборони (Strict Boundaries):**
+  - Виняток **НЕ АВТОРИЗУЄ** розгортання коммітів `ae23947` чи `243f8ba` на сервері `34.139.21.224` (`STRICT NO-GO`);
+  - Комерційні гейти (COM-1..7, LOG-1..3, CAT-1..6) залишаються заблокованими;
+  - Жоден наступний PR не повинен зливатися без формального незалежного рецензування.

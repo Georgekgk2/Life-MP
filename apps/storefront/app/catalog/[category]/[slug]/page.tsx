@@ -12,7 +12,7 @@ import {
 } from "@/components";
 import { getProductReviews } from "@/reviews/server";
 import { getCatalogSnapshot } from "@/catalog/server";
-import { products as fixtureProducts } from "@/fixtures";
+import { people, products as fixtureProducts } from "@/fixtures";
 import { formatHryvnia } from "@/formatters";
 
 export const dynamic = "force-dynamic";
@@ -89,6 +89,8 @@ export default async function ProductDetailPage({
   const relatedProducts = snapshot.products
     .filter((p) => p.categorySlug === categorySlug && p.id !== product.id)
     .slice(0, 3);
+
+  const artisan = people.find((p) => p.slug === product.provider?.handle);
 
   const reviewsResult = await getProductReviews(product.id);
   return (
@@ -208,6 +210,16 @@ export default async function ProductDetailPage({
                     ? "Синтетичні локальні дані"
                     : "Лише перегляд у демо"}
                 </span>
+                <span
+                  className="badge badge--status"
+                  style={{
+                    background: "var(--color-surface-strong)",
+                    color: "var(--color-primary-strong)",
+                    fontWeight: 600,
+                  }}
+                >
+                  ✓ Схвалений профіль для sandbox
+                </span>
                 {product.organicProductBadge && (
                   <span
                     className="badge badge--organic"
@@ -258,7 +270,7 @@ export default async function ProductDetailPage({
               </div>
 
               {/* Data specifications */}
-              <dl className="data-list" style={{ marginBottom: "2rem" }}>
+              <dl className="data-list" style={{ marginBottom: "1.5rem" }}>
                 <div className="data-list__item">
                   <dt className="data-list__label">Категорія</dt>
                   <dd className="data-list__value">{category.name}</dd>
@@ -280,6 +292,50 @@ export default async function ProductDetailPage({
                   </div>
                 )}
               </dl>
+
+              {/* Artisan Showcase Card */}
+              {product.provider && (
+                <section
+                  className="product-artisan-card"
+                  aria-label="Інформація про майстерню"
+                >
+                  <div className="product-artisan-card__header">
+                    <div
+                      className="product-artisan-card__avatar"
+                      aria-hidden="true"
+                    >
+                      {product.provider.name.charAt(0)}
+                    </div>
+                    <div className="product-artisan-card__meta">
+                      <span className="product-artisan-card__badge">
+                        Схвалений профіль для sandbox
+                      </span>
+                      <h3 className="product-artisan-card__name">
+                        {product.provider.name}
+                      </h3>
+                      {product.provider.region && (
+                        <p className="product-artisan-card__region">
+                          📍 {product.provider.region}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {artisan && (
+                    <p className="product-artisan-card__bio">
+                      {artisan.description}
+                    </p>
+                  )}
+                  <div>
+                    <Link
+                      href={`/people/${product.provider.handle}`}
+                      className="button button--secondary"
+                      style={{ fontSize: "0.85rem", padding: "0.4rem 0.8rem" }}
+                    >
+                      Переглянути всі вироби майстерні →
+                    </Link>
+                  </div>
+                </section>
+              )}
               {/* Non-commercial sandbox boundary notice */}
               <aside
                 className="notice"

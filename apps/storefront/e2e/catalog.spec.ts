@@ -73,6 +73,14 @@ test.describe("Catalog E2E & Visual Artifacts", () => {
 
     // Verify scoped category mode: dead category pills are hidden
     await expect(page.locator(".catalog-pills")).toHaveCount(0);
+
+    // Verify artisan attribution and link to profile on product card
+    const artisanLink = page.locator(".product-card__artisan-link").first();
+    await expect(artisanLink).toBeVisible();
+    await expect(artisanLink).toContainText("Тарас");
+    await expect(artisanLink).toContainText("Карпати");
+    await expect(artisanLink).toHaveAttribute("href", "/people/taras");
+
     // Verify search is available and functions inside the scoped category
     const searchInput = page.locator("#catalog-search");
     await expect(searchInput).toBeVisible();
@@ -94,6 +102,13 @@ test.describe("Catalog E2E & Visual Artifacts", () => {
     await expect(page.locator("h1")).toContainText("Футболка «Світло»");
     await expect(page.getByText("Некомерційний sandbox")).toBeVisible();
     await expect(page.getByText("Кошти зарезервовано")).toHaveCount(0);
+
+    // Verify artisan workshop link on product detail page
+    const workshopLink = page.locator(
+      ".product-detail-info .data-list__value a",
+    );
+    await expect(workshopLink).toContainText("Тарас (Карпати)");
+    await expect(workshopLink).toHaveAttribute("href", "/people/taras");
 
     // Verify product image loads and decodes successfully via next/image
     const productImage = page.locator(".product-detail-media img.card__image");

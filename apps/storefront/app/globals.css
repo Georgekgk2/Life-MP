@@ -1535,6 +1535,18 @@
     min-width: 0;
   }
 
+  .product-card__artisan-link {
+    color: inherit;
+    text-decoration: none;
+    transition: color 150ms var(--ease-out);
+  }
+
+  .product-card__artisan-link:hover,
+  .product-card__artisan-link:focus-visible {
+    color: var(--color-accent);
+    text-decoration: underline;
+  }
+
   .product-card__actions,
   .badge-group {
     display: flex;

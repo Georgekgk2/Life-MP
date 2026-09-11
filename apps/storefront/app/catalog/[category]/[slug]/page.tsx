@@ -268,7 +268,15 @@ export default async function ProductDetailPage({
                   <div className="data-list__item">
                     <dt className="data-list__label">Майстерня</dt>
                     <dd className="data-list__value">
-                      {product.provider.name}
+                      <Link
+                        href={`/people/${product.provider.handle}`}
+                        className="text-link"
+                      >
+                        {product.provider.name}
+                        {product.provider.region
+                          ? ` (${product.provider.region})`
+                          : ""}
+                      </Link>
                     </dd>
                   </div>
                 )}

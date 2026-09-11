@@ -22,9 +22,17 @@ export function ProductCard({ product }: ProductCardProps) {
       <div className="card__content product-card__content">
         <div className="product-card__topline">
           <p className="card__eyebrow">
-            {product.provider?.name
-              ? `Майстер: ${product.provider.name}`
-              : "Виріб спільноти"}
+            {product.provider?.name ? (
+              <Link
+                href={`/people/${product.provider.handle}`}
+                className="product-card__artisan-link"
+              >
+                Майстер: {product.provider.name}
+                {product.provider.region ? ` · ${product.provider.region}` : ""}
+              </Link>
+            ) : (
+              "Виріб спільноти"
+            )}
           </p>
           <div className="product-card__actions">
             <AddToCartButton product={product} size="sm" />

@@ -114,7 +114,7 @@ export const products = [
   {
     id: "product-zbirka-opovidan",
     slug: "zbirka-opovidan",
-    imageSrc: "/images/products/notatnyk-istorii.webp",
+    imageSrc: "/images/products/zbirka-opovidan.webp",
     categorySlug: "knyhy",
     name: "Збірка оповідань «Поруч»",
     description:
@@ -136,7 +136,7 @@ export const products = [
   {
     id: "product-zakladka-hvylya",
     slug: "zakladka-hvylya",
-    imageSrc: "/images/products/notatnyk-istorii.webp",
+    imageSrc: "/images/products/zakladka-hvylya.webp",
     categorySlug: "kanzeliariia",
     name: "Закладка «Хвиля»",
     description:
@@ -147,7 +147,7 @@ export const products = [
   {
     id: "product-lystivka-teplo",
     slug: "lystivka-teplo",
-    imageSrc: "/images/products/svichka-vechir.webp",
+    imageSrc: "/images/products/lystivka-teplo.webp",
     categorySlug: "podarunky",
     name: "Листівка «Тепло»",
     description:
@@ -169,7 +169,7 @@ export const products = [
   {
     id: "product-nabor-tvorchist",
     slug: "nabor-tvorchist",
-    imageSrc: "/images/products/nabir-oliva.webp",
+    imageSrc: "/images/products/nabor-tvorchist.webp",
     categorySlug: "maisteria",
     name: "Набір для творчості «Разом»",
     description:
@@ -180,7 +180,7 @@ export const products = [
   {
     id: "product-plakat-spilnota",
     slug: "plakat-spilnota",
-    imageSrc: "/images/products/nabir-oliva.webp",
+    imageSrc: "/images/products/plakat-spilnota.webp",
     categorySlug: "maisteria",
     name: "Плакат «Спільнота»",
     description:

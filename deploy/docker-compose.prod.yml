@@ -14,7 +14,7 @@ services:
   # PostgreSQL 16 (Private Storage)
   # ---------------------------------------------------------------------------
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
     container_name: life-mp-postgres
     command: ["postgres", "-c", "max_connections=150", "-c", "shared_buffers=128MB"]
     environment:
@@ -48,7 +48,7 @@ services:
   # Redis 7 (Private Cache & Session Store)
   # ---------------------------------------------------------------------------
   redis:
-    image: redis:7-alpine
+    image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
     container_name: life-mp-redis
     command:
       [
@@ -87,10 +87,7 @@ services:
   # Commerce Engine (Medusa v2 Headless Backend)
   # ---------------------------------------------------------------------------
   commerce:
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile.commerce
-    image: ${COMMERCE_IMAGE:-life-mp-commerce:production}
+    image: ghcr.io/georgekgk2/life-commerce@sha256:021fa9f3c47fa1ce0e597ada70d06c86048e2779496ab93753afec2979120cb7
     container_name: life-mp-commerce
     environment:
       NODE_ENV: production
@@ -142,12 +139,7 @@ services:
   # Storefront (Next.js 15 PWA Frontend)
   # ---------------------------------------------------------------------------
   storefront:
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile.storefront
-      args:
-        NEXT_PUBLIC_MEDUSA_API_URL: ${NEXT_PUBLIC_MEDUSA_API_URL:-/api}
-    image: ${STOREFRONT_IMAGE:-life-mp-storefront:production}
+    image: ghcr.io/georgekgk2/life-storefront@sha256:742bc8d7e45c6dfb232ac487b8939eb9cb35ae91c681083384ca4c075f77dcdb
     container_name: life-mp-storefront
     environment:
       NODE_ENV: production

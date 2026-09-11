@@ -3,6 +3,7 @@ import {
   getCatalogSnapshot,
   getCatalogProductsBySlugs,
 } from "../src/catalog/server";
+import { people } from "../src/fixtures";
 
 describe("storefront src/catalog/server.ts", () => {
   const originalEnv = process.env;
@@ -26,6 +27,33 @@ describe("storefront src/catalog/server.ts", () => {
       expect(result.snapshot.categories.length).toBe(6);
       expect(result.snapshot.products.length).toBe(12);
       expect(result.snapshot.products.every((p) => p.isSynthetic)).toBe(true);
+    }
+  });
+
+  it("enforces strict product-to-artisan data invariants for demo fixtures", async () => {
+    process.env["CATALOG_SOURCE"] = "fixtures";
+    const result = await getCatalogSnapshot();
+
+    expect(result.kind).toBe("ready");
+    if (result.kind === "ready") {
+      const { products } = result.snapshot;
+      expect(products.length).toBe(12);
+
+      const validPersonSlugs = people.map((p) => p.slug);
+
+      for (const product of products) {
+        // 1. Provider must exist with non-empty string fields
+        expect(product.provider).toBeDefined();
+        expect(product.provider.handle).toBeTruthy();
+        expect(product.provider.name).toBeTruthy();
+        expect(product.provider.region).toBeTruthy();
+
+        // 2. Residual demo-provider must be eliminated
+        expect(product.provider.handle).not.toBe("demo-provider");
+
+        // 3. Provider handle must map to a known person slug
+        expect(validPersonSlugs).toContain(product.provider.handle);
+      }
     }
   });
 

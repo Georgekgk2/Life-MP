@@ -82,4 +82,33 @@ test.describe("Instant Search & Ukrainian Morphology E2E", () => {
     await expect(page).toHaveURL("/catalog/kanzeliariia/olivtsi-kolir");
     await expect(page.locator("h1")).toContainText("Набір олівців «Колір»");
   });
+
+  test("traps keyboard focus inside search modal and restores focus to opener on Escape", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const searchBtn = page.getByRole("button", { name: /Швидкий пошук/i });
+    await expect(searchBtn).toBeVisible();
+    await searchBtn.click();
+
+    // 1. Verify dialog is open and search input is focused initially
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    const searchInput = page.getByLabel("Поле швидкого пошуку");
+    await expect(searchInput).toBeFocused();
+
+    // 2. Press Shift+Tab from the first focusable element — should wrap to the last focusable element (close button)
+    await page.keyboard.press("Shift+Tab");
+    const closeBtn = page.getByRole("button", { name: "Закрити пошук" });
+    await expect(closeBtn).toBeFocused();
+
+    // 3. Press Tab from the last focusable element — should wrap back to search input
+    await page.keyboard.press("Tab");
+    await expect(searchInput).toBeFocused();
+
+    // 4. Press Escape to close modal and verify focus is restored to searchBtn opener
+    await page.keyboard.press("Escape");
+    await expect(dialog).not.toBeVisible();
+    await expect(searchBtn).toBeFocused();
+  });
 });

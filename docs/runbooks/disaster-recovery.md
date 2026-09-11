@@ -149,20 +149,46 @@ docker compose -p life-mp -f docker-compose.prod.yml --env-file .env.production 
 
 ## 6. Локальна перевірка відновлення на синтетичних даних (Synthetic Drill)
 
-Розробники перевіряють процедуру відновлення локально без використання даних клієнтів:
+Розробники перевіряють процедуру відновлення локально на синтетичних фікстурах без доступу до продакшн-даних:
 
 ```bash
-# Запуск локального тестового оточення
-./scripts/with-commerce-test-env.sh pnpm --filter @life/commerce test:integration
+# 1. Запуск ізольованого тестового контейнера PostgreSQL
+docker run --rm -d --name life-synthetic-dr-test \
+  -e POSTGRES_DB=life_dr_source \
+  -e POSTGRES_USER=dr_user \
+  -e POSTGRES_PASSWORD=dr_password \
+  postgres:16-alpine
 
-# Тест створення синтетичного дампу
-docker exec life-test-postgres pg_dump -U postgres -Fc test_db > /tmp/synthetic-test.dump
+# 2. Створення тестової синтетичної схеми
+docker exec -i life-synthetic-dr-test psql -U dr_user -d life_dr_source << 'EOF'
+CREATE TABLE artisans (id SERIAL PRIMARY KEY, handle VARCHAR(64) UNIQUE, name VARCHAR(128));
+CREATE TABLE products (id SERIAL PRIMARY KEY, artisan_id INT REFERENCES artisans(id), title VARCHAR(128));
+INSERT INTO artisans (handle, name) VALUES ('kosiv-clay', 'Майстерня Косів');
+INSERT INTO products (artisan_id, title) VALUES (1, 'Глечик керамічний');
+EOF
 
-# Тест верифікації структури
-pg_restore -l /tmp/synthetic-test.dump | head -n 20
+# 3. Експорт кастомного архіву та розрахунок контрольної суми
+docker exec life-synthetic-dr-test pg_dump -U dr_user -Fc life_dr_source > /tmp/synthetic.dump
+sha256sum /tmp/synthetic.dump > /tmp/CHECKSUMS.sha256
 
-# Очищення артефактів
-rm -f /tmp/synthetic-test.dump
+# 4. Перевірка цілісності та структури
+sha256sum -c /tmp/CHECKSUMS.sha256
+docker exec -i life-synthetic-dr-test pg_restore -l < /tmp/synthetic.dump | grep "TABLE DATA"
+
+# 5. Відновлення в чисту цільову базу даних
+docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_source -c "CREATE DATABASE life_dr_target;"
+docker exec -i life-synthetic-dr-test pg_restore -U dr_user -d life_dr_target < /tmp/synthetic.dump
+
+# 6. Верифікація інваріантів відновлених даних
+docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_target -c "SELECT count(*) FROM products;"
+
+# 7. Fail-Closed негативний тест (перевірка реакції на пошкодження заголовка)
+head -c 100 /tmp/synthetic.dump > /tmp/corrupted.dump
+docker exec -i life-synthetic-dr-test pg_restore -l < /tmp/corrupted.dump || echo "Пошкоджений дамп успішно відхилено"
+
+# 8. Очищення тимчасових ресурсів
+docker rm -f life-synthetic-dr-test
+rm -f /tmp/synthetic.dump /tmp/CHECKSUMS.sha256 /tmp/corrupted.dump
 ```
 
 ---

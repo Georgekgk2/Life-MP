@@ -12,7 +12,7 @@ type CheckoutStep = 1 | 2 | 3 | 4;
 const STEPS = [
   { id: 1 as CheckoutStep, label: "Контакти" },
   { id: 2 as CheckoutStep, label: "Доставка" },
-  { id: 3 as CheckoutStep, label: "Оплата" },
+  { id: 3 as CheckoutStep, label: "Платіжний сценарій" },
   { id: 4 as CheckoutStep, label: "Підсумок чернетки" },
 ];
 
@@ -42,12 +42,18 @@ export function CheckoutView() {
       setError("Будь ласка, вкажіть ваше прізвище та ім'я.");
       return false;
     }
-    if (!formData.phone.trim()) {
-      setError("Будь ласка, вкажіть контактний номер телефону.");
+    const phoneTrimmed = formData.phone.trim();
+    if (!phoneTrimmed || !/^\+?[0-9\s-()]{10,20}$/.test(phoneTrimmed)) {
+      setError(
+        "Будь ласка, вкажіть контактний номер телефону (наприклад: +380 50 123 45 67).",
+      );
       return false;
     }
-    if (!formData.email.trim() || !formData.email.includes("@")) {
-      setError("Будь ласка, вкажіть коректну адресу електронної пошти.");
+    const emailTrimmed = formData.email.trim();
+    if (!emailTrimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed)) {
+      setError(
+        "Будь ласка, вкажіть дійсну адресу електронної пошти (наприклад: name@example.com).",
+      );
       return false;
     }
     setError(null);
@@ -571,22 +577,23 @@ export function CheckoutView() {
                     onClick={() => goToStep(3)}
                     className="button button--primary"
                   >
-                    Продовжити до оплати →
+                    Продовжити до сценарію оплати →
                   </button>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Step 3: Payment Method Preview */}
+          {/* Step 3: Payment Scenario Preview */}
           {currentStep === 3 && (
             <div className="checkout-step-card">
               <div className="checkout-step-card__header">
                 <h2 className="checkout-step-card__title">
-                  3. Демонстраційний спосіб оплати
+                  3. Платіжний сценарій (Демо-перевірка)
                 </h2>
                 <p className="checkout-step-card__desc">
-                  Вибір тестового методу оплати в середовищі пісочниці
+                  Перевірка параметрів тестового холдування в середовищі
+                  пісочниці
                 </p>
               </div>
 
@@ -688,7 +695,7 @@ export function CheckoutView() {
                     onClick={() => goToStep(4)}
                     className="button button--primary"
                   >
-                    Перейти до підсумку →
+                    Перейти до підсумку чернетки →
                   </button>
                 </div>
               </div>

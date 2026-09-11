@@ -55,15 +55,23 @@ test.describe("Multi-Vendor Cart & Checkout Draft Containment (Phase 4D)", () =>
     await page.locator("#email").fill("buyer@example.internal");
     await page.locator('button:has-text("Продовжити до доставки")').click();
 
+    // Verify all 4 stepper pills are visible
+    const stepPills = page.locator(".checkout-step-pill");
+    await expect(stepPills).toHaveCount(4);
+
     // Step 2: Delivery
     await page.locator("#city").fill("Тестове Місто");
     await page
       .locator("#novaPoshtaBranch")
       .fill("Відділення №0 (Тестова адреса)");
-    await page.locator('button:has-text("Продовжити до оплати")').click();
+    await page
+      .locator('button:has-text("Продовжити до сценарію оплати")')
+      .click();
 
-    // Step 3: Payment Preview
-    await page.locator('button:has-text("Перейти до підсумку")').click();
+    // Step 3: Payment Scenario Preview
+    await page
+      .locator('button:has-text("Перейти до підсумку чернетки")')
+      .click();
 
     // 6. Submit Checkout Form as a non-authoritative draft at Step 4 (Summary)
     const submitDraftBtn = page.locator(

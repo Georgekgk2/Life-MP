@@ -110,6 +110,19 @@ test.describe("Catalog E2E & Visual Artifacts", () => {
     await expect(workshopLink).toContainText("Тарас (Карпати)");
     await expect(workshopLink).toHaveAttribute("href", "/people/taras");
 
+    // Verify rich Artisan Showcase Card on product page
+    const artisanCard = page.locator(".product-artisan-card");
+    await expect(artisanCard).toBeVisible();
+    await expect(artisanCard).toContainText("Тарас");
+    await expect(artisanCard).toContainText("Карпати");
+    await expect(artisanCard.locator("a")).toHaveAttribute(
+      "href",
+      "/people/taras",
+    );
+    await expect(
+      artisanCard.locator(".product-artisan-card__avatar"),
+    ).toBeVisible();
+
     // Verify product image loads and decodes successfully via next/image
     const productImage = page.locator(".product-detail-media img.card__image");
     await expect(productImage).toBeVisible();

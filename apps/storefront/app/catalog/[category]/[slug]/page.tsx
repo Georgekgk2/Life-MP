@@ -91,6 +91,10 @@ export default async function ProductDetailPage({
     .slice(0, 3);
 
   const artisan = people.find((p) => p.slug === product.provider?.handle);
+  const artisanImageSrc =
+    artisan && "imageSrc" in artisan && typeof artisan.imageSrc === "string"
+      ? artisan.imageSrc
+      : undefined;
 
   const reviewsResult = await getProductReviews(product.id);
   return (
@@ -210,16 +214,18 @@ export default async function ProductDetailPage({
                     ? "Синтетичні локальні дані"
                     : "Лише перегляд у демо"}
                 </span>
-                <span
-                  className="badge badge--status"
-                  style={{
-                    background: "var(--color-surface-strong)",
-                    color: "var(--color-primary-strong)",
-                    fontWeight: 600,
-                  }}
-                >
-                  ✓ Схвалений профіль для sandbox
-                </span>
+                {product.verifiedVendorBadge && (
+                  <span
+                    className="badge badge--status"
+                    style={{
+                      background: "var(--color-surface-strong)",
+                      color: "var(--color-primary-strong)",
+                      fontWeight: 600,
+                    }}
+                  >
+                    ✓ {product.verifiedVendorBadge}
+                  </span>
+                )}
                 {product.organicProductBadge && (
                   <span
                     className="badge badge--organic"
@@ -300,15 +306,24 @@ export default async function ProductDetailPage({
                   aria-label="Інформація про майстерню"
                 >
                   <div className="product-artisan-card__header">
-                    <div
-                      className="product-artisan-card__avatar"
-                      aria-hidden="true"
-                    >
-                      {product.provider.name.charAt(0)}
-                    </div>
+                    {artisanImageSrc ? (
+                      <div className="product-artisan-card__avatar product-artisan-card__avatar--image">
+                        <img
+                          src={artisanImageSrc}
+                          alt={`Портрет: ${product.provider.name}`}
+                        />
+                      </div>
+                    ) : (
+                      <div
+                        className="product-artisan-card__avatar product-artisan-card__avatar--monogram"
+                        aria-label={`Монограма майстра ${product.provider.name}`}
+                      >
+                        {product.provider.name.charAt(0)}
+                      </div>
+                    )}
                     <div className="product-artisan-card__meta">
                       <span className="product-artisan-card__badge">
-                        Схвалений профіль для sandbox
+                        {product.verifiedVendorBadge || "Демо-майстерня"}
                       </span>
                       <h3 className="product-artisan-card__name">
                         {product.provider.name}

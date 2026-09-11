@@ -103,7 +103,7 @@ Public infrastructure accessibility не є application, legal, financial або
 - **Public infrastructure ingress:** `VERIFIED` за прямими DNS/TLS/HTTP probes; durability не перевірена.
 - **Staging:** `NOT VERIFIED`.
 - **Commercial production:** `BLOCKED / NOT READY`.
-- **Незалежний reviewer:** обов’язковий до merge; виконавець не сертифікує власну зміну (для PR #65 діє формальний виняток `EXC-20260909-SINGLE-OWNER-P0-CONTAINMENT`, див. розділ 7).
+- **Незалежний reviewer:** обов’язковий до merge; виконавець не сертифікує власну зміну (для PR #65 діє формальний виняток `EXC-20260909-SINGLE-OWNER-P0-CONTAINMENT`, для PR #70 діє виняток `EXC-20260911-SINGLE-OWNER-P2-COMPOSE`, див. розділ 7).
 
 ## 7. Реєстр офіційних винятків (Policy Exceptions)
 
@@ -125,3 +125,22 @@ Public infrastructure accessibility не є application, legal, financial або
   - Комерційні функції (`allow_live_payment_gateway`, `allow_live_shipping_api`, `allow_live_fiscalization`) залишаються у суворому стані **`BLOCKED / NOT READY`**;
   - Live сайт продовжує функціонувати виключно в режимі ізольованого публічного демо (`public-demo`) на статичних фікстурах;
   - Повноцінний незалежний людський аудит обов'язково залишається передумовою комерційного запуску (Фаза P5).
+
+### EXC-20260911-SINGLE-OWNER-P2-COMPOSE
+- **Дата набрання чинності:** 2026-09-11
+- **Власник авторизації:** Georgekgk2 (репозиторний та технічний власник)
+- **Статус винятку:** `APPROVED / SINGLE-OWNER EXCEPTION`
+- **Підстава:** Репозиторій функціонує в режимі персонального середовища розробки з єдиним зареєстрованим користувачем `Georgekgk2`. Незалежний рецензент (OMP) провів детальний технічний аудит змін PR #70 та надав позитивний вердикт `GO`, проте в інтерфейсі GitHub об'єкт `reviewDecision: "APPROVED"` технічно недоступний автору PR через платформове обмеження GitHub (автор не може схвалити власний PR). Оператор надав пряму авторизацію `go` на злиття.
+- **Точний обсяг винятку (Scope):** Поширюється виключно на злиття PR #70 (Phase P2.2 Compose Digest Pinning).
+- **Компенсаційні контроли безпеки:**
+  1. Незалежний технічний аналіз OMP підтвердив: повне вилучення директив `build:`, суворе закріплення 4 образів за канонічними дайджестами, відповідність дайджестів раніше верифікованому маніфесту `IMAGE_DIGESTS.json` з commit `e7ba8b3` (Run `34562907779`), збереження публічно-демонстраційних меж (`public-demo`).
+  2. Локальна валідація синтаксису через `docker compose -f deploy/docker-compose.prod.yml config` пройшла успішно.
+  3. Усі 9 обов'язкових перевірок GitHub Actions у PR #70 завершилися з кодом 0 (`Catalog Provider Integration`, `Catalog Provider Migrations`, `CodeQL`, `Container Scan (storefront)`, `Container Scan (commerce)`, `Dependency Audit`, `Secret Detection`, `Storefront E2E`, `Verify`).
+  4. 55/55 юніт-тестів у `@life/config`, `scripts/check-docs.mjs` та `verify-deployment-containment.mjs` пройшли зі 100% успіхом.
+  5. Повний автономний релізний запуск після злиття на `main` (Run `34565644913`) завершився 100% успіхом (8 / 8 робіт), підтвердивши бездоганну цілісність репозиторію та конвеєра.
+- **Залишковий ризик:** Злиття виконано за відсутності криптографічного схвалення другого облікового запису в GitHub Reviews API.
+- **Незмінні обмеження та заборони (Strict Boundaries):**
+  - Виняток **НЕ АВТОРИЗУЄ** розгортання на продакшн-сервері (`34.139.21.224`) або віддалені команди SSH / `docker compose pull/up` (`STRICT NO-GO`);
+  - Комерційні гейти (COM-1..6, LOG-1, CAT-1..5, FSC-1) залишаються заблокованими;
+  - Поточна конфігурація залишається суворо в режимі ізольованого публічного демо (`public-demo`) на фікстурах;
+  - Цільовий сервер `34.139.21.224`, його топологія, ресурси та бекапи залишаються неперевіреними згідно з ADR 0004 і вимагають окремого sanitized discovery report перед будь-якою реальною промоцією.

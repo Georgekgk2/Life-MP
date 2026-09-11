@@ -52,6 +52,9 @@ test.describe("Catalog E2E & Visual Artifacts", () => {
     await expect(page.locator("h1")).toContainText("Тематичні добірки");
     await expect(page.getByText("Купити")).not.toBeVisible();
     await expect(
+      page.getByText("Каталог у демонстраційному режимі"),
+    ).toBeVisible();
+    await expect(
       page.getByText("Каталог тимчасово недоступний"),
     ).not.toBeVisible();
     await expect(page.locator(".category-card")).toHaveCount(6);
@@ -67,6 +70,18 @@ test.describe("Catalog E2E & Visual Artifacts", () => {
     await page.goto("/catalog/odiah");
     await expect(page.locator("h1")).toContainText("Одяг і аксесуари");
     await expect(page.getByText("Купити")).not.toBeVisible();
+
+    // Verify scoped category mode: dead category pills are hidden
+    await expect(page.locator(".catalog-pills")).toHaveCount(0);
+    // Verify search is available and functions inside the scoped category
+    const searchInput = page.locator("#catalog-search");
+    await expect(searchInput).toBeVisible();
+    await searchInput.fill("Світло");
+    await expect(page.locator(".product-card")).toHaveCount(1);
+    await expect(page.locator(".product-card")).toContainText(
+      "Футболка «Світло»",
+    );
+    await searchInput.fill("");
 
     // Capture category screenshot
     await page.screenshot({

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 
 type CardImageProps = Readonly<{
@@ -7,6 +8,8 @@ type CardImageProps = Readonly<{
   fallbackSrc?: string | undefined;
   alt: string;
   loading?: "lazy" | "eager";
+  sizes?: string;
+  priority?: boolean;
 }>;
 
 export function CardImage({
@@ -14,6 +17,8 @@ export function CardImage({
   fallbackSrc,
   alt,
   loading = "lazy",
+  sizes = "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw",
+  priority = false,
 }: CardImageProps) {
   const initialSrc = src || fallbackSrc;
   const [currentSrc, setCurrentSrc] = useState(initialSrc);
@@ -41,12 +46,14 @@ export function CardImage({
   }
 
   return (
-    <img
+    <Image
       className="card__image"
       src={currentSrc}
       alt={alt}
-      loading={loading}
-      decoding="async"
+      fill
+      sizes={sizes}
+      priority={priority || loading === "eager"}
+      loading={priority || loading === "eager" ? undefined : "lazy"}
       onError={() => {
         if (fallbackSrc && currentSrc !== fallbackSrc) {
           setCurrentSrc(fallbackSrc);

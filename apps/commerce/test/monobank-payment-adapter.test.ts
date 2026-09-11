@@ -8,6 +8,8 @@ import {
   verifyEcdsaSignature,
   normalizePublicKeyPem,
   MonobankReconciliationError,
+  MonobankCancelResponseSchema,
+  MonobankInvoiceStatusResponseSchema,
   type MonobankWebhookPayload,
 } from "../src/services/monobank-payment-adapter";
 
@@ -753,7 +755,41 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Contract Core)", () => {
     );
   });
 
-  it("prohibits cancelHold after captured, refunded, or failed (allows only pending/authorized)", async () => {
+  it("differentiates cancelHold (authorized only) from removeInvoice (pending only)", async () => {
+    const { publicKey } = generateTestKeyPair();
+    const transport = new FakeMonobankTransport(publicKey);
+    const ledger = new InMemoryTestWebhookLedger();
+    const adapter = new MonobankSandboxPaymentAdapter({ transport, ledger });
+
+    const { invoiceId } = await adapter.createInvoice({
+      orderId: "ord_diff_test",
+      amountKopecks: 10000,
+      description: "Testing cancel vs remove",
+    });
+
+    // 1. Calling cancelHold on pending invoice is rejected
+    await expect(adapter.cancelHold(invoiceId)).rejects.toThrow(
+      "Cannot cancel hold for pending invoice. Use removeInvoice() to void unpaid invoices.",
+    );
+
+    // 2. Calling removeInvoice on pending invoice succeeds
+    const removeRes = await adapter.removeInvoice(invoiceId);
+    expect(removeRes.success).toBe(true);
+    expect((await ledger.getInvoice(invoiceId))?.status).toBe("canceled");
+
+    // 3. Calling cancelHold on authorized hold succeeds
+    const { invoiceId: inv2 } = await adapter.createInvoice({
+      orderId: "ord_diff_test_2",
+      amountKopecks: 10000,
+      description: "Testing cancel hold authorized",
+    });
+    await ledger.updateInvoiceStatus(inv2, "authorized");
+    const cancelRes = await adapter.cancelHold(inv2);
+    expect(cancelRes.success).toBe(true);
+    expect((await ledger.getInvoice(inv2))?.status).toBe("canceled");
+  });
+
+  it("prohibits cancelHold after captured, refunded, or failed", async () => {
     const { publicKey } = generateTestKeyPair();
     const transport = new FakeMonobankTransport(publicKey);
     const ledger = new InMemoryTestWebhookLedger();
@@ -771,18 +807,18 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Contract Core)", () => {
 
     // Attempt cancelHold on captured invoice
     await expect(adapter.cancelHold(invoiceId)).rejects.toThrow(
-      "Cannot cancel invoice in status captured. Only pending or authorized holds can be canceled.",
+      "Cannot cancel invoice in status captured. Only authorized holds can be canceled.",
     );
     expect((await ledger.getInvoice(invoiceId))?.status).toBe("captured");
 
     // Attempt cancelHold on failed invoice
     await ledger.updateInvoiceStatus(invoiceId, "failed");
     await expect(adapter.cancelHold(invoiceId)).rejects.toThrow(
-      "Cannot cancel invoice in status failed. Only pending or authorized holds can be canceled.",
+      "Cannot cancel invoice in status failed. Only authorized holds can be canceled.",
     );
   });
 
-  it("queries and reconciles invoice status via getInvoiceStatus and syncInvoiceStatus", async () => {
+  it("queries and reconciles invoice status via syncInvoiceStatus with strict invariant & FSM checks", async () => {
     const { publicKey } = generateTestKeyPair();
     const transport = new FakeMonobankTransport(publicKey);
     const ledger = new InMemoryTestWebhookLedger();
@@ -794,17 +830,71 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Contract Core)", () => {
       description: "Testing sync",
     });
 
-    expect((await ledger.getInvoice(invoiceId))?.status).toBe("pending");
+    // 1. Unknown invoice throws
+    await expect(adapter.syncInvoiceStatus("inv_non_existent")).rejects.toThrow(
+      "Invoice inv_non_existent not found in ledger",
+    );
 
-    // Simulate invoice status progression on Monobank side
-    const remote = await transport.getInvoiceStatus(invoiceId);
-    expect(remote.status).toBe("created");
+    // 2. Normal sync from created -> pending succeeds
+    const sync1 = await adapter.syncInvoiceStatus(invoiceId);
+    expect(sync1.status).toBe("pending");
+    expect(sync1.providerStatus).toBe("created");
 
-    // Reconcile status to local ledger
-    const syncRes = await adapter.syncInvoiceStatus(invoiceId);
-    expect(syncRes.providerStatus).toBe("created");
-    expect(syncRes.status).toBe("pending");
-    expect((await ledger.getInvoice(invoiceId))?.status).toBe("pending");
+    // 3. Amount mismatch throws
+    transport.getInvoiceStatus = async () => ({
+      invoiceId,
+      status: "hold",
+      amount: 99999, // Mismatched amount
+      ccy: 980,
+      createdDate: "2026-09-11T12:00:00Z",
+      modifiedDate: "2026-09-11T12:01:00Z",
+      reference: "ord_sync_test",
+    });
+    await expect(adapter.syncInvoiceStatus(invoiceId)).rejects.toThrow(
+      "Amount mismatch: expected 10000, got 99999",
+    );
+
+    // 4. Currency mismatch throws
+    transport.getInvoiceStatus = async () => ({
+      invoiceId,
+      status: "hold",
+      amount: 10000,
+      ccy: 840 as unknown as 980, // Mismatched currency (USD)
+      createdDate: "2026-09-11T12:00:00Z",
+      modifiedDate: "2026-09-11T12:01:00Z",
+      reference: "ord_sync_test",
+    });
+    await expect(adapter.syncInvoiceStatus(invoiceId)).rejects.toThrow(
+      "Currency mismatch: expected 980, got 840",
+    );
+
+    // 5. Illegal transition pending -> captured directly without hold throws
+    transport.getInvoiceStatus = async () => ({
+      invoiceId,
+      status: "success",
+      amount: 10000,
+      ccy: 980,
+      createdDate: "2026-09-11T12:00:00Z",
+      modifiedDate: "2026-09-11T12:01:00Z",
+      reference: "ord_sync_test",
+    });
+    await expect(adapter.syncInvoiceStatus(invoiceId)).rejects.toThrow(
+      "Invalid status transition from pending to captured during status sync",
+    );
+
+    // 6. Valid transition pending -> hold (authorized) succeeds
+    transport.getInvoiceStatus = async () => ({
+      invoiceId,
+      status: "hold",
+      amount: 10000,
+      ccy: 980,
+      createdDate: "2026-09-11T12:00:00Z",
+      modifiedDate: "2026-09-11T12:01:00Z",
+      reference: "ord_sync_test",
+    });
+    const sync2 = await adapter.syncInvoiceStatus(invoiceId);
+    expect(sync2.status).toBe("authorized");
+    expect((await ledger.getInvoice(invoiceId))?.status).toBe("authorized");
   });
 
   it("enforces NO-RETRY policy on mutating POST requests in MonobankHttpTransport", async () => {
@@ -833,6 +923,72 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Contract Core)", () => {
     expect(transport.logs[0].path).toBe("/api/merchant/invoice/create");
   });
 
+  it("validates MonobankCancelResponseSchema with status 'processing' or 'success' and optional dates", () => {
+    // 1. Success without dates
+    expect(
+      MonobankCancelResponseSchema.safeParse({ status: "success" }).success,
+    ).toBe(true);
+
+    // 2. Processing with dates
+    expect(
+      MonobankCancelResponseSchema.safeParse({
+        status: "processing",
+        createdDate: "2026-09-11T12:00:00Z",
+        modifiedDate: "2026-09-11T12:01:00Z",
+      }).success,
+    ).toBe(true);
+
+    // 3. Invalid status
+    expect(
+      MonobankCancelResponseSchema.safeParse({ status: "invalid_status" })
+        .success,
+    ).toBe(false);
+
+    // 4. Unknown property rejected
+    expect(
+      MonobankCancelResponseSchema.safeParse({
+        status: "success",
+        unknownProperty: 123,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("validates MonobankInvoiceStatusResponseSchema with full official fields", () => {
+    const fullOfficialResponse = {
+      invoiceId: "inv_status_001",
+      status: "hold",
+      amount: 45000,
+      ccy: 980,
+      finalAmount: 45000,
+      createdDate: "2026-09-11T12:00:00Z",
+      modifiedDate: "2026-09-11T12:01:00Z",
+      reference: "ord_full_001",
+      destination: "Payment for order ord_full_001",
+      paymentInfo: { maskedPan: "444400******1111" },
+      cancelList: [],
+      tipsInfo: {},
+      walletData: { cardToken: "token_123" },
+      failureReason: undefined,
+      errCode: undefined,
+    };
+
+    expect(
+      MonobankInvoiceStatusResponseSchema.safeParse(fullOfficialResponse)
+        .success,
+    ).toBe(true);
+
+    // Without optional reference and dates
+    const minimalResponse = {
+      invoiceId: "inv_status_002",
+      status: "created",
+      amount: 20000,
+      ccy: 980,
+    };
+    expect(
+      MonobankInvoiceStatusResponseSchema.safeParse(minimalResponse).success,
+    ).toBe(true);
+  });
+
   it("validates provider response shapes via strict Zod schemas in MonobankHttpTransport", async () => {
     const originalFetch = global.fetch;
     const transport = new MonobankHttpTransport({
@@ -841,7 +997,7 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Contract Core)", () => {
     });
 
     try {
-      // 1. Mock invalid response (e.g. key is a number instead of string)
+      // 1. Mock invalid public key response (e.g. key is a number instead of string)
       global.fetch = async () =>
         new Response(JSON.stringify({ key: 12345 }), {
           status: 200,
@@ -852,7 +1008,7 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Contract Core)", () => {
         "Monobank response validation failed",
       );
 
-      // 2. Mock valid response
+      // 2. Mock valid public key response
       global.fetch = async () =>
         new Response(JSON.stringify({ key: "valid_public_key_string" }), {
           status: 200,
@@ -877,6 +1033,41 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Contract Core)", () => {
           paymentType: "hold",
         }),
       ).rejects.toThrow("Monobank response validation failed");
+
+      // 4. Mock cancel response with "processing"
+      global.fetch = async () =>
+        new Response(
+          JSON.stringify({
+            status: "processing",
+            createdDate: "2026-09-11T12:00:00Z",
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+
+      const cancelRes = await transport.cancelHold({ invoiceId: "inv_cancel" });
+      expect(cancelRes.status).toBe("processing");
+
+      // 5. Mock getInvoiceStatus response
+      global.fetch = async () =>
+        new Response(
+          JSON.stringify({
+            invoiceId: "inv_stat",
+            status: "hold",
+            amount: 5000,
+            ccy: 980,
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+
+      const statusRes = await transport.getInvoiceStatus("inv_stat");
+      expect(statusRes.status).toBe("hold");
+      expect(statusRes.amount).toBe(5000);
     } finally {
       global.fetch = originalFetch;
     }

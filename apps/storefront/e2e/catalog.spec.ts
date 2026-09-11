@@ -170,11 +170,35 @@ test.describe("Catalog E2E & Visual Artifacts", () => {
     await expect(addButton).toBeFocused();
   });
 
-  test("ensures no horizontal document overflow", async ({ page }) => {
+  test("ensures no horizontal document overflow across catalog, product detail, and checkout", async ({
+    page,
+  }) => {
+    // 1. Catalog
     await page.goto("/catalog");
-    const hasHorizontalOverflow = await page.evaluate(() => {
-      return document.documentElement.scrollWidth > window.innerWidth;
-    });
-    expect(hasHorizontalOverflow).toBe(false);
+    let hasOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth,
+    );
+    expect(hasOverflow).toBe(false);
+
+    // 2. Product detail with monogram artisan (Taras without portrait image)
+    await page.goto("/catalog/odiah/futbolka-svitlo");
+    hasOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth,
+    );
+    expect(hasOverflow).toBe(false);
+
+    // 3. Product detail with photo portrait artisan (Solomiia)
+    await page.goto("/catalog/dim/chashka-ranok");
+    hasOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth,
+    );
+    expect(hasOverflow).toBe(false);
+
+    // 4. Checkout page
+    await page.goto("/checkout");
+    hasOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth,
+    );
+    expect(hasOverflow).toBe(false);
   });
 });

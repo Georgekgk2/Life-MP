@@ -7,6 +7,7 @@ import {
   InMemoryTestWebhookLedger,
   verifyEcdsaSignature,
   normalizePublicKeyPem,
+  MonobankReconciliationError,
   type MonobankWebhookPayload,
 } from "../src/services/monobank-payment-adapter";
 
@@ -134,7 +135,7 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Contract Core)", () => {
     }
   });
 
-  it("validates payload against strict Zod runtime schema (rejects missing/invalid dates and fields with 400)", async () => {
+  it("validates payload against strict Zod schema (rejects missing dates, invalid fields, or unrecognized keys with 400)", async () => {
     const { publicKey, privateKey } = generateTestKeyPair();
     const transport = new FakeMonobankTransport(publicKey);
     const ledger = new InMemoryTestWebhookLedger();
@@ -181,6 +182,29 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Contract Core)", () => {
     if (!res2.valid) {
       expect(res2.statusCode).toBe(400);
       expect(res2.error).toContain("Payload validation failed");
+    }
+
+    // 3. Strict schema: reject unexpected arbitrary properties
+    const unknownFieldPayload = {
+      invoiceId,
+      status: "hold",
+      amount: 10000,
+      ccy: 980,
+      createdDate: "2026-09-11T12:00:00Z",
+      modifiedDate: "2026-09-11T12:01:00Z",
+      reference: "ord_schema_test",
+      unrecognizedSecretBackdoorField: "forbidden",
+    };
+    const raw3 = JSON.stringify(unknownFieldPayload);
+    const res3 = await adapter.processWebhook({
+      rawBody: raw3,
+      signatureHeader: signPayload(raw3, privateKey),
+    });
+    expect(res3.valid).toBe(false);
+    if (!res3.valid) {
+      expect(res3.statusCode).toBe(400);
+      expect(res3.error).toContain("Payload validation failed");
+      expect(res3.error).toContain("Unrecognized key");
     }
   });
 
@@ -504,6 +528,47 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Contract Core)", () => {
     }
   });
 
+  it("enforces hold-only FSM: capture REQUIRES prior authorization (cannot capture from pending)", async () => {
+    const { publicKey, privateKey } = generateTestKeyPair();
+    const transport = new FakeMonobankTransport(publicKey);
+    const ledger = new InMemoryTestWebhookLedger();
+    const adapter = new MonobankSandboxPaymentAdapter({ transport, ledger });
+
+    const { invoiceId } = await adapter.createInvoice({
+      orderId: "ord_fsm_hold_req",
+      amountKopecks: 50000,
+      description: "Testing capture requires hold",
+    });
+
+    // Direct finalize attempt while still in pending state MUST be rejected
+    await expect(adapter.finalizeHold(invoiceId, 50000)).rejects.toThrow(
+      "Cannot finalize invoice in status pending. Invoice must be in authorized (hold) status before capture.",
+    );
+
+    // Direct webhook attempt to transition pending -> success (bypassing hold)
+    const directSuccessPayload: MonobankWebhookPayload = {
+      invoiceId,
+      status: "success",
+      amount: 50000,
+      ccy: 980,
+      createdDate: "2026-09-11T12:00:00Z",
+      modifiedDate: "2026-09-11T12:01:00Z",
+      reference: "ord_fsm_hold_req",
+    };
+    const directSuccessRaw = JSON.stringify(directSuccessPayload);
+    const directRes = await adapter.processWebhook({
+      rawBody: directSuccessRaw,
+      signatureHeader: signPayload(directSuccessRaw, privateKey),
+    });
+    expect(directRes.valid).toBe(false);
+    if (!directRes.valid) {
+      expect(directRes.statusCode).toBe(422);
+      expect(directRes.error).toContain(
+        "Invalid status transition from pending to captured",
+      );
+    }
+  });
+
   it("prevents illegal backward status transitions in FSM", async () => {
     const { publicKey, privateKey } = generateTestKeyPair();
     const transport = new FakeMonobankTransport(publicKey);
@@ -664,6 +729,30 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Contract Core)", () => {
     expect((await ledger.getInvoice(invoiceId))?.status).toBe("authorized");
   });
 
+  it("throws MonobankReconciliationError when provider succeeds but local ledger update fails", async () => {
+    const { publicKey } = generateTestKeyPair();
+    const transport = new FakeMonobankTransport(publicKey);
+    const ledger = new InMemoryTestWebhookLedger();
+
+    const adapter = new MonobankSandboxPaymentAdapter({ transport, ledger });
+    const { invoiceId } = await adapter.createInvoice({
+      orderId: "ord_reconcile_test",
+      amountKopecks: 10000,
+      description: "Testing reconciliation error",
+    });
+
+    await ledger.updateInvoiceStatus(invoiceId, "authorized");
+
+    // Make ledger update fail after provider call
+    ledger.updateInvoiceStatus = async () => {
+      throw new Error("DB write disk full");
+    };
+
+    await expect(adapter.finalizeHold(invoiceId, 10000)).rejects.toThrowError(
+      MonobankReconciliationError,
+    );
+  });
+
   it("prohibits cancelHold after captured, refunded, or failed (allows only pending/authorized)", async () => {
     const { publicKey } = generateTestKeyPair();
     const transport = new FakeMonobankTransport(publicKey);
@@ -693,6 +782,31 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Contract Core)", () => {
     );
   });
 
+  it("queries and reconciles invoice status via getInvoiceStatus and syncInvoiceStatus", async () => {
+    const { publicKey } = generateTestKeyPair();
+    const transport = new FakeMonobankTransport(publicKey);
+    const ledger = new InMemoryTestWebhookLedger();
+    const adapter = new MonobankSandboxPaymentAdapter({ transport, ledger });
+
+    const { invoiceId } = await adapter.createInvoice({
+      orderId: "ord_sync_test",
+      amountKopecks: 10000,
+      description: "Testing sync",
+    });
+
+    expect((await ledger.getInvoice(invoiceId))?.status).toBe("pending");
+
+    // Simulate invoice status progression on Monobank side
+    const remote = await transport.getInvoiceStatus(invoiceId);
+    expect(remote.status).toBe("created");
+
+    // Reconcile status to local ledger
+    const syncRes = await adapter.syncInvoiceStatus(invoiceId);
+    expect(syncRes.providerStatus).toBe("created");
+    expect(syncRes.status).toBe("pending");
+    expect((await ledger.getInvoice(invoiceId))?.status).toBe("pending");
+  });
+
   it("enforces NO-RETRY policy on mutating POST requests in MonobankHttpTransport", async () => {
     const transport = new MonobankHttpTransport({
       token: "test_token_sandbox",
@@ -719,14 +833,52 @@ describe("MonobankSandboxPaymentAdapter (ADR 0014 Contract Core)", () => {
     expect(transport.logs[0].path).toBe("/api/merchant/invoice/create");
   });
 
-  it("validates provider responses with Zod schemas in MonobankHttpTransport", () => {
+  it("validates provider response shapes via strict Zod schemas in MonobankHttpTransport", async () => {
+    const originalFetch = global.fetch;
     const transport = new MonobankHttpTransport({
-      token: "test_token_sandbox",
+      token: "test_token",
+      baseUrl: "https://mock.monobank.local",
     });
-    expect(transport).toBeDefined();
-    expect(typeof transport.getPublicKey).toBe("function");
-    expect(typeof transport.createInvoice).toBe("function");
-    expect(typeof transport.finalizeHold).toBe("function");
-    expect(typeof transport.cancelHold).toBe("function");
+
+    try {
+      // 1. Mock invalid response (e.g. key is a number instead of string)
+      global.fetch = async () =>
+        new Response(JSON.stringify({ key: 12345 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+
+      await expect(transport.getPublicKey()).rejects.toThrow(
+        "Monobank response validation failed",
+      );
+
+      // 2. Mock valid response
+      global.fetch = async () =>
+        new Response(JSON.stringify({ key: "valid_public_key_string" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+
+      const key = await transport.getPublicKey();
+      expect(key).toBe("valid_public_key_string");
+
+      // 3. Mock invalid createInvoice response (missing pageUrl)
+      global.fetch = async () =>
+        new Response(JSON.stringify({ invoiceId: "inv_bad" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+
+      await expect(
+        transport.createInvoice({
+          amount: 1000,
+          ccy: 980,
+          merchantPaymInfo: { reference: "ref", destination: "desc" },
+          paymentType: "hold",
+        }),
+      ).rejects.toThrow("Monobank response validation failed");
+    } finally {
+      global.fetch = originalFetch;
+    }
   });
 });

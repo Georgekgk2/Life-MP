@@ -8,15 +8,16 @@ import { z } from "zod";
  * Local sandbox contract layer for two-stage authorization hold orchestration:
  * - Fail-closed ECDSA webhook verification with forced public-key cache busting,
  *   24h TTL, and DoS amplification rate-limiting (60s cooldown);
- * - Strict Zod runtime payload and transport response schemas (.strip());
+ * - Strict Zod runtime payload and transport response schemas (.strict());
  * - Durable idempotency model with payloadHash conflict rejection (409);
  * - Sanitized external error reporting (503 without internal leak);
  * - Atomic command execution with per-invoice mutex locking;
  * - No-retry policy on mutating POST requests;
- * - Strict Finite State Machine (FSM) status transitions.
+ * - Status query & reconciliation via GET /api/merchant/invoice/status;
+ * - Strict Finite State Machine (FSM) status transitions: capture requires hold.
  *
- * NOTE: This is the local sandbox contract layer. Production deployment
- * requires PostgreSQL persistence (payment_webhook_events) and Redis mutex.
+ * NOTE: This is Slice 1 (local sandbox contract layer).
+ * Slice 2 introduces PostgreSQL persistence (payment_webhook_events) and Redis mutex.
  * ============================================================================
  */
 
@@ -31,6 +32,17 @@ export type MonobankInvoiceStatus =
 
 export type MedusaPaymentStatus =
   "pending" | "authorized" | "captured" | "failed" | "canceled" | "refunded";
+
+export class MonobankReconciliationError extends Error {
+  constructor(
+    public readonly invoiceId: string,
+    public readonly targetStatus: MedusaPaymentStatus,
+    message: string,
+  ) {
+    super(message);
+    this.name = "MonobankReconciliationError";
+  }
+}
 
 export type CreateInvoiceInput = Readonly<{
   orderId: string;
@@ -77,25 +89,57 @@ export const MonobankWebhookPayloadSchema = z
     modifiedDate: webhookDateSchema,
     reference: z.string().min(1),
     failureReason: z.string().optional(),
+    errCode: z.string().optional(),
+    cancelList: z.array(z.unknown()).optional(),
+    walletData: z.record(z.unknown()).optional(),
   })
-  .strip();
+  .strict();
 
 export type MonobankWebhookPayload = z.infer<
   typeof MonobankWebhookPayloadSchema
 >;
 
-export const MonobankPublicKeyResponseSchema = z.object({
-  key: z.string().min(1),
-});
+export const MonobankPublicKeyResponseSchema = z
+  .object({
+    key: z.string().min(1),
+  })
+  .strict();
 
-export const MonobankCreateInvoiceResponseSchema = z.object({
-  invoiceId: z.string().min(1),
-  pageUrl: z.string().url(),
-});
+export const MonobankCreateInvoiceResponseSchema = z
+  .object({
+    invoiceId: z.string().min(1),
+    pageUrl: z.string().url(),
+  })
+  .strict();
 
-export const MonobankSuccessResponseSchema = z.object({
-  status: z.literal("success"),
-});
+export const MonobankSuccessResponseSchema = z
+  .object({
+    status: z.literal("success"),
+  })
+  .strict();
+
+export const MonobankInvoiceStatusResponseSchema = z
+  .object({
+    invoiceId: z.string().min(1),
+    status: z.enum([
+      "created",
+      "processing",
+      "hold",
+      "success",
+      "failure",
+      "reversed",
+      "expired",
+    ]),
+    amount: z.number().int().positive(),
+    ccy: z.literal(980),
+    finalAmount: z.number().int().positive().optional(),
+    createdDate: webhookDateSchema,
+    modifiedDate: webhookDateSchema,
+    reference: z.string().min(1),
+    failureReason: z.string().optional(),
+    errCode: z.string().optional(),
+  })
+  .strict();
 
 export type MonobankWebhookProcessResult =
   | Readonly<{
@@ -153,7 +197,7 @@ export interface WebhookEventLedger {
 
 export type MonobankCreateInvoiceRequest = Readonly<{
   amount: number;
-  ccy: number;
+  ccy: 980;
   merchantPaymInfo: {
     reference: string;
     destination: string;
@@ -189,15 +233,9 @@ export type MonobankCancelHoldResponse = Readonly<{
   status: "success";
 }>;
 
-export type MonobankInvoiceStatusResponse = Readonly<{
-  invoiceId: string;
-  status: MonobankInvoiceStatus;
-  amount: number;
-  ccy: number;
-  createdDate: string;
-  modifiedDate: string;
-  reference: string;
-}>;
+export type MonobankInvoiceStatusResponse = z.infer<
+  typeof MonobankInvoiceStatusResponseSchema
+>;
 
 export interface MonobankTransport {
   getPublicKey(forceRefresh?: boolean): Promise<string>;
@@ -210,7 +248,7 @@ export interface MonobankTransport {
   cancelHold(
     request: MonobankCancelHoldRequest,
   ): Promise<MonobankCancelHoldResponse>;
-  getInvoiceStatus?(invoiceId: string): Promise<MonobankInvoiceStatusResponse>;
+  getInvoiceStatus(invoiceId: string): Promise<MonobankInvoiceStatusResponse>;
 }
 
 export const MONOBANK_TO_MEDUSA_STATUS: Readonly<
@@ -227,14 +265,14 @@ export const MONOBANK_TO_MEDUSA_STATUS: Readonly<
 
 /**
  * Strict forward-only Finite State Machine (FSM).
- * Backward transitions (e.g. captured -> hold or captured -> canceled) are strictly prohibited.
+ * In hold-only orchestration, capture REQUIRES prior authorization (hold).
+ * Backward transitions or jumping from pending to captured are strictly prohibited.
  */
 export const ALLOWED_STATUS_TRANSITIONS: Readonly<
   Record<MedusaPaymentStatus, readonly MedusaPaymentStatus[]>
 > = Object.freeze({
   pending: Object.freeze<MedusaPaymentStatus[]>([
     "authorized",
-    "captured",
     "failed",
     "canceled",
   ]),
@@ -458,7 +496,7 @@ export class FakeMonobankTransport implements MonobankTransport {
       invoiceId,
       status: "created",
       amount: request.amount,
-      ccy: request.ccy,
+      ccy: 980,
       createdDate: new Date().toISOString(),
       modifiedDate: new Date().toISOString(),
       reference: request.merchantPaymInfo.reference,
@@ -531,7 +569,7 @@ export type StructuredLogEntry = Readonly<{
  * - Timeout-bounded;
  * - Idempotency-safe: retries ONLY idempotent GET requests (status/pubkey);
  * - POST requests (invoice creation, hold finalization, cancellation) are NEVER automatically retried;
- * - Validates provider responses via Zod schemas.
+ * - Validates provider responses via strict Zod schemas.
  */
 export class MonobankHttpTransport implements MonobankTransport {
   private readonly baseUrl: string;
@@ -694,6 +732,18 @@ export class MonobankHttpTransport implements MonobankTransport {
       },
     );
   }
+
+  async getInvoiceStatus(
+    invoiceId: string,
+  ): Promise<MonobankInvoiceStatusResponse> {
+    return this.request<MonobankInvoiceStatusResponse>(
+      `/api/merchant/invoice/status?invoiceId=${encodeURIComponent(invoiceId)}`,
+      {
+        method: "GET",
+        schema: MonobankInvoiceStatusResponseSchema,
+      },
+    );
+  }
 }
 
 export class MonobankSandboxPaymentAdapter {
@@ -787,9 +837,22 @@ export class MonobankSandboxPaymentAdapter {
   }
 
   /**
+   * Syncs invoice status directly from Monobank via GET /api/merchant/invoice/status
+   */
+  async syncInvoiceStatus(invoiceId: string): Promise<{
+    status: MedusaPaymentStatus;
+    providerStatus: MonobankInvoiceStatus;
+  }> {
+    const remote = await this.transport.getInvoiceStatus(invoiceId);
+    const mapped = MONOBANK_TO_MEDUSA_STATUS[remote.status];
+    await this.ledger.updateInvoiceStatus(invoiceId, mapped);
+    return { status: mapped, providerStatus: remote.status };
+  }
+
+  /**
    * Processes Monobank Webhook according to ADR 0014:
    * 1. Cryptographic ECDSA signature verification with forced refresh on failure (amplification-protected);
-   * 2. Strict Zod runtime schema validation directly on rawBody (.strip());
+   * 2. Strict Zod runtime schema validation directly on rawBody (.strict());
    * 3. Business invariant checks against ledger record (currency 980, amount, reference);
    * 4. Durable idempotency via atomic ledger with payloadHash conflict rejection (409);
    * 5. FSM forward-only transition enforcement;
@@ -849,7 +912,7 @@ export class MonobankSandboxPaymentAdapter {
       };
     }
 
-    // 3. Strict Zod schema validation (.strip())
+    // 3. Strict Zod schema validation (.strict())
     const parsed = MonobankWebhookPayloadSchema.safeParse(unvalidatedJson);
     if (!parsed.success) {
       const issue = parsed.error.issues[0];
@@ -964,8 +1027,10 @@ export class MonobankSandboxPaymentAdapter {
 
   /**
    * Finalizes hold funds (capture) after artisan confirms fulfillment.
-   * Race-free via per-invoice mutex lock. Fails closed without local status mutation if transport fails.
+   * Race-free via per-invoice mutex lock.
+   * STRICT FSM: invoice MUST be in authorized (hold) status. Capturing from pending is strictly prohibited.
    * Prohibits partial finalization in the initial sandbox slice.
+   * Throws MonobankReconciliationError if provider succeeds but local ledger update fails.
    */
   async finalizeHold(
     invoiceId: string,
@@ -998,8 +1063,11 @@ export class MonobankSandboxPaymentAdapter {
         );
       }
 
-      if (invoice.status !== "authorized" && invoice.status !== "pending") {
-        throw new Error(`Cannot finalize invoice in status ${invoice.status}`);
+      // FSM Enforcement: invoice must be in authorized (hold) state before capture
+      if (invoice.status !== "authorized") {
+        throw new Error(
+          `Cannot finalize invoice in status ${invoice.status}. Invoice must be in authorized (hold) status before capture.`,
+        );
       }
 
       // Call provider transport first (if provider fails, local state remains unmutated)
@@ -1008,8 +1076,18 @@ export class MonobankSandboxPaymentAdapter {
         amount: amountKopecks,
       });
 
-      // Update local ledger status only after provider succeeds
-      await this.ledger.updateInvoiceStatus(invoiceId, "captured");
+      // Update local ledger status only after provider succeeds.
+      // If ledger update throws, signal explicit reconciliation error.
+      try {
+        await this.ledger.updateInvoiceStatus(invoiceId, "captured");
+      } catch (ledgerErr) {
+        throw new MonobankReconciliationError(
+          invoiceId,
+          "captured",
+          `Monobank finalized invoice ${invoiceId} successfully, but local ledger update failed: ${ledgerErr instanceof Error ? ledgerErr.message : String(ledgerErr)}. Status must be reconciled from provider.`,
+        );
+      }
+
       return { success: true, invoiceId };
     } finally {
       release();
@@ -1046,7 +1124,16 @@ export class MonobankSandboxPaymentAdapter {
       await this.transport.cancelHold({ invoiceId });
 
       // Update local ledger status only after provider succeeds
-      await this.ledger.updateInvoiceStatus(invoiceId, "canceled");
+      try {
+        await this.ledger.updateInvoiceStatus(invoiceId, "canceled");
+      } catch (ledgerErr) {
+        throw new MonobankReconciliationError(
+          invoiceId,
+          "canceled",
+          `Monobank canceled invoice ${invoiceId} successfully, but local ledger update failed: ${ledgerErr instanceof Error ? ledgerErr.message : String(ledgerErr)}. Status must be reconciled from provider.`,
+        );
+      }
+
       return { success: true, invoiceId };
     } finally {
       release();

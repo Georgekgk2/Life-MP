@@ -94,6 +94,15 @@ test.describe("Catalog E2E & Visual Artifacts", () => {
     await expect(page.locator("h1")).toContainText("Футболка «Світло»");
     await expect(page.getByText("Некомерційний sandbox")).toBeVisible();
     await expect(page.getByText("Кошти зарезервовано")).toHaveCount(0);
+
+    // Verify product image loads and decodes successfully via next/image
+    const productImage = page.locator(".product-detail-media img.card__image");
+    await expect(productImage).toBeVisible();
+    await expect(page.locator(".card__image-fallback")).toHaveCount(0);
+    const naturalWidth = await productImage.evaluate(
+      (img: HTMLImageElement) => img.naturalWidth,
+    );
+    expect(naturalWidth).toBeGreaterThan(0);
   });
 
   test("skip link moves focus to #main-content", async ({ page }) => {

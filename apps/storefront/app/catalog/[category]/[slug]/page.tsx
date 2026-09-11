@@ -177,6 +177,8 @@ export default async function ProductDetailPage({
                   fallbackSrc="/images/products/chashka-ranok.webp"
                   alt={`Фото виробу «${product.name}»`}
                   loading="eager"
+                  priority
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 600px"
                 />
                 <span className="card__visual-label">{product.name}</span>
               </div>

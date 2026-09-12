@@ -139,7 +139,7 @@ services:
   # Storefront (Next.js 15 PWA Frontend)
   # ---------------------------------------------------------------------------
   storefront:
-    image: ghcr.io/georgekgk2/life-storefront@sha256:7c8ae19636724a77f9cccf6ff617a10c6a6460685adab77819b2bb423a701c71
+    image: ghcr.io/georgekgk2/life-storefront@sha256:57f5921d38ef58e6c0d33efdde3aeb5b2f8f1b4169cd214f4a7567320590aa23
     container_name: life-mp-storefront
     environment:
       NODE_ENV: production

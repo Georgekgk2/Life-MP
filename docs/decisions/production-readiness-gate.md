@@ -174,3 +174,20 @@ Public infrastructure accessibility не є application, legal, financial або
   - Виняток **НЕ АВТОРИЗУЄ** розгортання коммітів `ae23947` чи `243f8ba` на сервері `34.139.21.224` (`STRICT NO-GO`);
   - Комерційні гейти (COM-1..7, LOG-1..3, CAT-1..6) залишаються заблокованими;
   - Жоден наступний PR не повинен зливатися без формального незалежного рецензування.
+
+### EXC-20260912-SINGLE-OWNER-STOREFRONT-DEMO-PROMOTION
+
+- **Дата набрання чинності:** 2026-09-12
+- **Власник авторизації:** Georgekgk2 (репозиторний та технічний власник)
+- **Статус винятку:** `RETROSPECTIVE EXCEPTION & PROMOTION RECORD / PUBLIC-DEMO ONLY`
+- **Хронологія та факт промоції:**
+  - 19:17:09Z: PR #82 злито (комміт `92db58a`) при `reviewDecision: ""` з оновленим Demo Presentation Pack.
+  - 20:27:33Z: PR #84 злито (комміт `49fa09a`) при `reviewDecision: ""` з виправленням мобільного горизонтального скролу (monogram layout).
+  - 04:50:21Z: PR #83 злито (комміт `1487f62`) з оновленням дайджесту storefront у `deploy/docker-compose.prod.yml`.
+  - 05:05:00Z: За прямою командою оператора `GO` виконано контрольовану промоцію на публічно-демонстраційний сервер `34.139.21.224`:
+    - Створено pre-promotion backup БД `/var/backups/life-mp/pre-ui-20260912T051000Z/database.dump` (`-rw-------` 0600, dir `drwx------` 0700);
+    - Оновлено сервіс `storefront` до immutable-дайджесту `ghcr.io/georgekgk2/life-storefront@sha256:57f5921d38ef58e6c0d33efdde3aeb5b2f8f1b4169cd214f4a7567320590aa23`;
+    - Сервіс `commerce` залишено на стабільному baseline-дайджесті `sha256:ebfe84b4576bbb070442e67c9c8e43d675ef9081f41e2f4ad368c03380cc56ea`;
+    - Виконано `docker logout ghcr.io`;
+    - Перевірено публічні ендпоінти (HTTP/2 200 на головній, каталозі, товарах, чекауті; 404 на `/moderation` та `/profile`).
+- **Підстава та обмеження:** Демонстраційна промоція візуального пакету для ознайомлення замовника. Комерційні шлюзи залишаються вимкненими (`allow_live_payment_gateway: false`, `allow_live_shipping_api: false`, `allow_live_fiscalization: false`). Подальші віддалені мутації на хості заморожено до отримання зворотного зв'язку замовника.

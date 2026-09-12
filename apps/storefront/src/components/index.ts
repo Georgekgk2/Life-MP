@@ -2,6 +2,7 @@ export { AddToCartButton } from "./add-to-cart-button";
 export { ArtisanForm } from "./artisan-form";
 export { CartDrawer } from "./cart-drawer";
 export { CardImage } from "./card-image";
+export { ChatBotWidget } from "./chat-bot-widget";
 export { CatalogBrowser } from "./catalog-browser";
 export { CategoryCard } from "./category-card";
 export { CheckoutSuccessView } from "./checkout-success-view";

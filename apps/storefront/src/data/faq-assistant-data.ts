@@ -1,3 +1,7 @@
+import { categories, people } from "@/fixtures";
+
+export const FAQ_KNOWLEDGE_VERSION = "2026-09-12.v1";
+
 export type FaqTopic = Readonly<{
   id: string;
   question: string;
@@ -7,6 +11,11 @@ export type FaqTopic = Readonly<{
     label: string;
   }>;
 }>;
+
+const categoryNames = categories.map((c) => c.name).join(", ");
+const artisanAttributions = people
+  .map((p) => `${p.name}${p.region ? ` (${p.region})` : ""}`)
+  .join(", ");
 
 export const FAQ_TOPICS: readonly FaqTopic[] = Object.freeze([
   {
@@ -22,8 +31,7 @@ export const FAQ_TOPICS: readonly FaqTopic[] = Object.freeze([
   {
     id: "catalog",
     question: "Як знайти виріб?",
-    answer:
-      "У нашому каталозі представлено 6 тематичних напрямів: Одяг і аксесуари, Дім і затишок, Книги й читання, Канцелярія, Подарунки та Майстерня. Також ви можете скористатися пошуком у шапці сайту з підтримкою української морфології та підказок.",
+    answer: `У нашому каталозі представлено ${categories.length} тематичних напрямів: ${categoryNames}. Також ви можете скористатися пошуком у шапці сайту з підтримкою української морфології та підказок.`,
     link: {
       href: "/catalog",
       label: "Перейти до каталогу виробів →",
@@ -32,8 +40,7 @@ export const FAQ_TOPICS: readonly FaqTopic[] = Object.freeze([
   {
     id: "artisans",
     question: "Хто такі майстри?",
-    answer:
-      "На вітрині представлені роботи українських авторів із різних регіонів: Олена (Київ), Марко (Полтавщина), Соломія (Львів), Тарас (Карпати) та Надія (Поділля). У кожного автора є власна сторінка з описом філософії ремесла та добіркою виробів.",
+    answer: `На вітрині представлені роботи українських авторів із різних регіонів: ${artisanAttributions}. У кожного автора є власна сторінка з описом філософії ремесла та добіркою виробів.`,
     link: {
       href: "/people",
       label: "Познайомитися з майстрами →",

@@ -150,4 +150,43 @@ test.describe("FAQ Chatbot Widget E2E", () => {
     );
     expect(hasOverflow).toBe(false);
   });
+
+  test("suppresses chatbot widget on checkout and internal routes to prevent funnel overlap", async ({
+    page,
+  }) => {
+    // 1. Checkout route
+    await page.goto("/checkout");
+    await expect(page.locator(".chatbot-fab")).toHaveCount(0);
+
+    // 2. Moderation route
+    await page.goto("/moderation");
+    await expect(page.locator(".chatbot-fab")).toHaveCount(0);
+
+    // 3. Vendor dashboard route
+    await page.goto("/vendor/dashboard");
+    await expect(page.locator(".chatbot-fab")).toHaveCount(0);
+
+    // 4. Catalog page (chatbot MUST be present)
+    await page.goto("/catalog");
+    await expect(page.locator(".chatbot-fab")).toBeVisible();
+  });
+
+  test("respects prefers-reduced-motion without breaking message scrolling", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto("/");
+
+    const fab = page.locator(".chatbot-fab");
+    await fab.click();
+
+    const dialog = page.locator("#faq-assistant-dialog");
+    await expect(dialog).toBeVisible();
+
+    // Click a pill
+    const pill = dialog.locator(".chatbot-pill-btn").first();
+    await pill.click();
+
+    await expect(dialog.locator(".chatbot-msg--bot")).toHaveCount(2);
+  });
 });

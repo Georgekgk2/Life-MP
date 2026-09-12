@@ -46,10 +46,16 @@ export function ChatBotWidget() {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const wasOpenRef = useRef(false);
 
-  // Auto-scroll messages
+  // Auto-scroll messages respecting user's prefers-reduced-motion preference
   useEffect(() => {
     if (isOpen) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      const prefersReduced =
+        typeof window !== "undefined" &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      messagesEndRef.current?.scrollIntoView({
+        behavior: prefersReduced ? "auto" : "smooth",
+      });
     }
   }, [messages, isOpen]);
 

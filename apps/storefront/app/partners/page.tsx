@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { SectionHeading } from "@/components";
 import { partners } from "@/fixtures";
@@ -46,7 +47,7 @@ export default async function PartnersPage() {
             title="Згадані партнери"
             description="Формат згадки збережено як текст без зовнішнього посилання."
           />
-          <div className="content-grid content-grid--cards">
+          <div className="content-grid content-grid--cards partner-grid">
             {partners.map((partner) => {
               const partnerProducts = allProducts.filter(
                 (p) =>
@@ -60,62 +61,42 @@ export default async function PartnersPage() {
               );
 
               return (
-                <article className="card" key={partner.id}>
-                  <p className="card__eyebrow">Майстерня / Партнер</p>
-                  <h2>{partner.name}</h2>
-                  <p>{partner.summary}</p>
-                  <dl className="data-list" style={{ marginBottom: "1rem" }}>
-                    <div className="data-list__item">
-                      <dt className="data-list__label">Формат згадки</dt>
-                      <dd className="data-list__value">
+                <article className="card partner-card" key={partner.id}>
+                  <div className="card__content partner-card__content">
+                    <div className="partner-card__topline">
+                      <p className="card__eyebrow">Майстерня / Партнер</p>
+                      <span className="badge badge--demo">
                         {partner.websiteLabel}
-                      </dd>
+                      </span>
                     </div>
-                  </dl>
-                  {partnerProducts.length > 0 && (
-                    <div
-                      style={{
-                        marginTop: "1rem",
-                        paddingTop: "0.75rem",
-                        borderTop: "1px solid var(--color-border)",
-                      }}
-                    >
-                      <p
-                        style={{
-                          fontSize: "0.875rem",
-                          fontWeight: "600",
-                          color: "var(--color-ink)",
-                          marginBottom: "0.5rem",
-                        }}
-                      >
-                        Вироби в каталозі ({partnerProducts.length}):
-                      </p>
-                      <ul
-                        style={{
-                          listStyle: "none",
-                          padding: 0,
-                          fontSize: "0.875rem",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "0.25rem",
-                        }}
-                      >
-                        {partnerProducts.slice(0, 3).map((prod) => (
-                          <li key={prod.id}>
-                            <a
-                              href={`/catalog/${prod.categorySlug}/${prod.slug}`}
-                              style={{
-                                color: "var(--color-primary)",
-                                textDecoration: "underline",
-                              }}
-                            >
-                              {prod.name}
-                            </a>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                    <h2 className="card__title">{partner.name}</h2>
+                    <p className="card__description">{partner.summary}</p>
+                    {partnerProducts.length > 0 && (
+                      <div className="partner-card__products">
+                        <p className="partner-card__products-title">
+                          Вироби в каталозі ({partnerProducts.length}):
+                        </p>
+                        <ul className="partner-card__products-list">
+                          {partnerProducts.slice(0, 3).map((prod) => (
+                            <li key={prod.id}>
+                              <Link
+                                href={`/catalog/${prod.categorySlug}/${prod.slug}`}
+                                className="partner-card__product-link"
+                              >
+                                <span>{prod.name}</span>
+                                <span
+                                  aria-hidden="true"
+                                  className="partner-card__arrow"
+                                >
+                                  →
+                                </span>
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
                 </article>
               );
             })}

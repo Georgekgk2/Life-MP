@@ -58,6 +58,7 @@
 | `docs/runbooks/transactional-sandbox-runbook.md`                 | Runbook                 | Робочий sandbox-посібник | Технічний власник                     | Draft-only кошик/замовлення без реальних операцій          |
 | `docs/runbooks/production-server-discovery.md`                   | Runbook                 | Заблокований gate        | Інфраструктурний власник              | Лише авторизоване read-only обстеження                     |
 | `docs/runbooks/remote-server-production-deployment-guide.md`     | Runbook                 | Заблокований             | Інфраструктурний власник              | Неопераційний документ до всіх production gate             |
+| `docs/runbooks/ghcr-authenticated-pull-runbook.md`               | Runbook                 | Операційний регламент    | Інфраструктурний + Security власник   | Безпечна автентифікація GHCR та захист від витоку токенів  |
 | `docs/templates/adr-template.md`                                 | Шаблон                  | Довідковий               | Технічний власник                     | Структура ADR, статус і rollback                           |
 | `docs/templates/decision-template.md`                            | Шаблон                  | Довідковий               | Технічний власник                     | Структура бізнесового/юридичного рішення та evidence       |
 | `docs/templates/runbook-template.md`                             | Шаблон                  | Довідковий               | Технічний власник                     | Структура runbook, межі дозволу та відновлення             |

@@ -26,7 +26,7 @@ jobs:
         run: corepack enable
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7.0.0
         with:
           node-version: 22
           check-latest: true
@@ -93,7 +93,7 @@ jobs:
         run: corepack enable
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7.0.0
         with:
           node-version: 22
           check-latest: true
@@ -161,7 +161,7 @@ jobs:
         run: corepack enable
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7.0.0
         with:
           node-version: 22
           check-latest: true
@@ -204,7 +204,7 @@ jobs:
         run: corepack enable
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7.0.0
         with:
           node-version: 22
           check-latest: true

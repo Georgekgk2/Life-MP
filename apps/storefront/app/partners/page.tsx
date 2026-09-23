@@ -90,14 +90,19 @@ export default async function PartnersPage() {
                     <p className="card__description">{partner.summary}</p>
                     {partner.videoTitle && (
                       <p
+                        className="partner-card__video-title"
                         style={{
                           fontSize: "0.8125rem",
-                          color: "var(--color-primary-strong)",
-                          margin: "0.25rem 0",
-                          fontWeight: 500,
+                          color: "var(--color-ink)",
+                          fontWeight: 600,
+                          margin: "0.35rem 0",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.35rem",
                         }}
                       >
-                        📹 Відео: {partner.videoTitle}
+                        <span aria-hidden="true">📹</span>
+                        <span>Відео: {partner.videoTitle}</span>
                       </p>
                     )}
                     {partnerProducts.length > 0 && (

@@ -9,13 +9,18 @@ type StoryCardProps = Readonly<{
 export function StoryCard({ story }: StoryCardProps) {
   return (
     <article className="card story-card">
-      <div className="card__visual story-card__visual">
+      <Link
+        href={`/stories/${story.slug}`}
+        className="card__visual story-card__visual card__visual-link"
+        tabIndex={-1}
+        aria-hidden="true"
+      >
         <CardImage
           src={story.imageSrc}
           fallbackSrc="/images/stories/story-politsia.webp"
-          alt={`Ілюстрація історії «${story.title}»`}
+          alt=""
         />
-      </div>
+      </Link>
       <div className="card__content">
         <p className="card__eyebrow">Історія спільноти</p>
         <h3 className="card__title">

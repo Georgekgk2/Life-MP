@@ -228,9 +228,14 @@ export default async function HomePage() {
               <article className="card partner-card" key={partner.id}>
                 <div className="card__content">
                   <div className="partner-card__topline">
-                    <p className="card__eyebrow">{partner.categoryLabel || "Організація допомоги"}</p>
+                    <p className="card__eyebrow">
+                      {partner.categoryLabel || "Організація допомоги"}
+                    </p>
                     {partner.videoDuration && (
-                      <span className="badge badge--demo" style={{ fontSize: "0.75rem" }}>
+                      <span
+                        className="badge badge--demo"
+                        style={{ fontSize: "0.75rem" }}
+                      >
                         ▶ Відео · {partner.videoDuration}
                       </span>
                     )}
@@ -238,7 +243,13 @@ export default async function HomePage() {
                   <h3 className="card__title">{partner.name}</h3>
                   <p className="card__description">{partner.summary}</p>
                   {partner.videoTitle && (
-                    <p style={{ fontSize: "0.8125rem", color: "var(--color-primary-quiet)", margin: "0.25rem 0" }}>
+                    <p
+                      style={{
+                        fontSize: "0.8125rem",
+                        color: "var(--color-primary-quiet)",
+                        margin: "0.25rem 0",
+                      }}
+                    >
                       📹 {partner.videoTitle}
                     </p>
                   )}
@@ -259,7 +270,9 @@ export default async function HomePage() {
               textAlign: "center",
             }}
           >
-            Інформаційне застереження: відомості про реабілітаційні, психологічні та оздоровчі центри мають виключно ознайомчий характер у демонстраційному прототипі та не є медичною консультацією.
+            Інформаційне застереження: відомості про реабілітаційні,
+            психологічні та оздоровчі центри мають виключно ознайомчий характер
+            у демонстраційному прототипі та не є медичною консультацією.
           </p>
         </div>
       </section>

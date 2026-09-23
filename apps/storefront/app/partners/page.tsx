@@ -22,8 +22,8 @@ export default async function PartnersPage() {
             <p className="page-intro__eyebrow">Організації допомоги</p>
             <h1>Організації та центри підтримки</h1>
             <p className="page-intro__lead">
-              Ветеранські простори, центри фізичної та психологічної реабілітації,
-              майстерні відновлення та правовий супровід.
+              Ветеранські простори, центри фізичної та психологічної
+              реабілітації, майстерні відновлення та правовий супровід.
             </p>
           </div>
           <aside className="notice" aria-label="Статус партнерської сторінки">
@@ -63,10 +63,21 @@ export default async function PartnersPage() {
                 <article className="card partner-card" key={partner.id}>
                   <div className="card__content partner-card__content">
                     <div className="partner-card__topline">
-                      <p className="card__eyebrow">{partner.categoryLabel || "Організація допомоги"}</p>
-                      <div style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap" }}>
+                      <p className="card__eyebrow">
+                        {partner.categoryLabel || "Організація допомоги"}
+                      </p>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "0.35rem",
+                          flexWrap: "wrap",
+                        }}
+                      >
                         {partner.videoDuration && (
-                          <span className="badge badge--demo" style={{ fontSize: "0.75rem" }}>
+                          <span
+                            className="badge badge--demo"
+                            style={{ fontSize: "0.75rem" }}
+                          >
                             ▶ {partner.videoDuration}
                           </span>
                         )}
@@ -78,7 +89,14 @@ export default async function PartnersPage() {
                     <h2 className="card__title">{partner.name}</h2>
                     <p className="card__description">{partner.summary}</p>
                     {partner.videoTitle && (
-                      <p style={{ fontSize: "0.8125rem", color: "var(--color-primary-strong)", margin: "0.25rem 0", fontWeight: 500 }}>
+                      <p
+                        style={{
+                          fontSize: "0.8125rem",
+                          color: "var(--color-primary-strong)",
+                          margin: "0.25rem 0",
+                          fontWeight: 500,
+                        }}
+                      >
                         📹 Відео: {partner.videoTitle}
                       </p>
                     )}
@@ -114,7 +132,10 @@ export default async function PartnersPage() {
           </div>
         </div>
       </section>
-      <div className="page-shell" style={{ marginTop: "1.5rem", marginBottom: "2rem" }}>
+      <div
+        className="page-shell"
+        style={{ marginTop: "1.5rem", marginBottom: "2rem" }}
+      >
         <p
           style={{
             fontSize: "0.8125rem",
@@ -125,7 +146,10 @@ export default async function PartnersPage() {
             paddingTop: "1rem",
           }}
         >
-          Інформаційне застереження: відомості про реабілітаційні, психологічні та оздоровчі центри мають виключно ознайомчий характер у демонстраційному прототипі та не є медичною або психологічною консультацією.
+          Інформаційне застереження: відомості про реабілітаційні, психологічні
+          та оздоровчі центри мають виключно ознайомчий характер у
+          демонстраційному прототипі та не є медичною або психологічною
+          консультацією.
         </p>
       </div>
     </>

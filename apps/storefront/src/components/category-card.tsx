@@ -9,13 +9,18 @@ type CategoryCardProps = Readonly<{
 export function CategoryCard({ category }: CategoryCardProps) {
   return (
     <article className="card category-card">
-      <div className="card__visual category-card__visual">
+      <Link
+        href={`/catalog/${category.slug}`}
+        className="card__visual category-card__visual card__visual-link"
+        tabIndex={-1}
+        aria-hidden="true"
+      >
         <CardImage
           src={category.imageSrc}
           fallbackSrc="/images/categories/category-dim.webp"
-          alt={`Ілюстрація категорії «${category.name}»`}
+          alt=""
         />
-      </div>
+      </Link>
       <div className="card__content">
         <p className="card__eyebrow">Категорія</p>
         <h3 className="card__title">

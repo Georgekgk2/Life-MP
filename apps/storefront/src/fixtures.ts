@@ -160,11 +160,16 @@ export const products = [
     slug: "nabor-podarunok",
     imageSrc: "/images/products/plate-berehynia.webp",
     categorySlug: "podarunky",
-    name: "Набір «Добрий знак»",
+    name: "Набір «Добрий знак» (Доброїж смаколики)",
     description:
-      "Демо-товар для перегляду структури каталогу; оформлення замовлення недоступне.",
+      "Крафтові смаколики та сувенірний збір від ТОВ «Доброїж» із підтвердженим сертифікатом відповідності.",
     priceUah: 450,
     availability: "demo-only",
+    certifiedProductBadge: "ДСТУ / Сертифікат якості",
+    certificateImageSrc:
+      "/images/certificates/certificate-compliance-sample.webp",
+    certificateTitle:
+      "Сертифікат відповідності ДСТУ / безпечності харчової продукції (Держпродспоживслужба)",
   },
   {
     id: "product-nabor-tvorchist",
@@ -401,28 +406,64 @@ export const events = [
 
 export const partners = [
   {
-    id: "partner-svitlo",
-    slug: "svitlo",
-    name: "Майстерня «Світло»",
+    id: "partner-veteranska-khata",
+    slug: "veteranska-khata",
+    name: "Ветеранська хата",
     summary:
-      "Вигаданий партнер демо-вітрини, що підтримує ідею доступних творчих матеріалів.",
-    websiteLabel: "Сторінка партнера доступна лише як частина демо",
+      "Простір взаємопідтримки, адаптації та психологічного розвантаження ветеранів і їхніх родин.",
+    categoryLabel: "Ветеранський простір",
+    websiteLabel: "Ветеранський простір · Організація допомоги",
+    videoTitle: "Практикум соціальної адаптації та взаємодії",
+    videoDuration: "14 хв",
+    relatedProductSlugs: ["futbolka-svitlo", "shoper-razom"],
   },
   {
-    id: "partner-prostir",
-    slug: "prostir",
-    name: "Простір «Поруч»",
+    id: "partner-tsentr-kapralova",
+    slug: "tsentr-kapralova",
+    name: "Центр Капралова",
     summary:
-      "Вигаданий партнер демо-вітрини для прикладу локальних спільних зустрічей.",
-    websiteLabel: "Сторінка партнера доступна лише як частина демо",
+      "Центр фізичної реабілітації, кінезіотерапії та відновлення рухової активності після бойових поранень.",
+    categoryLabel: "Фізична реабілітація",
+    websiteLabel: "Центр реабілітації · Організація допомоги",
+    videoTitle: "Кінезіотерапія та відновлювальні вправи: відео-розбір",
+    videoDuration: "22 хв",
+    relatedProductSlugs: ["nabor-tvorchist"],
   },
   {
-    id: "partner-kolo",
-    slug: "kolo",
-    name: "Ініціатива «Коло»",
+    id: "partner-tsentr-krutova",
+    slug: "tsentr-krutova",
+    name: "Центр Крутова",
     summary:
-      "Вигаданий партнер демо-вітрини, що додає приклад співпраці навколо добрих ідей.",
-    websiteLabel: "Сторінка партнера доступна лише як частина демо",
+      "Простір психологічної підтримки, стабілізації та групових терапевтичних зустрічей для захисників.",
+    categoryLabel: "Психологічна підтримка",
+    websiteLabel: "Психологічна допомога · Організація допомоги",
+    videoTitle: "Групові практики психоемоційного відновлення",
+    videoDuration: "18 хв",
+    relatedProductSlugs: ["svichka-vechir", "chashka-ranok"],
+  },
+  {
+    id: "partner-aromaterapiia",
+    slug: "aromaterapiia",
+    name: "Майстерня «Ароматерапія»",
+    summary:
+      "Терапевтична крафтова майстерня: натуральні ефірні олії, релаксаційні техніки та відновлення.",
+    categoryLabel: "Терапевтична майстерня",
+    websiteLabel: "Ароматерапія · Творча майстерня",
+    videoTitle: "Створення релаксаційних композицій: відкритий воркшоп",
+    videoDuration: "12 хв",
+    relatedProductSlugs: ["svichka-vechir"],
+  },
+  {
+    id: "partner-yust",
+    slug: "yust",
+    name: "Центр «ЮСТ»",
+    summary:
+      "Правова допомога, соціальний супровід та правозахисні консультації для ветеранів і їхніх сімей.",
+    categoryLabel: "Правова підтримка",
+    websiteLabel: "Правовий центр · Організація допомоги",
+    videoTitle: "Правовий навігатор ветерана: виплати та захист прав",
+    videoDuration: "25 хв",
+    relatedProductSlugs: ["notatnyk-istorii"],
   },
 ] as const satisfies readonly Partner[];
 
@@ -436,7 +477,11 @@ export const charityProjects = [
     summary:
       "Демонстраційний опис партнерської ініціативи: пожертви, покупки та збір даних на цій вітрині не здійснюються.",
     beneficiaryPersonSlug: "nadiia",
-    partnerIds: ["partner-svitlo", "partner-prostir", "partner-kolo"],
+    partnerIds: [
+      "partner-veteranska-khata",
+      "partner-tsentr-kapralova",
+      "partner-tsentr-krutova",
+    ],
     relatedProductSlugs: ["nabor-tvorchist", "plakat-spilnota"],
     status: "demo-only",
   },

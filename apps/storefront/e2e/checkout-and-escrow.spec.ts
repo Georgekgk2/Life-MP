@@ -33,7 +33,8 @@ test.describe("Multi-Vendor Cart & Checkout Draft Containment (Phase 4D)", () =>
     // 4. Click Checkout button in cart drawer
     const checkoutBtn = page.locator('a:has-text("Оформити замовлення")');
     await expect(checkoutBtn).toBeVisible();
-    await checkoutBtn.click({ force: true });
+    await checkoutBtn.scrollIntoViewIfNeeded();
+    await checkoutBtn.click();
 
     // 5. Verify Checkout page
     await page.waitForURL("**/checkout");

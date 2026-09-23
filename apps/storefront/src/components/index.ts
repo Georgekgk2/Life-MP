@@ -15,6 +15,7 @@ export { ModerationDashboard } from "./moderation-dashboard";
 export { OrderTrackerView } from "./order-tracker-view";
 export { PersonCard } from "./person-card";
 export { ProductCard } from "./product-card";
+export { ProductMediaViewer } from "./product-media-viewer";
 export { ProductReviewsSection } from "./product-reviews-section";
 export { PwaRegister } from "./pwa-register";
 export { SaveButton } from "./save-button";

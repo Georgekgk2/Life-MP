@@ -71,6 +71,9 @@ export async function getCatalogSnapshot(): Promise<CatalogReadResult> {
         description: p.description,
         priceUah: p.priceUah,
         imageSrc: p.imageSrc,
+        certificateImageSrc: "certificateImageSrc" in p ? (p.certificateImageSrc as string) : undefined,
+        certificateTitle: "certificateTitle" in p ? (p.certificateTitle as string) : undefined,
+        certifiedProductBadge: "certifiedProductBadge" in p ? (p.certifiedProductBadge as string) : undefined,
         provider: {
           handle: person?.slug || "spilnota",
           name: person?.name || "Майстерня спільноти",
@@ -125,6 +128,9 @@ export async function getCatalogSnapshot(): Promise<CatalogReadResult> {
         description: p.description,
         priceUah: p.priceUah,
         imageSrc: p.imageSrc,
+        certificateImageSrc: "certificateImageSrc" in p ? (p.certificateImageSrc as string) : undefined,
+        certificateTitle: "certificateTitle" in p ? (p.certificateTitle as string) : undefined,
+        certifiedProductBadge: "certifiedProductBadge" in p ? (p.certifiedProductBadge as string) : undefined,
         provider: {
           handle: person?.slug || "spilnota",
           name: person?.name || "Майстерня спільноти",

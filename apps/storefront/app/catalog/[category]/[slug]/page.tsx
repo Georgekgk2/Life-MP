@@ -4,8 +4,8 @@ import { notFound } from "next/navigation";
 
 import {
   AddToCartButton,
-  CardImage,
   ProductCard,
+  ProductMediaViewer,
   ProductReviewsSection,
   SaveButton,
   SectionHeading,
@@ -168,25 +168,12 @@ export default async function ProductDetailPage({
           <div className="product-detail-layout">
             {/* Visual preview */}
             <div className="product-detail-media">
-              <div
-                className="card__visual product-card__visual"
-                style={{
-                  position: "relative",
-                  overflow: "hidden",
-                  height: "380px",
-                  borderRadius: "var(--radius-md)",
-                  backgroundColor: "var(--color-sand-200)",
-                }}
-              >
-                <CardImage
-                  src={product.imageSrc}
-                  alt={`Фото виробу «${product.name}»`}
-                  loading="eager"
-                  priority
-                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 600px"
-                />
-                <span className="card__visual-label">{product.name}</span>
-              </div>
+              <ProductMediaViewer
+                imageSrc={product.imageSrc}
+                productName={product.name}
+                certificateImageSrc={product.certificateImageSrc}
+                certificateTitle={product.certificateTitle}
+              />
             </div>
 
             {/* Information panel */}
@@ -224,6 +211,19 @@ export default async function ProductDetailPage({
                     }}
                   >
                     ✓ {product.verifiedVendorBadge}
+                  </span>
+                )}
+                {product.certifiedProductBadge && (
+                  <span
+                    className="badge badge--certified"
+                    style={{
+                      background: "var(--color-primary-quiet)",
+                      color: "var(--color-primary-strong)",
+                      fontWeight: 600,
+                    }}
+                    title={product.certificateTitle}
+                  >
+                    ✓ {product.certifiedProductBadge}
                   </span>
                 )}
                 {product.organicProductBadge && (

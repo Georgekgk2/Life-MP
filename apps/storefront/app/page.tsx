@@ -100,7 +100,7 @@ export default async function HomePage() {
         <div className="page-shell">
           <SectionHeading
             eyebrow="Напрями"
-            title="Почніть із того, що вам відгукується"
+            title="Почніть саме з того, в чому маєте потребу"
             description="Добірки, які допомагають швидко знайти своє."
             actionHref="/catalog"
             actionLabel="Усі категорії"
@@ -123,8 +123,8 @@ export default async function HomePage() {
         <div className="page-shell">
           <SectionHeading
             eyebrow="Вітрина"
-            title="Речі, які хочеться забрати із собою"
-            description="Вибрані вироби від майстрів і локальних брендів."
+            title="Речі, якими варто володіти"
+            description="Вибрані крафтові вироби, натуральні смаколики та продукція від майстрів."
             actionHref="/catalog"
             actionLabel="Відкрити каталог"
           />
@@ -205,9 +205,11 @@ export default async function HomePage() {
       >
         <div className="page-shell">
           <SectionHeading
-            eyebrow="Підтримка"
-            title="Ініціативи та коло партнерів"
-            description="Спільноти, простори та команди, які допомагають локальним ідеям зростати."
+            eyebrow="Організації та центри допомоги"
+            title="Люди та спільноти, які допомагають"
+            description="Простори ветеранської адаптації, центри реабілітації, майстерні та організації взаємопідтримки."
+            actionHref="/partners"
+            actionLabel="Усі організації"
           />
           <div className="content-grid content-grid--wide-cards partner-grid">
             {charityProjects.slice(0, 2).map((project) => (
@@ -225,16 +227,40 @@ export default async function HomePage() {
             {partners.slice(0, 2).map((partner) => (
               <article className="card partner-card" key={partner.id}>
                 <div className="card__content">
-                  <p className="card__eyebrow">Партнер</p>
+                  <div className="partner-card__topline">
+                    <p className="card__eyebrow">{partner.categoryLabel || "Організація допомоги"}</p>
+                    {partner.videoDuration && (
+                      <span className="badge badge--demo" style={{ fontSize: "0.75rem" }}>
+                        ▶ Відео · {partner.videoDuration}
+                      </span>
+                    )}
+                  </div>
                   <h3 className="card__title">{partner.name}</h3>
                   <p className="card__description">{partner.summary}</p>
+                  {partner.videoTitle && (
+                    <p style={{ fontSize: "0.8125rem", color: "var(--color-primary-quiet)", margin: "0.25rem 0" }}>
+                      📹 {partner.videoTitle}
+                    </p>
+                  )}
                   <Link href="/partners" className="text-link">
-                    Познайомитися з партнерами
+                    Познайомитися з організаціями
                   </Link>
                 </div>
               </article>
             ))}
           </div>
+          <p
+            style={{
+              marginTop: "2rem",
+              fontSize: "0.8125rem",
+              color: "#c9e2d0",
+              opacity: 0.95,
+              lineHeight: 1.5,
+              textAlign: "center",
+            }}
+          >
+            Інформаційне застереження: відомості про реабілітаційні, психологічні та оздоровчі центри мають виключно ознайомчий характер у демонстраційному прототипі та не є медичною консультацією.
+          </p>
         </div>
       </section>
     </>

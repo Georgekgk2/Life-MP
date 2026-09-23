@@ -52,6 +52,19 @@ export function ProductCard({ product }: ProductCardProps) {
             {formatHryvnia(product.priceUah)}
           </data>
           <div className="badge-group">
+            {product.certifiedProductBadge && (
+              <span
+                className="badge badge--certified"
+                style={{
+                  background: "var(--color-primary-quiet)",
+                  color: "var(--color-primary-strong)",
+                  fontWeight: 600,
+                }}
+                title={product.certificateTitle}
+              >
+                ✓ {product.certifiedProductBadge}
+              </span>
+            )}
             {product.verifiedVendorBadge && (
               <span className="badge badge--verified">
                 {product.verifiedVendorBadge}

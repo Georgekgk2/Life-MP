@@ -165,7 +165,10 @@ export function ProductMediaViewer({
             >
               <img
                 src={certificateImageSrc}
-                alt={certificateTitle || `Сертифікат відповідності для ${productName}`}
+                alt={
+                  certificateTitle ||
+                  `Сертифікат відповідності для ${productName}`
+                }
                 style={{
                   maxWidth: "100%",
                   maxHeight: "320px",

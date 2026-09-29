@@ -51,6 +51,7 @@
 | `docs/adr/0011-sast-and-codeql-governance.md`                    | ADR                     | Прийнятий технічний ADR  | Security-власник                      | Правила локальних security scans                           |
 | `docs/adr/0012-vendor-verification-and-compliance.md`            | ADR                     | Прийнятий sandbox ADR    | Технічний + compliance-власник        | Модель verification/evidence; не юридичний висновок        |
 | `docs/adr/0013-immutable-container-pipeline-and-promotion.md`    | ADR                     | Прийнятий технічний ADR  | Технічний та інфраструктурний власник | Незмінний конвеєр збірки контейнерів і GHCR promotion      |
+| `docs/adr/0014-payment-gateway-sandbox-architecture.md`          | ADR                     | Прийнятий технічний ADR  | Технічний власник + фінанси           | Архітектура тестового еквайрингу та криптографічних вебхуків |
 | `docs/runbooks/local-development.md`                             | Runbook                 | Робочий посібник         | Технічний власник                     | Локальні сервіси, міграції та тести                        |
 | `docs/runbooks/disaster-recovery.md`                             | Runbook                 | Робочий посібник         | Технічний власник + інфраструктура    | Резервне копіювання, контрольні суми та аварійне відновлення БД |
 | `docs/runbooks/repository-bootstrap.md`                          | Runbook                 | Робочий посібник         | Технічний власник                     | Безпечний імпорт і Git/CI hygiene                          |

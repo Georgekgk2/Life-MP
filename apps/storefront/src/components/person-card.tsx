@@ -9,13 +9,18 @@ type PersonCardProps = Readonly<{
 export function PersonCard({ person }: PersonCardProps) {
   return (
     <article className="card person-card">
-      <div className="card__visual person-card__visual">
+      <Link
+        href={`/people/${person.slug}`}
+        className="card__visual person-card__visual card__visual-link"
+        tabIndex={-1}
+        aria-hidden="true"
+      >
         <CardImage
           src={person.imageSrc}
           fallbackSrc="/images/people/person-olena.webp"
-          alt={`Портрет учасника спільноти: ${person.name}`}
+          alt=""
         />
-      </div>
+      </Link>
       <div className="card__content">
         <p className="card__eyebrow">{person.role}</p>
         <h3 className="card__title">

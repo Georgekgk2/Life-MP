@@ -1,10 +1,23 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import type { UnifiedSearchSuggestion } from "@life/types";
 import { getSearchProvider } from "../search";
 import { products as fixtureProducts } from "../fixtures";
+
+const FOCUSABLE_SELECTOR =
+  'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function getFocusableElements(container: HTMLElement): HTMLElement[] {
+  return Array.from(
+    container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+  ).filter(
+    (element) =>
+      element.getAttribute("aria-hidden") !== "true" &&
+      element.getClientRects().length > 0,
+  );
+}
 
 export function SearchAutocompleteModal({
   isOpen,
@@ -18,6 +31,9 @@ export function SearchAutocompleteModal({
     readonly UnifiedSearchSuggestion[]
   >([]);
   const [, startTransition] = useTransition();
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+  const wasOpenRef = useRef(false);
 
   const searchProvider = getSearchProvider(fixtureProducts as never);
 
@@ -25,17 +41,74 @@ export function SearchAutocompleteModal({
     if (!isOpen) {
       setQuery("");
       setSuggestions([]);
+      if (wasOpenRef.current) {
+        wasOpenRef.current = false;
+        const opener = openerRef.current;
+        openerRef.current = null;
+        if (opener && document.contains(opener)) {
+          window.requestAnimationFrame(() => opener.focus());
+        }
+      }
       return;
     }
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+    if (!wasOpenRef.current) {
+      const activeElement = document.activeElement;
+      openerRef.current =
+        activeElement instanceof HTMLElement ? activeElement : null;
+      wasOpenRef.current = true;
+    }
+
+    const panel = panelRef.current;
+    const initialFocusFrame = window.requestAnimationFrame(() => {
+      const searchInput = panel?.querySelector<HTMLElement>(
+        "input.catalog-search-input",
+      );
+      searchInput?.focus();
+    });
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
         onClose();
+        return;
+      }
+
+      if (event.key !== "Tab" || !panel) {
+        return;
+      }
+
+      const focusableElements = getFocusableElements(panel);
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        return;
+      }
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+      if (!firstElement || !lastElement) {
+        event.preventDefault();
+        return;
+      }
+      const activeElement = document.activeElement;
+
+      if (event.shiftKey && activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      } else if (!panel.contains(activeElement)) {
+        event.preventDefault();
+        (event.shiftKey ? lastElement : firstElement).focus();
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(initialFocusFrame);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, [isOpen, onClose]);
 
   const handleQueryChange = (val: string) => {
@@ -60,6 +133,7 @@ export function SearchAutocompleteModal({
 
   return (
     <div
+      ref={panelRef}
       role="dialog"
       aria-modal="true"
       aria-labelledby="quick-search-title"
@@ -137,7 +211,6 @@ export function SearchAutocompleteModal({
             🔍
           </span>
           <input
-            autoFocus
             type="text"
             className="catalog-search-input"
             placeholder="Введіть назву виробу, майстерні чи події (наприклад, чашка, льон, воркшоп)..."

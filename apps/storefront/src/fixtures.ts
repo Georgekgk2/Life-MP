@@ -114,7 +114,7 @@ export const products = [
   {
     id: "product-zbirka-opovidan",
     slug: "zbirka-opovidan",
-    imageSrc: "/images/products/notatnyk-istorii.webp",
+    imageSrc: "/images/products/zbirka-opovidan.webp",
     categorySlug: "knyhy",
     name: "Збірка оповідань «Поруч»",
     description:
@@ -136,7 +136,7 @@ export const products = [
   {
     id: "product-zakladka-hvylya",
     slug: "zakladka-hvylya",
-    imageSrc: "/images/products/notatnyk-istorii.webp",
+    imageSrc: "/images/products/zakladka-hvylya.webp",
     categorySlug: "kanzeliariia",
     name: "Закладка «Хвиля»",
     description:
@@ -147,7 +147,7 @@ export const products = [
   {
     id: "product-lystivka-teplo",
     slug: "lystivka-teplo",
-    imageSrc: "/images/products/svichka-vechir.webp",
+    imageSrc: "/images/products/lystivka-teplo.webp",
     categorySlug: "podarunky",
     name: "Листівка «Тепло»",
     description:
@@ -160,16 +160,16 @@ export const products = [
     slug: "nabor-podarunok",
     imageSrc: "/images/products/plate-berehynia.webp",
     categorySlug: "podarunky",
-    name: "Набір «Добрий знак»",
+    name: "Подарунковий набір «Добрий знак»",
     description:
-      "Демо-товар для перегляду структури каталогу; оформлення замовлення недоступне.",
+      "Демонстраційний зразок крафтового набору для перегляду структури каталогу; оформлення замовлення недоступне.",
     priceUah: 450,
     availability: "demo-only",
   },
   {
     id: "product-nabor-tvorchist",
     slug: "nabor-tvorchist",
-    imageSrc: "/images/products/nabir-oliva.webp",
+    imageSrc: "/images/products/nabor-tvorchist.webp",
     categorySlug: "maisteria",
     name: "Набір для творчості «Разом»",
     description:
@@ -180,7 +180,7 @@ export const products = [
   {
     id: "product-plakat-spilnota",
     slug: "plakat-spilnota",
-    imageSrc: "/images/products/nabir-oliva.webp",
+    imageSrc: "/images/products/plakat-spilnota.webp",
     categorySlug: "maisteria",
     name: "Плакат «Спільнота»",
     description:
@@ -201,6 +201,7 @@ export const people = [
     role: "Авторка майстерні",
     description:
       "Вигадана учасниця демо-спільноти, яка ділиться ідеями для читання.",
+    region: "Київ",
     featuredProductSlugs: ["notatnyk-istorii", "zbirka-opovidan"],
   },
   {
@@ -211,6 +212,7 @@ export const people = [
     role: "Куратор творчих занять",
     description:
       "Вигаданий учасник демо-спільноти, який збирає прості творчі формати.",
+    region: "Полтавщина",
     featuredProductSlugs: ["olivtsi-kolir", "nabor-tvorchist"],
   },
   {
@@ -221,7 +223,12 @@ export const people = [
     role: "Редакторка історій",
     description:
       "Вигадана учасниця демо-спільноти, яка допомагає оформлювати короткі оповіді.",
-    featuredProductSlugs: ["chashka-ranok", "zakladka-hvylya"],
+    region: "Львів",
+    featuredProductSlugs: [
+      "chashka-ranok",
+      "svichka-vechir",
+      "zakladka-hvylya",
+    ],
   },
   {
     id: "person-taras",
@@ -230,6 +237,7 @@ export const people = [
     role: "Ведучий відкритих зустрічей",
     description:
       "Вигаданий учасник демо-спільноти, який запрошує до неквапливого діалогу.",
+    region: "Карпати",
     featuredProductSlugs: ["futbolka-svitlo", "plakat-spilnota"],
   },
   {
@@ -239,7 +247,8 @@ export const people = [
     role: "Координаторка добрих ініціатив",
     description:
       "Вигадана учасниця демо-спільноти, яка поєднує партнерські ідеї та творчість.",
-    featuredProductSlugs: ["shoper-razom", "lystivka-teplo"],
+    region: "Поділля",
+    featuredProductSlugs: ["shoper-razom", "lystivka-teplo", "nabor-podarunok"],
   },
 ] as const satisfies readonly Person<ProductSlug>[];
 
@@ -392,28 +401,64 @@ export const events = [
 
 export const partners = [
   {
-    id: "partner-svitlo",
-    slug: "svitlo",
-    name: "Майстерня «Світло»",
+    id: "partner-veteranska-khata",
+    slug: "veteranska-khata",
+    name: "Ветеранська хата",
     summary:
-      "Вигаданий партнер демо-вітрини, що підтримує ідею доступних творчих матеріалів.",
-    websiteLabel: "Сторінка партнера доступна лише як частина демо",
+      "Ініціатива взаємопідтримки та спілкування ветеранів і їхніх родин у межах демонстраційного прототипу.",
+    categoryLabel: "Ветеранський простір",
+    websiteLabel: "Ветеранський простір · Організація допомоги",
+    videoTitle: "Практикум соціальної адаптації та взаємодії",
+    videoDuration: "14 хв",
+    relatedProductSlugs: ["futbolka-svitlo", "shoper-razom"],
   },
   {
-    id: "partner-prostir",
-    slug: "prostir",
-    name: "Простір «Поруч»",
+    id: "partner-tsentr-kapralova",
+    slug: "tsentr-kapralova",
+    name: "Центр Капралова",
     summary:
-      "Вигаданий партнер демо-вітрини для прикладу локальних спільних зустрічей.",
-    websiteLabel: "Сторінка партнера доступна лише як частина демо",
+      "Ознайомчий профіль оздоровчого простору для демонстрації партнерського каталогу.",
+    categoryLabel: "Оздоровчий простір",
+    websiteLabel: "Оздоровчий центр · Організація підтримки",
+    videoTitle: "Ознайомчий матеріал щодо оздоровчих практик",
+    videoDuration: "22 хв",
+    relatedProductSlugs: ["nabor-tvorchist"],
   },
   {
-    id: "partner-kolo",
-    slug: "kolo",
-    name: "Ініціатива «Коло»",
+    id: "partner-tsentr-krutova",
+    slug: "tsentr-krutova",
+    name: "Центр Крутова",
     summary:
-      "Вигаданий партнер демо-вітрини, що додає приклад співпраці навколо добрих ідей.",
-    websiteLabel: "Сторінка партнера доступна лише як частина демо",
+      "Ознайомчий профіль простору підтримки та взаємодії для демонстрації партнерського каталогу.",
+    categoryLabel: "Простір підтримки",
+    websiteLabel: "Простір підтримки · Організація допомоги",
+    videoTitle: "Презентація програм взаємопідтримки",
+    videoDuration: "18 хв",
+    relatedProductSlugs: ["svichka-vechir", "chashka-ranok"],
+  },
+  {
+    id: "partner-aromaterapiia",
+    slug: "aromaterapiia",
+    name: "Майстерня «Ароматерапія»",
+    summary:
+      "Крафтова майстерня ароматичних композицій та творчих занять для демонстрації каталогу.",
+    categoryLabel: "Творча майстерня",
+    websiteLabel: "Ароматерапія · Творча майстерня",
+    videoTitle: "Створення релаксаційних композицій: відкритий воркшоп",
+    videoDuration: "12 хв",
+    relatedProductSlugs: ["svichka-vechir"],
+  },
+  {
+    id: "partner-yust",
+    slug: "yust",
+    name: "Центр «ЮСТ»",
+    summary:
+      "Ознайомчий профіль правозахисної та консультаційної ініціативи для демонстрації структури каталогу.",
+    categoryLabel: "Правовий супровід",
+    websiteLabel: "Консультаційний центр · Організація допомоги",
+    videoTitle: "Ознайомча лекція щодо правового захисту",
+    videoDuration: "25 хв",
+    relatedProductSlugs: ["notatnyk-istorii"],
   },
 ] as const satisfies readonly Partner[];
 
@@ -427,7 +472,11 @@ export const charityProjects = [
     summary:
       "Демонстраційний опис партнерської ініціативи: пожертви, покупки та збір даних на цій вітрині не здійснюються.",
     beneficiaryPersonSlug: "nadiia",
-    partnerIds: ["partner-svitlo", "partner-prostir", "partner-kolo"],
+    partnerIds: [
+      "partner-veteranska-khata",
+      "partner-tsentr-kapralova",
+      "partner-tsentr-krutova",
+    ],
     relatedProductSlugs: ["nabor-tvorchist", "plakat-spilnota"],
     status: "demo-only",
   },

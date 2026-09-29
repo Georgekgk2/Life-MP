@@ -12,19 +12,28 @@ type ProductCardProps = Readonly<{
 export function ProductCard({ product }: ProductCardProps) {
   return (
     <article className="card product-card">
-      <div className="card__visual product-card__visual">
-        <CardImage
-          src={product.imageSrc}
-          fallbackSrc="/images/products/chashka-ranok.webp"
-          alt={`Фото виробу «${product.name}»`}
-        />
-      </div>
+      <Link
+        href={`/catalog/${product.categorySlug}/${product.slug}`}
+        className="card__visual product-card__visual card__visual-link"
+        tabIndex={-1}
+        aria-hidden="true"
+      >
+        <CardImage src={product.imageSrc} alt="" />
+      </Link>
       <div className="card__content product-card__content">
         <div className="product-card__topline">
           <p className="card__eyebrow">
-            {product.provider?.name
-              ? `Майстер: ${product.provider.name}`
-              : "Виріб спільноти"}
+            {product.provider?.name ? (
+              <Link
+                href={`/people/${product.provider.handle}`}
+                className="product-card__artisan-link"
+              >
+                Майстер: {product.provider.name}
+                {product.provider.region ? ` · ${product.provider.region}` : ""}
+              </Link>
+            ) : (
+              "Виріб спільноти"
+            )}
           </p>
           <div className="product-card__actions">
             <AddToCartButton product={product} size="sm" />
@@ -44,22 +53,34 @@ export function ProductCard({ product }: ProductCardProps) {
           <data value={product.priceUah}>
             {formatHryvnia(product.priceUah)}
           </data>
-          <div className="badge-group">
-            {product.verifiedVendorBadge && (
+          <div className="badge-group product-card__badge-group">
+            {product.certifiedProductBadge ? (
+              <span
+                className="badge badge--certified"
+                style={{
+                  background: "var(--color-primary-quiet)",
+                  color: "var(--color-primary-strong)",
+                  fontWeight: 600,
+                }}
+                title={product.certificateTitle}
+              >
+                ✓ {product.certifiedProductBadge}
+              </span>
+            ) : product.verifiedVendorBadge ? (
               <span className="badge badge--verified">
                 {product.verifiedVendorBadge}
               </span>
-            )}
-            {product.organicProductBadge && (
+            ) : product.organicProductBadge ? (
               <span className="badge badge--organic">
                 {product.organicProductBadge}
               </span>
+            ) : (
+              <span className="badge badge--demo">
+                {product.isSynthetic
+                  ? "Синтетичні локальні дані"
+                  : "Лише перегляд у демо"}
+              </span>
             )}
-            <span className="badge badge--demo">
-              {product.isSynthetic
-                ? "Синтетичні локальні дані"
-                : "Лише перегляд у демо"}
-            </span>
           </div>
         </div>
       </div>

@@ -52,6 +52,9 @@ test.describe("Catalog E2E & Visual Artifacts", () => {
     await expect(page.locator("h1")).toContainText("Тематичні добірки");
     await expect(page.getByText("Купити")).not.toBeVisible();
     await expect(
+      page.getByText("Каталог у демонстраційному режимі"),
+    ).toBeVisible();
+    await expect(
       page.getByText("Каталог тимчасово недоступний"),
     ).not.toBeVisible();
     await expect(page.locator(".category-card")).toHaveCount(6);
@@ -68,6 +71,26 @@ test.describe("Catalog E2E & Visual Artifacts", () => {
     await expect(page.locator("h1")).toContainText("Одяг і аксесуари");
     await expect(page.getByText("Купити")).not.toBeVisible();
 
+    // Verify scoped category mode: dead category pills are hidden
+    await expect(page.locator(".catalog-pills")).toHaveCount(0);
+
+    // Verify artisan attribution and link to profile on product card
+    const artisanLink = page.locator(".product-card__artisan-link").first();
+    await expect(artisanLink).toBeVisible();
+    await expect(artisanLink).toContainText("Тарас");
+    await expect(artisanLink).toContainText("Карпати");
+    await expect(artisanLink).toHaveAttribute("href", "/people/taras");
+
+    // Verify search is available and functions inside the scoped category
+    const searchInput = page.locator("#catalog-search");
+    await expect(searchInput).toBeVisible();
+    await searchInput.fill("Світло");
+    await expect(page.locator(".product-card")).toHaveCount(1);
+    await expect(page.locator(".product-card")).toContainText(
+      "Футболка «Світло»",
+    );
+    await searchInput.fill("");
+
     // Capture category screenshot
     await page.screenshot({
       caret: "initial",
@@ -79,6 +102,35 @@ test.describe("Catalog E2E & Visual Artifacts", () => {
     await expect(page.locator("h1")).toContainText("Футболка «Світло»");
     await expect(page.getByText("Некомерційний sandbox")).toBeVisible();
     await expect(page.getByText("Кошти зарезервовано")).toHaveCount(0);
+
+    // Verify artisan workshop link on product detail page
+    const workshopLink = page.locator(
+      ".product-detail-info .data-list__value a",
+    );
+    await expect(workshopLink).toContainText("Тарас (Карпати)");
+    await expect(workshopLink).toHaveAttribute("href", "/people/taras");
+
+    // Verify rich Artisan Showcase Card on product page
+    const artisanCard = page.locator(".product-artisan-card");
+    await expect(artisanCard).toBeVisible();
+    await expect(artisanCard).toContainText("Тарас");
+    await expect(artisanCard).toContainText("Карпати");
+    await expect(artisanCard.locator("a")).toHaveAttribute(
+      "href",
+      "/people/taras",
+    );
+    await expect(
+      artisanCard.locator(".product-artisan-card__avatar"),
+    ).toBeVisible();
+
+    // Verify product image loads and decodes successfully via next/image
+    const productImage = page.locator(".product-detail-media img.card__image");
+    await expect(productImage).toBeVisible();
+    await expect(page.locator(".card__image-fallback")).toHaveCount(0);
+    const naturalWidth = await productImage.evaluate(
+      (img: HTMLImageElement) => img.naturalWidth,
+    );
+    expect(naturalWidth).toBeGreaterThan(0);
   });
 
   test("skip link moves focus to #main-content", async ({ page }) => {
@@ -118,11 +170,35 @@ test.describe("Catalog E2E & Visual Artifacts", () => {
     await expect(addButton).toBeFocused();
   });
 
-  test("ensures no horizontal document overflow", async ({ page }) => {
+  test("ensures no horizontal document overflow across catalog, product detail, and checkout", async ({
+    page,
+  }) => {
+    // 1. Catalog
     await page.goto("/catalog");
-    const hasHorizontalOverflow = await page.evaluate(() => {
-      return document.documentElement.scrollWidth > window.innerWidth;
-    });
-    expect(hasHorizontalOverflow).toBe(false);
+    let hasOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth,
+    );
+    expect(hasOverflow).toBe(false);
+
+    // 2. Product detail with monogram artisan (Taras without portrait image)
+    await page.goto("/catalog/odiah/futbolka-svitlo");
+    hasOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth,
+    );
+    expect(hasOverflow).toBe(false);
+
+    // 3. Product detail with photo portrait artisan (Solomiia)
+    await page.goto("/catalog/dim/chashka-ranok");
+    hasOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth,
+    );
+    expect(hasOverflow).toBe(false);
+
+    // 4. Checkout page
+    await page.goto("/checkout");
+    hasOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth,
+    );
+    expect(hasOverflow).toBe(false);
   });
 });

@@ -2,6 +2,7 @@ import type { StorefrontCatalogSnapshot } from "@life/types";
 import {
   categories as fixtureCategories,
   products as fixtureProducts,
+  people as fixturePeople,
 } from "@/fixtures";
 
 export type CatalogReadResult =
@@ -58,20 +59,36 @@ export async function getCatalogSnapshot(): Promise<CatalogReadResult> {
       imageSrc: c.imageSrc,
     }));
 
-    const products = fixtureProducts.map((p) => ({
-      id: p.id,
-      slug: p.slug,
-      categorySlug: p.categorySlug,
-      name: p.name,
-      description: p.description,
-      priceUah: p.priceUah,
-      imageSrc: p.imageSrc,
-      provider: {
-        handle: "demo-provider",
-        name: "Локальний майстер",
-      },
-      isSynthetic: true,
-    }));
+    const products = fixtureProducts.map((p) => {
+      const person = fixturePeople.find((per) =>
+        (per.featuredProductSlugs as readonly string[]).includes(p.slug),
+      );
+      return {
+        id: p.id,
+        slug: p.slug,
+        categorySlug: p.categorySlug,
+        name: p.name,
+        description: p.description,
+        priceUah: p.priceUah,
+        imageSrc: p.imageSrc,
+        certificateImageSrc:
+          "certificateImageSrc" in p
+            ? (p.certificateImageSrc as string)
+            : undefined,
+        certificateTitle:
+          "certificateTitle" in p ? (p.certificateTitle as string) : undefined,
+        certifiedProductBadge:
+          "certifiedProductBadge" in p
+            ? (p.certifiedProductBadge as string)
+            : undefined,
+        provider: {
+          handle: person?.slug || "spilnota",
+          name: person?.name || "Майстерня спільноти",
+          region: person?.region || "Україна",
+        },
+        isSynthetic: true,
+      };
+    });
 
     return {
       kind: "ready",
@@ -106,20 +123,36 @@ export async function getCatalogSnapshot(): Promise<CatalogReadResult> {
       imageSrc: c.imageSrc,
     }));
 
-    const products = fixtureProducts.map((p) => ({
-      id: p.id,
-      slug: p.slug,
-      categorySlug: p.categorySlug,
-      name: p.name,
-      description: p.description,
-      priceUah: p.priceUah,
-      imageSrc: p.imageSrc,
-      provider: {
-        handle: "demo-provider",
-        name: "Локальний майстер",
-      },
-      isSynthetic: true,
-    }));
+    const products = fixtureProducts.map((p) => {
+      const person = fixturePeople.find((per) =>
+        (per.featuredProductSlugs as readonly string[]).includes(p.slug),
+      );
+      return {
+        id: p.id,
+        slug: p.slug,
+        categorySlug: p.categorySlug,
+        name: p.name,
+        description: p.description,
+        priceUah: p.priceUah,
+        imageSrc: p.imageSrc,
+        certificateImageSrc:
+          "certificateImageSrc" in p
+            ? (p.certificateImageSrc as string)
+            : undefined,
+        certificateTitle:
+          "certificateTitle" in p ? (p.certificateTitle as string) : undefined,
+        certifiedProductBadge:
+          "certifiedProductBadge" in p
+            ? (p.certifiedProductBadge as string)
+            : undefined,
+        provider: {
+          handle: person?.slug || "spilnota",
+          name: person?.name || "Майстерня спільноти",
+          region: person?.region || "Україна",
+        },
+        isSynthetic: true,
+      };
+    });
 
     return {
       kind: "ready",

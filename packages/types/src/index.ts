@@ -67,15 +67,18 @@ export type StorefrontCatalogProduct = Readonly<{
   name: string;
   description: string;
   priceUah: number;
-  imageSrc?: string;
+  imageSrc?: string | undefined;
+  certificateImageSrc?: string | undefined;
+  certificateTitle?: string | undefined;
   provider: Readonly<{
     handle: string;
     name: string;
+    region?: string | undefined;
   }>;
   isSynthetic: boolean;
-  verifiedVendorBadge?: string;
-  certifiedProductBadge?: string;
-  organicProductBadge?: string;
+  verifiedVendorBadge?: string | undefined;
+  certifiedProductBadge?: string | undefined;
+  organicProductBadge?: string | undefined;
 }>;
 
 export type StorefrontCatalogSnapshot = Readonly<{
@@ -102,7 +105,10 @@ export type Product<
   name: string;
   description: string;
   priceUah: number;
-  imageSrc?: string;
+  imageSrc?: string | undefined;
+  certificateImageSrc?: string | undefined;
+  certificateTitle?: string | undefined;
+  certifiedProductBadge?: string | undefined;
   availability: DemoAvailability;
 }>;
 
@@ -115,6 +121,7 @@ export type Person<
   name: string;
   role: string;
   description: string;
+  region?: string;
   imageSrc?: string;
   featuredProductSlugs: readonly ProductSlug[];
 }>;
@@ -181,6 +188,10 @@ export type Partner<Slug extends string = string> = Readonly<{
   name: string;
   summary: string;
   websiteLabel: string;
+  categoryLabel?: string | undefined;
+  videoTitle?: string | undefined;
+  videoDuration?: string | undefined;
+  relatedProductSlugs?: readonly string[] | undefined;
 }>;
 
 export type SearchSortOption =

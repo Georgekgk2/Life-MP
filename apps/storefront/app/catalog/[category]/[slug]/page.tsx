@@ -4,15 +4,15 @@ import { notFound } from "next/navigation";
 
 import {
   AddToCartButton,
-  CardImage,
   ProductCard,
+  ProductMediaViewer,
   ProductReviewsSection,
   SaveButton,
   SectionHeading,
 } from "@/components";
 import { getProductReviews } from "@/reviews/server";
 import { getCatalogSnapshot } from "@/catalog/server";
-import { products as fixtureProducts } from "@/fixtures";
+import { people, products as fixtureProducts } from "@/fixtures";
 import { formatHryvnia } from "@/formatters";
 
 export const dynamic = "force-dynamic";
@@ -90,6 +90,12 @@ export default async function ProductDetailPage({
     .filter((p) => p.categorySlug === categorySlug && p.id !== product.id)
     .slice(0, 3);
 
+  const artisan = people.find((p) => p.slug === product.provider?.handle);
+  const artisanImageSrc =
+    artisan && "imageSrc" in artisan && typeof artisan.imageSrc === "string"
+      ? artisan.imageSrc
+      : undefined;
+
   const reviewsResult = await getProductReviews(product.id);
   return (
     <>
@@ -162,24 +168,12 @@ export default async function ProductDetailPage({
           <div className="product-detail-layout">
             {/* Visual preview */}
             <div className="product-detail-media">
-              <div
-                className="card__visual product-card__visual"
-                style={{
-                  position: "relative",
-                  overflow: "hidden",
-                  height: "380px",
-                  borderRadius: "var(--radius-md)",
-                  backgroundColor: "var(--color-sand-200)",
-                }}
-              >
-                <CardImage
-                  src={product.imageSrc}
-                  fallbackSrc="/images/products/chashka-ranok.webp"
-                  alt={`Фото виробу «${product.name}»`}
-                  loading="eager"
-                />
-                <span className="card__visual-label">{product.name}</span>
-              </div>
+              <ProductMediaViewer
+                imageSrc={product.imageSrc}
+                productName={product.name}
+                certificateImageSrc={product.certificateImageSrc}
+                certificateTitle={product.certificateTitle}
+              />
             </div>
 
             {/* Information panel */}
@@ -207,6 +201,31 @@ export default async function ProductDetailPage({
                     ? "Синтетичні локальні дані"
                     : "Лише перегляд у демо"}
                 </span>
+                {product.verifiedVendorBadge && (
+                  <span
+                    className="badge badge--status"
+                    style={{
+                      background: "var(--color-surface-strong)",
+                      color: "var(--color-primary-strong)",
+                      fontWeight: 600,
+                    }}
+                  >
+                    ✓ {product.verifiedVendorBadge}
+                  </span>
+                )}
+                {product.certifiedProductBadge && (
+                  <span
+                    className="badge badge--certified"
+                    style={{
+                      background: "var(--color-primary-quiet)",
+                      color: "var(--color-primary-strong)",
+                      fontWeight: 600,
+                    }}
+                    title={product.certificateTitle}
+                  >
+                    ✓ {product.certifiedProductBadge}
+                  </span>
+                )}
                 {product.organicProductBadge && (
                   <span
                     className="badge badge--organic"
@@ -257,7 +276,7 @@ export default async function ProductDetailPage({
               </div>
 
               {/* Data specifications */}
-              <dl className="data-list" style={{ marginBottom: "2rem" }}>
+              <dl className="data-list" style={{ marginBottom: "1.5rem" }}>
                 <div className="data-list__item">
                   <dt className="data-list__label">Категорія</dt>
                   <dd className="data-list__value">{category.name}</dd>
@@ -266,11 +285,72 @@ export default async function ProductDetailPage({
                   <div className="data-list__item">
                     <dt className="data-list__label">Майстерня</dt>
                     <dd className="data-list__value">
-                      {product.provider.name}
+                      <Link
+                        href={`/people/${product.provider.handle}`}
+                        className="text-link"
+                      >
+                        {product.provider.name}
+                        {product.provider.region
+                          ? ` (${product.provider.region})`
+                          : ""}
+                      </Link>
                     </dd>
                   </div>
                 )}
               </dl>
+
+              {/* Artisan Showcase Card */}
+              {product.provider && (
+                <section
+                  className="product-artisan-card"
+                  aria-label="Інформація про майстерню"
+                >
+                  <div className="product-artisan-card__header">
+                    {artisanImageSrc ? (
+                      <div className="product-artisan-card__avatar product-artisan-card__avatar--image">
+                        <img
+                          src={artisanImageSrc}
+                          alt={`Портрет: ${product.provider.name}`}
+                        />
+                      </div>
+                    ) : (
+                      <div
+                        className="product-artisan-card__avatar product-artisan-card__avatar--monogram"
+                        aria-label={`Монограма майстра ${product.provider.name}`}
+                      >
+                        {product.provider.name.charAt(0)}
+                      </div>
+                    )}
+                    <div className="product-artisan-card__meta">
+                      <span className="product-artisan-card__badge">
+                        {product.verifiedVendorBadge || "Демо-майстерня"}
+                      </span>
+                      <h3 className="product-artisan-card__name">
+                        {product.provider.name}
+                      </h3>
+                      {product.provider.region && (
+                        <p className="product-artisan-card__region">
+                          📍 {product.provider.region}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {artisan && (
+                    <p className="product-artisan-card__bio">
+                      {artisan.description}
+                    </p>
+                  )}
+                  <div>
+                    <Link
+                      href={`/people/${product.provider.handle}`}
+                      className="button button--secondary"
+                      style={{ fontSize: "0.85rem", padding: "0.4rem 0.8rem" }}
+                    >
+                      Переглянути всі вироби майстерні →
+                    </Link>
+                  </div>
+                </section>
+              )}
               {/* Non-commercial sandbox boundary notice */}
               <aside
                 className="notice"

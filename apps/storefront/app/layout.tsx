@@ -1,7 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
-import { CartDrawer, PwaRegister, SiteFooter, SiteHeader } from "@/components";
+import {
+  CartDrawer,
+  ChatBotWidget,
+  PwaRegister,
+  SiteFooter,
+  SiteHeader,
+} from "@/components";
 import { CartProvider } from "@/context/cart-context";
 import { SavedProvider } from "@/context/saved-context";
 import { ProfileProvider } from "@/context/profile-context";
@@ -62,6 +68,7 @@ export default function RootLayout({
                 {children}
               </main>
               <SiteFooter />
+              <ChatBotWidget />
             </CartProvider>
           </SavedProvider>
         </ProfileProvider>

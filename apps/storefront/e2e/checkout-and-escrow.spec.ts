@@ -33,7 +33,8 @@ test.describe("Multi-Vendor Cart & Checkout Draft Containment (Phase 4D)", () =>
     // 4. Click Checkout button in cart drawer
     const checkoutBtn = page.locator('a:has-text("Оформити замовлення")');
     await expect(checkoutBtn).toBeVisible();
-    await checkoutBtn.click({ force: true });
+    await checkoutBtn.scrollIntoViewIfNeeded();
+    await checkoutBtn.click();
 
     // 5. Verify Checkout page
     await page.waitForURL("**/checkout");
@@ -48,16 +49,32 @@ test.describe("Multi-Vendor Cart & Checkout Draft Containment (Phase 4D)", () =>
       fullPage: true,
     });
 
-    // Fill required customer details using non-routable synthetic test data
+    // Fill required customer details using non-routable synthetic test data across stepper
+    // Step 1: Contacts
     await page.locator("#fullName").fill("Тестовий Покупець");
     await page.locator("#phone").fill("+380 00 000 00 00");
     await page.locator("#email").fill("buyer@example.internal");
+    await page.locator('button:has-text("Продовжити до доставки")').click();
+
+    // Verify all 4 stepper pills are visible
+    const stepPills = page.locator(".checkout-step-pill");
+    await expect(stepPills).toHaveCount(4);
+
+    // Step 2: Delivery
     await page.locator("#city").fill("Тестове Місто");
     await page
       .locator("#novaPoshtaBranch")
       .fill("Відділення №0 (Тестова адреса)");
+    await page
+      .locator('button:has-text("Продовжити до сценарію оплати")')
+      .click();
 
-    // 6. Submit Checkout Form as a non-authoritative draft
+    // Step 3: Payment Scenario Preview
+    await page
+      .locator('button:has-text("Перейти до підсумку чернетки")')
+      .click();
+
+    // 6. Submit Checkout Form as a non-authoritative draft at Step 4 (Summary)
     const submitDraftBtn = page.locator(
       'button:has-text("Переглянути стан чернетки")',
     );

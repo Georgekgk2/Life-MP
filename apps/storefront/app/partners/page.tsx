@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { SectionHeading } from "@/components";
 import { partners } from "@/fixtures";
 import { getCatalogSnapshot } from "@/catalog/server";
 
 export const metadata: Metadata = {
-  title: "Партнери Life-MP",
+  title: "Організації та центри допомоги — Life-MP",
   description:
-    "Інформаційна добірка партнерів Life-MP у локальному демонстраційному прототипі.",
+    "Ветеранські простори, центри реабілітації, майстерні та організації підтримки в демонстраційному прототипі Life-MP.",
 };
-
 export default async function PartnersPage() {
   const catalogResult = await getCatalogSnapshot();
   const allProducts =
@@ -19,11 +19,11 @@ export default async function PartnersPage() {
       <section className="page-section page-section--spacious">
         <div className="page-shell">
           <div className="page-intro">
-            <p className="page-intro__eyebrow">Партнери</p>
-            <h1>Коло партнерів</h1>
+            <p className="page-intro__eyebrow">Організації допомоги</p>
+            <h1>Організації та центри підтримки</h1>
             <p className="page-intro__lead">
-              Тут зібрано інформаційні згадки про організації, з якими
-              перетинаються ініціативи та історії Life-MP.
+              Ветеранські простори, центри фізичної та психологічної
+              реабілітації, майстерні відновлення та правовий супровід.
             </p>
           </div>
           <aside className="notice" aria-label="Статус партнерської сторінки">
@@ -42,11 +42,11 @@ export default async function PartnersPage() {
       <section className="page-section--tint" aria-label="Перелік партнерів">
         <div className="page-shell">
           <SectionHeading
-            eyebrow="Співпраця"
-            title="Згадані партнери"
-            description="Формат згадки збережено як текст без зовнішнього посилання."
+            eyebrow="Спільноти та центри"
+            title="Організації, які допомагають"
+            description="Простори взаємодопомоги, адаптації та реабілітації для ветеранів і спільноти."
           />
-          <div className="content-grid content-grid--cards">
+          <div className="content-grid content-grid--cards partner-grid">
             {partners.map((partner) => {
               const partnerProducts = allProducts.filter(
                 (p) =>
@@ -60,68 +60,103 @@ export default async function PartnersPage() {
               );
 
               return (
-                <article className="card" key={partner.id}>
-                  <p className="card__eyebrow">Майстерня / Партнер</p>
-                  <h2>{partner.name}</h2>
-                  <p>{partner.summary}</p>
-                  <dl className="data-list" style={{ marginBottom: "1rem" }}>
-                    <div className="data-list__item">
-                      <dt className="data-list__label">Формат згадки</dt>
-                      <dd className="data-list__value">
-                        {partner.websiteLabel}
-                      </dd>
-                    </div>
-                  </dl>
-                  {partnerProducts.length > 0 && (
-                    <div
-                      style={{
-                        marginTop: "1rem",
-                        paddingTop: "0.75rem",
-                        borderTop: "1px solid var(--color-border)",
-                      }}
-                    >
-                      <p
-                        style={{
-                          fontSize: "0.875rem",
-                          fontWeight: "600",
-                          color: "var(--color-ink)",
-                          marginBottom: "0.5rem",
-                        }}
-                      >
-                        Вироби в каталозі ({partnerProducts.length}):
+                <article className="card partner-card" key={partner.id}>
+                  <div className="card__content partner-card__content">
+                    <div className="partner-card__topline">
+                      <p className="card__eyebrow">
+                        {partner.categoryLabel || "Організація допомоги"}
                       </p>
-                      <ul
+                      <div
                         style={{
-                          listStyle: "none",
-                          padding: 0,
-                          fontSize: "0.875rem",
                           display: "flex",
-                          flexDirection: "column",
-                          gap: "0.25rem",
+                          gap: "0.35rem",
+                          flexWrap: "wrap",
                         }}
                       >
-                        {partnerProducts.slice(0, 3).map((prod) => (
-                          <li key={prod.id}>
-                            <a
-                              href={`/catalog/${prod.categorySlug}/${prod.slug}`}
-                              style={{
-                                color: "var(--color-primary)",
-                                textDecoration: "underline",
-                              }}
-                            >
-                              {prod.name}
-                            </a>
-                          </li>
-                        ))}
-                      </ul>
+                        {partner.videoDuration && (
+                          <span
+                            className="badge badge--demo"
+                            style={{ fontSize: "0.75rem" }}
+                          >
+                            ▶ {partner.videoDuration}
+                          </span>
+                        )}
+                        <span className="badge badge--demo">
+                          {partner.websiteLabel}
+                        </span>
+                      </div>
                     </div>
-                  )}
+                    <h2 className="card__title">{partner.name}</h2>
+                    <p className="card__description">{partner.summary}</p>
+                    {partner.videoTitle && (
+                      <p
+                        className="partner-card__video-title"
+                        style={{
+                          fontSize: "0.8125rem",
+                          color: "var(--color-ink)",
+                          fontWeight: 600,
+                          margin: "0.35rem 0",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "0.35rem",
+                        }}
+                      >
+                        <span aria-hidden="true">📹</span>
+                        <span>Відео: {partner.videoTitle}</span>
+                      </p>
+                    )}
+                    {partnerProducts.length > 0 && (
+                      <div className="partner-card__products">
+                        <p className="partner-card__products-title">
+                          Вироби в каталозі ({partnerProducts.length}):
+                        </p>
+                        <ul className="partner-card__products-list">
+                          {partnerProducts.slice(0, 3).map((prod) => (
+                            <li key={prod.id}>
+                              <Link
+                                href={`/catalog/${prod.categorySlug}/${prod.slug}`}
+                                className="partner-card__product-link"
+                              >
+                                <span>{prod.name}</span>
+                                <span
+                                  aria-hidden="true"
+                                  className="partner-card__arrow"
+                                >
+                                  →
+                                </span>
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
                 </article>
               );
             })}
           </div>
         </div>
       </section>
+      <div
+        className="page-shell"
+        style={{ marginTop: "1.5rem", marginBottom: "2rem" }}
+      >
+        <p
+          style={{
+            fontSize: "0.8125rem",
+            color: "var(--color-ink-muted)",
+            lineHeight: 1.5,
+            textAlign: "center",
+            borderTop: "1px solid var(--color-border-subtle)",
+            paddingTop: "1rem",
+          }}
+        >
+          Інформаційне застереження: відомості про реабілітаційні, психологічні
+          та оздоровчі центри мають виключно ознайомчий характер у
+          демонстраційному прототипі та не є медичною або психологічною
+          консультацією.
+        </p>
+      </div>
     </>
   );
 }

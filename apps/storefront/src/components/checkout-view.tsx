@@ -7,9 +7,23 @@ import { useCart } from "@/context/cart-context";
 import type { CheckoutCustomerInput } from "@life/types";
 import { formatHryvnia } from "@/formatters";
 
+type CheckoutStep = 1 | 2 | 3 | 4;
+
+const STEPS = [
+  { id: 1 as CheckoutStep, label: "Контакти" },
+  { id: 2 as CheckoutStep, label: "Доставка" },
+  { id: 3 as CheckoutStep, label: "Платіжний сценарій" },
+  { id: 4 as CheckoutStep, label: "Підсумок чернетки" },
+];
+
 export function CheckoutView() {
   const router = useRouter();
-  const { items, vendorGroups, totalItems, totalAmountUah } = useCart();
+  const { items, totalItems, totalAmountUah } = useCart();
+
+  const [currentStep, setCurrentStep] = useState<CheckoutStep>(1);
+  const [deliveryType, setDeliveryType] = useState<
+    "branch" | "postomate" | "courier"
+  >("branch");
 
   const [formData, setFormData] = useState<CheckoutCustomerInput>({
     fullName: "",
@@ -21,8 +35,55 @@ export function CheckoutView() {
     comment: "",
   });
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const validateStep1 = (): boolean => {
+    if (!formData.fullName.trim()) {
+      setError("Будь ласка, вкажіть ваше прізвище та ім'я.");
+      return false;
+    }
+    const phoneTrimmed = formData.phone.trim();
+    if (!phoneTrimmed || !/^\+?[0-9\s-()]{10,20}$/.test(phoneTrimmed)) {
+      setError(
+        "Будь ласка, вкажіть контактний номер телефону (наприклад: +380 50 123 45 67).",
+      );
+      return false;
+    }
+    const emailTrimmed = formData.email.trim();
+    if (!emailTrimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed)) {
+      setError(
+        "Будь ласка, вкажіть дійсну адресу електронної пошти (наприклад: name@example.com).",
+      );
+      return false;
+    }
+    setError(null);
+    return true;
+  };
+
+  const validateStep2 = (): boolean => {
+    if (!formData.city.trim()) {
+      setError("Будь ласка, вкажіть місто для доставки.");
+      return false;
+    }
+    if (!formData.novaPoshtaBranch.trim()) {
+      setError("Будь ласка, вкажіть номер відділення або адресу поштомату.");
+      return false;
+    }
+    setError(null);
+    return true;
+  };
+
+  const goToStep = (step: CheckoutStep) => {
+    if (step === 2 && !validateStep1()) return;
+    if (step === 3) {
+      if (!validateStep1() || !validateStep2()) return;
+    }
+    if (step === 4) {
+      if (!validateStep1() || !validateStep2()) return;
+    }
+    setError(null);
+    setCurrentStep(step);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,13 +92,9 @@ export function CheckoutView() {
       return;
     }
 
-    if (!formData.fullName.trim() || !formData.phone.trim()) {
-      setError("Будь ласка, вкажіть ваше ім'я та контактний номер телефону.");
+    if (!validateStep1() || !validateStep2()) {
       return;
     }
-
-    setIsSubmitting(true);
-    setError(null);
 
     // The server-side order writer is not available yet. Keep the cart draft
     // intact and show an explicit non-authoritative sandbox state instead of
@@ -57,7 +114,7 @@ export function CheckoutView() {
           Для переходу до оформлення замовлення оберіть товари у каталозі
           майстерень.
         </p>
-        <Link href="/catalog" className="button button-primary">
+        <Link href="/catalog" className="button button--primary">
           Перейти до каталогу
         </Link>
       </div>
@@ -67,8 +124,9 @@ export function CheckoutView() {
   return (
     <div
       className="section"
-      style={{ maxWidth: "1100px", margin: "0 auto", padding: "2rem 1rem" }}
+      style={{ maxWidth: "1000px", margin: "0 auto", padding: "2rem 1rem" }}
     >
+      {/* Header */}
       <div style={{ marginBottom: "2rem" }}>
         <h1
           style={{
@@ -84,6 +142,37 @@ export function CheckoutView() {
           створюються.
         </p>
       </div>
+
+      {/* Stepper Navigation Bar */}
+      <nav
+        aria-label="Етапи оформлення чернетки"
+        className="checkout-stepper-nav"
+      >
+        {STEPS.map((step) => {
+          const isActive = currentStep === step.id;
+          const isCompleted = currentStep > step.id;
+          return (
+            <button
+              key={step.id}
+              type="button"
+              onClick={() => goToStep(step.id)}
+              className={`checkout-step-pill ${
+                isActive
+                  ? "checkout-step-pill--active"
+                  : isCompleted
+                    ? "checkout-step-pill--completed"
+                    : ""
+              }`}
+              aria-current={isActive ? "step" : undefined}
+            >
+              <span className="checkout-step-pill__num">
+                {isCompleted ? "✓" : step.id}
+              </span>
+              <span>{step.label}</span>
+            </button>
+          );
+        })}
+      </nav>
 
       {error && (
         <div
@@ -104,38 +193,27 @@ export function CheckoutView() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+            gridTemplateColumns: "1fr",
             gap: "2rem",
           }}
         >
-          {/* Left Column: Customer & Delivery Details */}
-          <div
-            style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
-          >
-            {/* 1. Contact Info */}
-            <div
-              style={{
-                backgroundColor: "#fff",
-                padding: "1.5rem",
-                borderRadius: "var(--radius-md)",
-                border: "1px solid var(--color-sand-200)",
-              }}
-            >
-              <h2
-                style={{
-                  fontSize: "1.2rem",
-                  margin: "0 0 1.25rem 0",
-                  color: "var(--color-pine-900)",
-                }}
-              >
-                1. Контактні дані отримувача
-              </h2>
+          {/* Step 1: Contact Details */}
+          {currentStep === 1 && (
+            <div className="checkout-step-card">
+              <div className="checkout-step-card__header">
+                <h2 className="checkout-step-card__title">
+                  1. Контактні дані отримувача
+                </h2>
+                <p className="checkout-step-card__desc">
+                  Вкажіть контакти для демонстраційного оформлення
+                </p>
+              </div>
 
               <div
                 style={{
                   display: "flex",
                   flexDirection: "column",
-                  gap: "1rem",
+                  gap: "1.25rem",
                 }}
               >
                 <div>
@@ -154,15 +232,16 @@ export function CheckoutView() {
                     id="fullName"
                     type="text"
                     required
+                    placeholder="Наприклад: Олена Коваленко"
                     value={formData.fullName}
                     onChange={(e) =>
                       setFormData({ ...formData, fullName: e.target.value })
                     }
                     style={{
                       width: "100%",
-                      padding: "0.6rem 0.8rem",
+                      padding: "0.75rem 1rem",
                       borderRadius: "var(--radius-sm)",
-                      border: "1px solid var(--color-sand-200)",
+                      border: "1px solid var(--color-border)",
                     }}
                   />
                 </div>
@@ -170,8 +249,8 @@ export function CheckoutView() {
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: "1rem",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                    gap: "1.25rem",
                   }}
                 >
                   <div>
@@ -190,15 +269,16 @@ export function CheckoutView() {
                       id="phone"
                       type="tel"
                       required
+                      placeholder="+380 00 000 00 00"
                       value={formData.phone}
                       onChange={(e) =>
                         setFormData({ ...formData, phone: e.target.value })
                       }
                       style={{
                         width: "100%",
-                        padding: "0.6rem 0.8rem",
+                        padding: "0.75rem 1rem",
                         borderRadius: "var(--radius-sm)",
-                        border: "1px solid var(--color-sand-200)",
+                        border: "1px solid var(--color-border)",
                       }}
                     />
                   </div>
@@ -219,48 +299,202 @@ export function CheckoutView() {
                       id="email"
                       type="email"
                       required
+                      placeholder="olena@example.com"
                       value={formData.email}
                       onChange={(e) =>
                         setFormData({ ...formData, email: e.target.value })
                       }
                       style={{
                         width: "100%",
-                        padding: "0.6rem 0.8rem",
+                        padding: "0.75rem 1rem",
                         borderRadius: "var(--radius-sm)",
-                        border: "1px solid var(--color-sand-200)",
+                        border: "1px solid var(--color-border)",
                       }}
                     />
                   </div>
                 </div>
+
+                <div className="checkout-step-actions">
+                  <span
+                    style={{
+                      fontSize: "0.85rem",
+                      color: "var(--color-ink-muted)",
+                    }}
+                  >
+                    Крок 1 з 4
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => goToStep(2)}
+                    className="button button--primary"
+                  >
+                    Продовжити до доставки →
+                  </button>
+                </div>
               </div>
             </div>
+          )}
 
-            {/* 2. Delivery */}
-            <div
-              style={{
-                backgroundColor: "#fff",
-                padding: "1.5rem",
-                borderRadius: "var(--radius-md)",
-                border: "1px solid var(--color-sand-200)",
-              }}
-            >
-              <h2
-                style={{
-                  fontSize: "1.2rem",
-                  margin: "0 0 1.25rem 0",
-                  color: "var(--color-pine-900)",
-                }}
-              >
-                2. Доставка Новою Поштою
-              </h2>
+          {/* Step 2: Delivery Details */}
+          {currentStep === 2 && (
+            <div className="checkout-step-card">
+              <div className="checkout-step-card__header">
+                <h2 className="checkout-step-card__title">
+                  2. Доставка (Нова Пошта)
+                </h2>
+                <p className="checkout-step-card__desc">
+                  Оберіть зручний спосіб доставки виробів від майстерень
+                </p>
+              </div>
 
               <div
                 style={{
                   display: "flex",
                   flexDirection: "column",
-                  gap: "1rem",
+                  gap: "1.25rem",
                 }}
               >
+                {/* Delivery format selector */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                    gap: "0.75rem",
+                  }}
+                >
+                  <label
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      padding: "1rem",
+                      border: `2px solid ${
+                        deliveryType === "branch"
+                          ? "var(--color-primary)"
+                          : "var(--color-border)"
+                      }`,
+                      borderRadius: "var(--radius-md)",
+                      backgroundColor:
+                        deliveryType === "branch"
+                          ? "var(--color-surface-strong)"
+                          : "var(--color-canvas)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                        marginBottom: "0.25rem",
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="deliveryType"
+                        checked={deliveryType === "branch"}
+                        onChange={() => setDeliveryType("branch")}
+                      />
+                      <strong>Відділення</strong>
+                    </div>
+                    <span
+                      style={{
+                        fontSize: "0.8rem",
+                        color: "var(--color-ink-muted)",
+                      }}
+                    >
+                      До 30 кг у відділення
+                    </span>
+                  </label>
+
+                  <label
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      padding: "1rem",
+                      border: `2px solid ${
+                        deliveryType === "postomate"
+                          ? "var(--color-primary)"
+                          : "var(--color-border)"
+                      }`,
+                      borderRadius: "var(--radius-md)",
+                      backgroundColor:
+                        deliveryType === "postomate"
+                          ? "var(--color-surface-strong)"
+                          : "var(--color-canvas)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                        marginBottom: "0.25rem",
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="deliveryType"
+                        checked={deliveryType === "postomate"}
+                        onChange={() => setDeliveryType("postomate")}
+                      />
+                      <strong>Поштомат</strong>
+                    </div>
+                    <span
+                      style={{
+                        fontSize: "0.8rem",
+                        color: "var(--color-ink-muted)",
+                      }}
+                    >
+                      Цілодобове отримання
+                    </span>
+                  </label>
+
+                  <label
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      padding: "1rem",
+                      border: `2px solid ${
+                        deliveryType === "courier"
+                          ? "var(--color-primary)"
+                          : "var(--color-border)"
+                      }`,
+                      borderRadius: "var(--radius-md)",
+                      backgroundColor:
+                        deliveryType === "courier"
+                          ? "var(--color-surface-strong)"
+                          : "var(--color-canvas)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                        marginBottom: "0.25rem",
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="deliveryType"
+                        checked={deliveryType === "courier"}
+                        onChange={() => setDeliveryType("courier")}
+                      />
+                      <strong>Кур'єр</strong>
+                    </div>
+                    <span
+                      style={{
+                        fontSize: "0.8rem",
+                        color: "var(--color-ink-muted)",
+                      }}
+                    >
+                      Доставка за адресою
+                    </span>
+                  </label>
+                </div>
+
                 <div>
                   <label
                     htmlFor="city"
@@ -271,21 +505,22 @@ export function CheckoutView() {
                       marginBottom: "0.35rem",
                     }}
                   >
-                    Населений пункт *
+                    Населений пункт (місто / село) *
                   </label>
                   <input
                     id="city"
                     type="text"
                     required
+                    placeholder="Київ, Львів, Полтава тощо"
                     value={formData.city}
                     onChange={(e) =>
                       setFormData({ ...formData, city: e.target.value })
                     }
                     style={{
                       width: "100%",
-                      padding: "0.6rem 0.8rem",
+                      padding: "0.75rem 1rem",
                       borderRadius: "var(--radius-sm)",
-                      border: "1px solid var(--color-sand-200)",
+                      border: "1px solid var(--color-border)",
                     }}
                   />
                 </div>
@@ -300,12 +535,19 @@ export function CheckoutView() {
                       marginBottom: "0.35rem",
                     }}
                   >
-                    Відділення або поштомат *
+                    {deliveryType === "courier"
+                      ? "Адреса доставки (вулиця, будинок, квартира) *"
+                      : "Номер відділення або поштомату Нової Пошти *"}
                   </label>
                   <input
                     id="novaPoshtaBranch"
                     type="text"
                     required
+                    placeholder={
+                      deliveryType === "courier"
+                        ? "вул. Хрещатик, 1, кв. 10"
+                        : "Відділення №1 (вул. Спаська, 12)"
+                    }
                     value={formData.novaPoshtaBranch}
                     onChange={(e) =>
                       setFormData({
@@ -315,11 +557,99 @@ export function CheckoutView() {
                     }
                     style={{
                       width: "100%",
-                      padding: "0.6rem 0.8rem",
+                      padding: "0.75rem 1rem",
                       borderRadius: "var(--radius-sm)",
-                      border: "1px solid var(--color-sand-200)",
+                      border: "1px solid var(--color-border)",
                     }}
                   />
+                </div>
+
+                <div className="checkout-step-actions">
+                  <button
+                    type="button"
+                    onClick={() => goToStep(1)}
+                    className="button button--secondary"
+                  >
+                    ← Назад до контактів
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => goToStep(3)}
+                    className="button button--primary"
+                  >
+                    Продовжити до сценарію оплати →
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Payment Scenario Preview */}
+          {currentStep === 3 && (
+            <div className="checkout-step-card">
+              <div className="checkout-step-card__header">
+                <h2 className="checkout-step-card__title">
+                  3. Платіжний сценарій (Демо-перевірка)
+                </h2>
+                <p className="checkout-step-card__desc">
+                  Перевірка параметрів тестового холдування в середовищі
+                  пісочниці
+                </p>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "1.25rem",
+                }}
+              >
+                <div
+                  style={{
+                    padding: "1rem 1.25rem",
+                    border: "2px solid var(--color-primary)",
+                    borderRadius: "var(--radius-md)",
+                    backgroundColor: "var(--color-surface-strong)",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.75rem",
+                      marginBottom: "0.5rem",
+                    }}
+                  >
+                    <span style={{ fontSize: "1.25rem" }} aria-hidden="true">
+                      💳
+                    </span>
+                    <strong>Тестова оплата (Sandbox)</strong>
+                    <span
+                      style={{
+                        marginLeft: "auto",
+                        fontSize: "0.75rem",
+                        padding: "0.2rem 0.5rem",
+                        borderRadius: "var(--radius-sm)",
+                        background: "var(--color-primary)",
+                        color: "#fff",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Пісочниця
+                    </span>
+                  </div>
+                  <p
+                    style={{
+                      fontSize: "0.875rem",
+                      color: "var(--color-ink-muted)",
+                      margin: 0,
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    Двостадійна авторизація оплати (Authorization Hold) у
+                    тестовому режимі. Реальні кошти не списуються, а номер
+                    картки не запитується.
+                  </p>
                 </div>
 
                 <div>
@@ -336,338 +666,210 @@ export function CheckoutView() {
                   </label>
                   <textarea
                     id="comment"
-                    rows={2}
+                    rows={3}
+                    placeholder="Побажання щодо пакування, зручний час тощо"
                     value={formData.comment}
                     onChange={(e) =>
                       setFormData({ ...formData, comment: e.target.value })
                     }
-                    placeholder="Побажання щодо пакування або доставки"
                     style={{
                       width: "100%",
-                      padding: "0.6rem 0.8rem",
+                      padding: "0.75rem 1rem",
                       borderRadius: "var(--radius-sm)",
-                      border: "1px solid var(--color-sand-200)",
+                      border: "1px solid var(--color-border)",
                       fontFamily: "inherit",
                     }}
                   />
                 </div>
+
+                <div className="checkout-step-actions">
+                  <button
+                    type="button"
+                    onClick={() => goToStep(2)}
+                    className="button button--secondary"
+                  >
+                    ← Назад до доставки
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => goToStep(4)}
+                    className="button button--primary"
+                  >
+                    Перейти до підсумку чернетки →
+                  </button>
+                </div>
               </div>
             </div>
+          )}
 
-            {/* 3. Payment Method */}
-            <div
-              style={{
-                backgroundColor: "#fff",
-                padding: "1.5rem",
-                borderRadius: "var(--radius-md)",
-                border: "1px solid var(--color-sand-200)",
-              }}
-            >
-              <h2
-                style={{
-                  fontSize: "1.2rem",
-                  margin: "0 0 1.25rem 0",
-                  color: "var(--color-pine-900)",
-                }}
-              >
-                3. Тестовий спосіб оплати
-              </h2>
-
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "0.75rem",
-                }}
-              >
-                <label
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: "0.75rem",
-                    padding: "0.75rem",
-                    borderRadius: "var(--radius-sm)",
-                    border:
-                      formData.paymentMethod === "sandbox_escrow"
-                        ? "2px solid var(--color-pine-900)"
-                        : "1px solid var(--color-sand-200)",
-                    backgroundColor:
-                      formData.paymentMethod === "sandbox_escrow"
-                        ? "var(--color-sand-100)"
-                        : "#fff",
-                    cursor: "pointer",
-                  }}
-                >
-                  <input
-                    type="radio"
-                    name="paymentMethod"
-                    value="sandbox_escrow"
-                    checked={formData.paymentMethod === "sandbox_escrow"}
-                    onChange={() =>
-                      setFormData({
-                        ...formData,
-                        paymentMethod: "sandbox_escrow",
-                      })
-                    }
-                    style={{ marginTop: "0.25rem" }}
-                  />
-                  <div>
-                    <div
-                      style={{
-                        fontWeight: 600,
-                        color: "var(--color-pine-900)",
-                      }}
-                    >
-                      Тестова онлайн-оплата (не виконується)
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "0.8rem",
-                        color: "var(--color-ink-muted)",
-                        marginTop: "2px",
-                      }}
-                    >
-                      Платіж, Escrow-холдинг і виплата майстерням не створюються
-                      у режимі чернетки
-                    </div>
-                  </div>
-                </label>
-
-                <label
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: "0.75rem",
-                    padding: "0.75rem",
-                    borderRadius: "var(--radius-sm)",
-                    border:
-                      formData.paymentMethod === "card_on_delivery"
-                        ? "2px solid var(--color-pine-900)"
-                        : "1px solid var(--color-sand-200)",
-                    backgroundColor:
-                      formData.paymentMethod === "card_on_delivery"
-                        ? "var(--color-sand-100)"
-                        : "#fff",
-                    cursor: "pointer",
-                  }}
-                >
-                  <input
-                    type="radio"
-                    name="paymentMethod"
-                    value="card_on_delivery"
-                    checked={formData.paymentMethod === "card_on_delivery"}
-                    onChange={() =>
-                      setFormData({
-                        ...formData,
-                        paymentMethod: "card_on_delivery",
-                      })
-                    }
-                    style={{ marginTop: "0.25rem" }}
-                  />
-                  <div>
-                    <div
-                      style={{
-                        fontWeight: 600,
-                        color: "var(--color-pine-900)",
-                      }}
-                    >
-                      Оплата при отриманні (лише чернетка)
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "0.8rem",
-                        color: "var(--color-ink-muted)",
-                        marginTop: "2px",
-                      }}
-                    >
-                      Реальна оплата та відправлення не створюються
-                    </div>
-                  </div>
-                </label>
+          {/* Step 4: Summary & Draft Verification */}
+          {currentStep === 4 && (
+            <div className="checkout-step-card">
+              <div className="checkout-step-card__header">
+                <h2 className="checkout-step-card__title">
+                  4. Перегляд чернетки замовлення
+                </h2>
+                <p className="checkout-step-card__desc">
+                  Перевірте введені дані перед переходом до демонстраційного
+                  стану
+                </p>
               </div>
-            </div>
-          </div>
 
-          {/* Right Column: Multi-Vendor Order Breakdown & Summary */}
-          <div
-            style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
-          >
-            <div
-              style={{
-                backgroundColor: "#fff",
-                padding: "1.5rem",
-                borderRadius: "var(--radius-md)",
-                border: "1px solid var(--color-sand-200)",
-                position: "sticky",
-                top: "2rem",
-              }}
-            >
-              <h2
-                style={{
-                  fontSize: "1.2rem",
-                  margin: "0 0 1rem 0",
-                  color: "var(--color-pine-900)",
-                }}
-              >
-                Склад чернетки ({totalItems} тов.)
-              </h2>
-
-              <p
-                style={{
-                  fontSize: "0.8rem",
-                  color: "var(--color-ink-muted)",
-                  marginBottom: "1rem",
-                }}
-              >
-                У чернетці товари згруповано за майстернями (
-                {vendorGroups.length}
-                груп). Відправлення не створюються:
-              </p>
-
-              {/* Vendor Groups Summary */}
+              {/* Summary of buyer & delivery */}
               <div
                 style={{
-                  display: "flex",
-                  flexDirection: "column",
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
                   gap: "1rem",
                   marginBottom: "1.5rem",
+                  padding: "1rem",
+                  backgroundColor: "var(--color-surface-muted)",
+                  borderRadius: "var(--radius-sm)",
                 }}
               >
-                {vendorGroups.map((group, idx) => (
-                  <div
-                    key={group.vendorHandle}
+                <div>
+                  <strong
                     style={{
-                      border: "1px solid var(--color-sand-200)",
-                      borderRadius: "var(--radius-sm)",
-                      padding: "0.85rem",
-                      backgroundColor: "var(--color-sand-50)",
+                      display: "block",
+                      fontSize: "0.85rem",
+                      color: "var(--color-ink-muted)",
                     }}
                   >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        marginBottom: "0.5rem",
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontWeight: 600,
-                          fontSize: "0.9rem",
-                          color: "var(--color-pine-900)",
-                        }}
-                      >
-                        Посилка #{idx + 1}: {group.vendorName}
-                      </span>
-                      <strong style={{ fontSize: "0.9rem" }}>
-                        {formatHryvnia(group.subtotalUah)}
-                      </strong>
-                    </div>
-
-                    <ul
-                      style={{
-                        margin: 0,
-                        paddingLeft: "1.2rem",
-                        fontSize: "0.85rem",
-                        color: "var(--color-ink-muted)",
-                      }}
-                    >
-                      {group.items.map((it) => (
-                        <li key={it.id}>
-                          {it.name} × {it.quantity} (
-                          {formatHryvnia(it.priceUah)})
-                        </li>
-                      ))}
-                    </ul>
+                    Отримувач
+                  </strong>
+                  <div style={{ fontWeight: 600 }}>
+                    {formData.fullName || "—"}
                   </div>
-                ))}
+                  <div
+                    style={{
+                      fontSize: "0.85rem",
+                      color: "var(--color-ink-subtle)",
+                    }}
+                  >
+                    {formData.phone} • {formData.email}
+                  </div>
+                </div>
+
+                <div>
+                  <strong
+                    style={{
+                      display: "block",
+                      fontSize: "0.85rem",
+                      color: "var(--color-ink-muted)",
+                    }}
+                  >
+                    Доставка
+                  </strong>
+                  <div style={{ fontWeight: 600 }}>
+                    Нова Пошта (
+                    {deliveryType === "branch"
+                      ? "Відділення"
+                      : deliveryType === "postomate"
+                        ? "Поштомат"
+                        : "Кур'єр"}
+                    )
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "0.85rem",
+                      color: "var(--color-ink-subtle)",
+                    }}
+                  >
+                    {formData.city}, {formData.novaPoshtaBranch}
+                  </div>
+                </div>
               </div>
 
-              {/* Totals */}
+              {/* Vendor Groups breakdown */}
+              <div style={{ marginBottom: "1.5rem" }}>
+                <h3 style={{ fontSize: "1.1rem", marginBottom: "0.75rem" }}>
+                  Вироби у чернетці ({totalItems})
+                </h3>
+                <table className="checkout-summary-table">
+                  <thead>
+                    <tr>
+                      <th>Найменування</th>
+                      <th>Кількість</th>
+                      <th style={{ textAlign: "right" }}>Ціна</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((item) => (
+                      <tr key={item.id}>
+                        <td>{item.name}</td>
+                        <td>{item.quantity} шт.</td>
+                        <td style={{ textAlign: "right" }}>
+                          {formatHryvnia(item.priceUah * item.quantity)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td
+                        colSpan={2}
+                        style={{ fontWeight: 700, paddingTop: "1rem" }}
+                      >
+                        Разом до сплати (демо):
+                      </td>
+                      <td
+                        style={{
+                          fontWeight: 700,
+                          fontSize: "1.1rem",
+                          color: "var(--color-pine-900)",
+                          textAlign: "right",
+                          paddingTop: "1rem",
+                        }}
+                      >
+                        {formatHryvnia(totalAmountUah)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              {/* Sandbox contained notice */}
               <div
+                role="status"
                 style={{
-                  borderTop: "1px solid var(--color-sand-200)",
-                  paddingTop: "1rem",
+                  padding: "1rem",
+                  backgroundColor: "#fff8e1",
+                  border: "1px solid #f1d48a",
+                  borderRadius: "var(--radius-sm)",
+                  color: "#6b4f00",
+                  fontSize: "0.85rem",
+                  lineHeight: 1.5,
                   marginBottom: "1.5rem",
                 }}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    marginBottom: "0.5rem",
-                    fontSize: "0.9rem",
-                  }}
-                >
-                  <span>Вартість товарів:</span>
-                  <span>{formatHryvnia(totalAmountUah)}</span>
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    marginBottom: "0.5rem",
-                    fontSize: "0.9rem",
-                    color: "var(--color-ink-muted)",
-                  }}
-                >
-                  <span>Доставка Новою Поштою:</span>
-                  <span>За тарифами перевізника</span>
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    fontSize: "1.25rem",
-                    fontWeight: 700,
-                    color: "var(--color-pine-900)",
-                    marginTop: "0.75rem",
-                    paddingTop: "0.75rem",
-                    borderTop: "1px dashed var(--color-sand-200)",
-                  }}
-                >
-                  <span>Сума чернетки:</span>
-                  <span>{formatHryvnia(totalAmountUah)}</span>
-                </div>
+                <strong>🧪 Демонстраційний режим:</strong> Серверне оформлення,
+                банківський платіж, формування накладної Нової Пошти та виплата
+                майстерні не активні. Дані використовуються виключно для
+                клієнтської візуалізації процесу замовлення.
               </div>
 
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="button button-primary"
-                style={{
-                  width: "100%",
-                  padding: "0.85rem",
-                  fontSize: "1rem",
-                  fontWeight: 600,
-                  backgroundColor: "var(--color-terracotta-500)",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "var(--radius-sm)",
-                  cursor: isSubmitting ? "not-allowed" : "pointer",
-                }}
-              >
-                {isSubmitting
-                  ? "Відкриття стану чернетки..."
-                  : `Переглянути стан чернетки (${formatHryvnia(totalAmountUah)})`}
-              </button>
-
-              <div
-                style={{
-                  marginTop: "1rem",
-                  fontSize: "0.75rem",
-                  color: "var(--color-ink-muted)",
-                  textAlign: "center",
-                  lineHeight: 1.4,
-                }}
-              >
-                ⚠️ Серверне створення замовлення недоступне: кошти, комісія,
-                IBAN, Escrow, ТТН і виплати не створюються. Дані форми не
-                передаються на сервер і не показуються на сторінці стану.
+              <div className="checkout-step-actions">
+                <button
+                  type="button"
+                  onClick={() => goToStep(3)}
+                  className="button button--secondary"
+                >
+                  ← Назад до оплати
+                </button>
+                <button
+                  type="submit"
+                  className="button button--primary"
+                  style={{
+                    padding: "0.85rem 1.75rem",
+                    fontSize: "1rem",
+                    fontWeight: 700,
+                  }}
+                >
+                  Переглянути стан чернетки
+                </button>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </form>
     </div>

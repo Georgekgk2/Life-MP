@@ -103,4 +103,29 @@ test.describe("Community Stories & Dynamic Events E2E", () => {
       fullPage: true,
     });
   });
+  test("organizations page displays demonstration support centers with compliance disclaimer and product detail page displays product media", async ({
+    page,
+  }) => {
+    // 1. Visit organizations/partners page
+    await page.goto("/partners");
+    await expect(page.locator("h1")).toContainText(
+      "Організації та центри підтримки",
+    );
+    await expect(page.getByText("Ветеранська хата")).toBeVisible();
+    await expect(page.getByText("Центр Капралова")).toBeVisible();
+    await expect(page.getByText("Центр Крутова")).toBeVisible();
+    await expect(page.getByText("Інформаційне застереження")).toBeVisible();
+
+    // 2. Visit demo product detail page
+    await page.goto("/catalog/podarunky/nabor-podarunok");
+    await expect(page.locator("h1")).toContainText(
+      "Подарунковий набір «Добрий знак»",
+    );
+
+    // 3. Verify clean product photo display
+    const productImage = page.locator(
+      '.product-media-viewer img[alt*="Фото виробу"]',
+    );
+    await expect(productImage).toBeVisible();
+  });
 });

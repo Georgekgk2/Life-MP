@@ -9,13 +9,18 @@ type EventCardProps = Readonly<{
 export function EventCard({ event }: EventCardProps) {
   return (
     <article className="card event-card">
-      <div className="card__visual event-card__visual">
+      <Link
+        href={`/events/${event.slug}`}
+        className="card__visual event-card__visual card__visual-link"
+        tabIndex={-1}
+        aria-hidden="true"
+      >
         <CardImage
           src={event.imageSrc}
           fallbackSrc="/images/events/event-maisteria.webp"
-          alt={`Ілюстрація події «${event.title}»`}
+          alt=""
         />
-      </div>
+      </Link>
       <div className="card__content">
         <p className="card__eyebrow">
           {event.typeLabel ? `Подія · ${event.typeLabel}` : "Подія спільноти"}

@@ -41,7 +41,7 @@ export default function CharityPage() {
             title="Напрями підтримки"
             description="Кожна ініціатива пов’язана з людиною та згаданими партнерами у локальних даних."
           />
-          <div className="content-grid content-grid--wide-cards">
+          <div className="charity-grid">
             {charityProjects.map((project) => {
               const beneficiary = people.find(
                 (person) => person.slug === project.beneficiaryPersonSlug,
@@ -53,40 +53,64 @@ export default function CharityPage() {
               );
 
               return (
-                <article className="card" key={project.id}>
-                  <p className="card__eyebrow">Ініціатива підтримки</p>
-                  <h2>{project.title}</h2>
-                  <p>{project.summary}</p>
-                  <dl className="data-list">
-                    <div className="data-list__item">
-                      <dt className="data-list__label">Статус</dt>
-                      <dd className="data-list__value">
-                        Лише інформація в демо-прототипі
-                      </dd>
-                    </div>
-                    {beneficiary ? (
-                      <div className="data-list__item">
-                        <dt className="data-list__label">Пов’язана людина</dt>
-                        <dd className="data-list__value">
-                          <Link href={`/people/${beneficiary.slug}`}>
-                            {beneficiary.name}
-                          </Link>
-                        </dd>
+                <article className="card charity-card" key={project.id}>
+                  <div className="card__content charity-card__content">
+                    <div className="charity-card__header">
+                      <div className="charity-card__topline">
+                        <span className="badge badge--verified">
+                          Ініціатива підтримки
+                        </span>
+                        <span className="badge badge--demo">
+                          Лише інформація в демо-прототипі
+                        </span>
                       </div>
-                    ) : null}
-                  </dl>
-                  {projectPartners.length > 0 ? (
-                    <div>
-                      <p>Згадані партнери</p>
-                      <ul className="chip-list">
-                        {projectPartners.map((partner) => (
-                          <li className="chip" key={partner.id}>
-                            {partner.name}
-                          </li>
-                        ))}
-                      </ul>
+                      <h2 className="charity-card__title">{project.title}</h2>
+                      <p className="charity-card__summary">{project.summary}</p>
                     </div>
-                  ) : null}
+
+                    <div className="charity-card__meta">
+                      {beneficiary ? (
+                        <div className="charity-card__curator-block">
+                          <span className="charity-card__meta-label">
+                            Пов’язана людина
+                          </span>
+                          <Link
+                            href={`/people/${beneficiary.slug}`}
+                            className="charity-card__curator-link"
+                          >
+                            <span
+                              className="charity-card__curator-avatar"
+                              aria-hidden="true"
+                            >
+                              {beneficiary.name.slice(0, 1)}
+                            </span>
+                            <span>
+                              <strong>{beneficiary.name}</strong>
+                              <span className="charity-card__curator-role">
+                                {" "}
+                                · {beneficiary.role}
+                              </span>
+                            </span>
+                          </Link>
+                        </div>
+                      ) : null}
+
+                      {projectPartners.length > 0 ? (
+                        <div className="charity-card__partners-block">
+                          <span className="charity-card__meta-label">
+                            Згадані партнери
+                          </span>
+                          <ul className="chip-list">
+                            {projectPartners.map((partner) => (
+                              <li className="chip" key={partner.id}>
+                                {partner.name}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
                 </article>
               );
             })}

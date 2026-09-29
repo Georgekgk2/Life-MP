@@ -37,9 +37,9 @@ export default function CharityPage() {
       <section className="page-section--tint" aria-label="Ініціативи підтримки">
         <div className="page-shell">
           <SectionHeading
-            eyebrow="Ініціативи"
-            title="Напрями підтримки"
-            description="Кожна ініціатива пов’язана з людиною та згаданими партнерами у локальних даних."
+            eyebrow="Демо-ініціативи"
+            title="Приклади ініціатив"
+            description="Картки, пов’язані профілі та зв’язки в цьому розділі — дані для демонстрації; вони не підтверджують реальну діяльність чи партнерство."
           />
           <div className="charity-grid">
             {charityProjects.map((project) => {
@@ -57,8 +57,8 @@ export default function CharityPage() {
                   <div className="card__content charity-card__content">
                     <div className="charity-card__header">
                       <div className="charity-card__topline">
-                        <span className="badge badge--verified">
-                          Ініціатива підтримки
+                        <span className="badge badge--demo">
+                          Демонстраційний запис
                         </span>
                         <span className="badge badge--demo">
                           Лише інформація в демо-прототипі
@@ -72,7 +72,7 @@ export default function CharityPage() {
                       {beneficiary ? (
                         <div className="charity-card__curator-block">
                           <span className="charity-card__meta-label">
-                            Пов’язана людина
+                            Демо-профіль людини
                           </span>
                           <Link
                             href={`/people/${beneficiary.slug}`}
@@ -98,7 +98,7 @@ export default function CharityPage() {
                       {projectPartners.length > 0 ? (
                         <div className="charity-card__partners-block">
                           <span className="charity-card__meta-label">
-                            Згадані партнери
+                            Демо-профілі у прикладі
                           </span>
                           <ul className="chip-list">
                             {projectPartners.map((partner) => (

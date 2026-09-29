@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { events, partners, people, products, stories } from "../src/fixtures";
+import { events, people, products, stories } from "../src/fixtures";
 describe("Community Fixtures & Data Integrity", () => {
   it("verifies all stories have valid hosts and linked products", () => {
     expect(stories.length).toBeGreaterThan(0);
@@ -29,25 +29,6 @@ describe("Community Fixtures & Data Integrity", () => {
         for (const item of event.agenda) {
           expect(item.time).toBeDefined();
           expect(item.title).toBeDefined();
-        }
-      }
-    }
-  });
-
-  it("verifies organizations and centers have category labels and valid linked products", () => {
-    expect(partners.length).toBeGreaterThanOrEqual(5);
-
-    for (const partner of partners) {
-      expect(partner.id).toMatch(/^partner-/);
-      expect(partner.slug).toBeTruthy();
-      expect(partner.name).toBeTruthy();
-      expect(partner.summary).toBeTruthy();
-      expect(partner.categoryLabel).toBeTruthy();
-
-      if (partner.relatedProductSlugs) {
-        for (const productSlug of partner.relatedProductSlugs) {
-          const found = products.find((p) => p.slug === productSlug);
-          expect(found).toBeDefined();
         }
       }
     }

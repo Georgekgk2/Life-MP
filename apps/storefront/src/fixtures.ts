@@ -399,56 +399,48 @@ export const events = [
   },
 ] as const satisfies readonly StorefrontEvent<PersonSlug, ProductSlug>[];
 
+const demoPartnerSummary = "Приклад картки для демонстраційного каталогу.";
+
 export const partners = [
   {
     id: "partner-veteranska-khata",
     slug: "veteranska-khata",
-    name: "Ветеранська хата",
-    summary:
-      "Ініціатива взаємопідтримки та спілкування ветеранів і їхніх родин у межах демонстраційного прототипу.",
-    categoryLabel: "Ветеранський простір",
-    websiteLabel: "Ветеранський простір · Демо-профіль",
-    relatedProductSlugs: ["futbolka-svitlo", "shoper-razom"],
+    name: "Демо-профіль 01",
+    summary: demoPartnerSummary,
+    categoryLabel: "Демонстраційний запис",
+    websiteLabel: "Демо-профіль",
   },
   {
     id: "partner-tsentr-kapralova",
     slug: "tsentr-kapralova",
-    name: "Центр Капралова",
-    summary:
-      "Ознайомчий профіль для демонстрації партнерського каталогу; медичні послуги та запис на процедури на вітрині не надаються.",
-    categoryLabel: "Демо-партнер",
-    websiteLabel: "Ознайомчий профіль",
-    relatedProductSlugs: ["nabor-tvorchist"],
+    name: "Демо-профіль 02",
+    summary: demoPartnerSummary,
+    categoryLabel: "Демонстраційний запис",
+    websiteLabel: "Демо-профіль",
   },
   {
     id: "partner-tsentr-krutova",
     slug: "tsentr-krutova",
-    name: "Центр Крутова",
-    summary:
-      "Ознайомчий профіль для демонстрації партнерського каталогу; консультаційні послуги та запис на прийом на вітрині не надаються.",
-    categoryLabel: "Демо-партнер",
-    websiteLabel: "Ознайомчий профіль",
-    relatedProductSlugs: ["svichka-vechir", "chashka-ranok"],
+    name: "Демо-профіль 03",
+    summary: demoPartnerSummary,
+    categoryLabel: "Демонстраційний запис",
+    websiteLabel: "Демо-профіль",
   },
   {
     id: "partner-aromaterapiia",
     slug: "aromaterapiia",
-    name: "Майстерня «Ароматерапія»",
-    summary:
-      "Крафтова майстерня ароматичних композицій та творчих занять для демонстрації каталогу.",
-    categoryLabel: "Творча майстерня",
-    websiteLabel: "Ароматерапія · Творча майстерня",
-    relatedProductSlugs: ["svichka-vechir"],
+    name: "Демо-профіль 04",
+    summary: demoPartnerSummary,
+    categoryLabel: "Демонстраційний запис",
+    websiteLabel: "Демо-профіль",
   },
   {
     id: "partner-yust",
     slug: "yust",
-    name: "Центр «ЮСТ»",
-    summary:
-      "Ознайомчий профіль правозахисної та консультаційної ініціативи для демонстрації структури каталогу.",
-    categoryLabel: "Правовий супровід",
-    websiteLabel: "Консультаційний центр · Демо-профіль",
-    relatedProductSlugs: ["notatnyk-istorii"],
+    name: "Демо-профіль 05",
+    summary: demoPartnerSummary,
+    categoryLabel: "Демонстраційний запис",
+    websiteLabel: "Демо-профіль",
   },
 ] as const satisfies readonly Partner[];
 

@@ -202,15 +202,15 @@ export default async function HomePage() {
 
       <section
         className="page-section page-section--accent"
-        aria-label="Ініціативи та партнери"
+        aria-label="Демонстраційні профілі та ініціативи"
       >
         <div className="page-shell">
           <SectionHeading
-            eyebrow="Організації та центри допомоги"
-            title="Люди та спільноти, які допомагають"
-            description="Простори ветеранської адаптації, центри реабілітації, майстерні та організації взаємопідтримки."
+            eyebrow="Демонстраційні дані"
+            title="Приклади профілів та ініціатив"
+            description="Усі картки цього блоку — приклади для прототипу; вони не підтверджують реальні організації, партнерства чи послуги."
             actionHref="/partners"
-            actionLabel="Усі організації"
+            actionLabel="Демо-профілі"
           />
           <div className="content-grid content-grid--wide-cards partner-grid">
             {charityProjects.slice(0, 2).map((project) => (
@@ -230,7 +230,7 @@ export default async function HomePage() {
                 <div className="card__content">
                   <div className="partner-card__topline">
                     <p className="card__eyebrow">
-                      {partner.categoryLabel || "Організація допомоги"}
+                      {partner.categoryLabel || "Демонстраційний запис"}
                     </p>
                     {partner.videoDuration && (
                       <span
@@ -261,7 +261,7 @@ export default async function HomePage() {
                     </p>
                   )}
                   <Link href="/partners" className="text-link">
-                    Познайомитися з організаціями
+                    Переглянути демо-профілі
                   </Link>
                 </div>
               </article>
@@ -277,9 +277,8 @@ export default async function HomePage() {
               textAlign: "center",
             }}
           >
-            Інформаційне застереження: відомості про реабілітаційні,
-            психологічні та оздоровчі центри мають виключно ознайомчий характер
-            у демонстраційному прототипі та не є медичною консультацією.
+            Усі профілі та зв’язки в цьому блоці — приклади для інтерфейсу; вони
+            не підтверджують реальні організації, партнерства чи послуги.
           </p>
         </div>
       </section>

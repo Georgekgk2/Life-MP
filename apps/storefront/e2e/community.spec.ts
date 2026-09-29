@@ -103,18 +103,30 @@ test.describe("Community Stories & Dynamic Events E2E", () => {
       fullPage: true,
     });
   });
-  test("organizations page displays demonstration support centers with compliance disclaimer and product detail page displays product media", async ({
+  test("organizations page marks demo profiles clearly and product detail page displays product media", async ({
     page,
   }) => {
     // 1. Visit organizations/partners page
     await page.goto("/partners");
-    await expect(page.locator("h1")).toContainText(
-      "Організації та центри підтримки",
-    );
-    await expect(page.getByText("Ветеранська хата")).toBeVisible();
-    await expect(page.getByText("Центр Капралова")).toBeVisible();
-    await expect(page.getByText("Центр Крутова")).toBeVisible();
-    await expect(page.getByText("Інформаційне застереження")).toBeVisible();
+    await expect(
+      page.getByRole("heading", {
+        name: "Демонстраційні профілі",
+        level: 1,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Не є переліком партнерів" }),
+    ).toBeVisible();
+    for (const formerName of [
+      "Ветеранська хата",
+      "Центр Капралова",
+      "Центр Крутова",
+      "Майстерня «Ароматерапія»",
+      "Центр «ЮСТ»",
+    ]) {
+      await expect(page.getByText(formerName, { exact: true })).toHaveCount(0);
+    }
+    await expect(page.getByText(/реабілітац|психолог/i)).toHaveCount(0);
 
     // 2. Visit demo product detail page
     await page.goto("/catalog/podarunky/nabor-podarunok");

@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   CategoryCard,
   EventCard,
+  OrganizationVideoTrigger,
   PersonCard,
   ProductCard,
   SectionHeading,
@@ -224,47 +225,56 @@ export default async function HomePage() {
                 </div>
               </article>
             ))}
-            {partners.slice(0, 2).map((partner) => (
-              <article className="card partner-card" key={partner.id}>
-                <div className="card__content">
-                  <div className="partner-card__topline">
-                    <p className="card__eyebrow">
-                      {partner.categoryLabel || "Організація допомоги"}
-                    </p>
-                    {partner.videoDuration && (
-                      <span
-                        className="badge badge--demo"
-                        style={{ fontSize: "0.75rem" }}
-                      >
-                        ▶ Відео · {partner.videoDuration}
-                      </span>
+            {partners.slice(0, 2).map((partner) => {
+              const partnerProducts = products.filter(
+                (p) =>
+                  p.provider?.name
+                    ?.toLowerCase()
+                    .includes(partner.name.toLowerCase()) ||
+                  partner.name
+                    .toLowerCase()
+                    .includes(p.provider?.name?.toLowerCase() || "") ||
+                  p.provider?.handle.includes(partner.slug),
+              );
+
+              return (
+                <article className="card partner-card" key={partner.id}>
+                  <div className="card__content">
+                    <div className="partner-card__topline">
+                      <p className="card__eyebrow">
+                        {partner.categoryLabel || "Організація допомоги"}
+                      </p>
+                      {partner.videoDuration && (
+                        <span
+                          className="badge badge--demo"
+                          style={{ fontSize: "0.75rem" }}
+                        >
+                          ▶ Відео · {partner.videoDuration}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="card__title">{partner.name}</h3>
+                    <p className="card__description">{partner.summary}</p>
+                    {partner.videoTitle && (
+                      <OrganizationVideoTrigger
+                        videoTitle={partner.videoTitle}
+                        videoDuration={partner.videoDuration}
+                        organizationName={partner.name}
+                        videoEmbedUrl={
+                          "videoEmbedUrl" in partner
+                            ? (partner.videoEmbedUrl as string)
+                            : undefined
+                        }
+                        relatedProducts={partnerProducts}
+                      />
                     )}
+                    <Link href="/partners" className="text-link">
+                      Познайомитися з організаціями
+                    </Link>
                   </div>
-                  <h3 className="card__title">{partner.name}</h3>
-                  <p className="card__description">{partner.summary}</p>
-                  {partner.videoTitle && (
-                    <p
-                      className="partner-card__video-title"
-                      style={{
-                        fontSize: "0.8125rem",
-                        color: "var(--color-ink)",
-                        fontWeight: 600,
-                        margin: "0.35rem 0",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "0.35rem",
-                      }}
-                    >
-                      <span aria-hidden="true">📹</span>
-                      <span>{partner.videoTitle}</span>
-                    </p>
-                  )}
-                  <Link href="/partners" className="text-link">
-                    Познайомитися з організаціями
-                  </Link>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
           <p
             style={{

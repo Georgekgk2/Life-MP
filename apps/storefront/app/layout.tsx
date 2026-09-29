@@ -5,13 +5,14 @@ import {
   CartDrawer,
   ChatBotWidget,
   PwaRegister,
+  ReferralNotice,
   SiteFooter,
   SiteHeader,
 } from "@/components";
 import { CartProvider } from "@/context/cart-context";
 import { SavedProvider } from "@/context/saved-context";
 import { ProfileProvider } from "@/context/profile-context";
-
+import { ReferralProvider } from "@/context/referral-context";
 import "./globals.css";
 
 export const viewport: Viewport = {
@@ -62,13 +63,16 @@ export default function RootLayout({
         <ProfileProvider>
           <SavedProvider>
             <CartProvider>
-              <SiteHeader />
-              <CartDrawer />
-              <main id="main-content" tabIndex={-1}>
-                {children}
-              </main>
-              <SiteFooter />
-              <ChatBotWidget />
+              <ReferralProvider>
+                <SiteHeader />
+                <ReferralNotice />
+                <CartDrawer />
+                <main id="main-content" tabIndex={-1}>
+                  {children}
+                </main>
+                <SiteFooter />
+                <ChatBotWidget />
+              </ReferralProvider>
             </CartProvider>
           </SavedProvider>
         </ProfileProvider>

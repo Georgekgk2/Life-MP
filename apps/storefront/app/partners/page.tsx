@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { SectionHeading } from "@/components";
+import { OrganizationVideoTrigger, SectionHeading } from "@/components";
 import { partners } from "@/fixtures";
 import { getCatalogSnapshot } from "@/catalog/server";
 
@@ -89,21 +89,17 @@ export default async function PartnersPage() {
                     <h2 className="card__title">{partner.name}</h2>
                     <p className="card__description">{partner.summary}</p>
                     {partner.videoTitle && (
-                      <p
-                        className="partner-card__video-title"
-                        style={{
-                          fontSize: "0.8125rem",
-                          color: "var(--color-ink)",
-                          fontWeight: 600,
-                          margin: "0.35rem 0",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "0.35rem",
-                        }}
-                      >
-                        <span aria-hidden="true">📹</span>
-                        <span>Відео: {partner.videoTitle}</span>
-                      </p>
+                      <OrganizationVideoTrigger
+                        videoTitle={partner.videoTitle}
+                        videoDuration={partner.videoDuration}
+                        organizationName={partner.name}
+                        videoEmbedUrl={
+                          "videoEmbedUrl" in partner
+                            ? (partner.videoEmbedUrl as string)
+                            : undefined
+                        }
+                        relatedProducts={partnerProducts}
+                      />
                     )}
                     {partnerProducts.length > 0 && (
                       <div className="partner-card__products">

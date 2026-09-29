@@ -191,6 +191,7 @@ export type Partner<Slug extends string = string> = Readonly<{
   categoryLabel?: string | undefined;
   videoTitle?: string | undefined;
   videoDuration?: string | undefined;
+  videoEmbedUrl?: string | undefined;
   relatedProductSlugs?: readonly string[] | undefined;
 }>;
 

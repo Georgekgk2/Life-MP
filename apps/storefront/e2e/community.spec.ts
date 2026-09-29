@@ -149,4 +149,39 @@ test.describe("Community Stories & Dynamic Events E2E", () => {
     );
     await expect(productImage).toBeVisible();
   });
+
+  test("video player modal opens on organization card and referral attribution captures ?ref parameter", async ({
+    page,
+  }) => {
+    // 1. Visit partners page and click video button
+    await page.goto("/partners");
+    const videoBtn = page
+      .getByRole("button", { name: /Переглянути відео/i })
+      .first();
+    await expect(videoBtn).toBeVisible();
+    await videoBtn.click();
+
+    // 2. Verify modal opened
+    const modal = page.getByRole("dialog");
+    await expect(modal).toBeVisible();
+    await expect(modal.getByText("Демо-потік активний")).toBeVisible();
+
+    // 3. Close on Escape
+    await page.keyboard.press("Escape");
+    await expect(modal).not.toBeVisible();
+
+    // 4. Test referral attribution via URL parameter
+    await page.goto("/?ref=tiktok_creator_alex&utm_source=tiktok");
+    const referralNotice = page.locator(".referral-notice-bar");
+    await expect(referralNotice).toBeVisible();
+    await expect(referralNotice).toContainText("@tiktok_creator_alex");
+    await expect(referralNotice).toContainText("TikTok");
+
+    // 5. Dismiss referral notice
+    const dismissBtn = referralNotice.getByRole("button", {
+      name: /Приховати сповіщення/i,
+    });
+    await dismissBtn.click();
+    await expect(referralNotice).not.toBeVisible();
+  });
 });

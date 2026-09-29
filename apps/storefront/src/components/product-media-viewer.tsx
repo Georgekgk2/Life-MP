@@ -82,7 +82,7 @@ export function ProductMediaViewer({
               transition: "all var(--duration-fast) ease",
             }}
           >
-            📜 Сертифікат відповідності (2-й екран)
+            📜 Документ виробу (якщо додано)
           </button>
         </div>
       )}
@@ -131,15 +131,15 @@ export function ProductMediaViewer({
               }}
             >
               <span
-                className="badge badge--certified"
+                className="badge"
                 style={{
-                  background: "var(--color-primary-quiet)",
-                  color: "var(--color-primary-strong)",
-                  fontWeight: 600,
+                  background: "var(--color-surface-sunken, #f0f0f0)",
+                  color: "var(--color-ink)",
+                  fontWeight: 500,
                   fontSize: "0.75rem",
                 }}
               >
-                ✓ Підтверджений документ
+                Документ виробу
               </span>
               <span
                 style={{
@@ -147,7 +147,7 @@ export function ProductMediaViewer({
                   color: "var(--color-ink-muted)",
                 }}
               >
-                Документ відповідності стандартам
+                Ознайомчий перегляд доданого документа
               </span>
             </div>
 
@@ -189,7 +189,7 @@ export function ProductMediaViewer({
               }}
             >
               {certificateTitle ||
-                "Документ відповідності та безпечності виробу."}
+                "Ознайомчий документ або декларація виробника."}
             </p>
           </div>
         )}

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { Partner } from "@life/types";
 import Link from "next/link";
 
 import {
@@ -224,7 +225,7 @@ export default async function HomePage() {
                 </div>
               </article>
             ))}
-            {partners.slice(0, 2).map((partner) => (
+            {partners.slice(0, 2).map((partner: Partner) => (
               <article className="card partner-card" key={partner.id}>
                 <div className="card__content">
                   <div className="partner-card__topline">

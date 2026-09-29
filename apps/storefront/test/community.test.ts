@@ -34,7 +34,7 @@ describe("Community Fixtures & Data Integrity", () => {
     }
   });
 
-  it("verifies organizations and centers have category labels, video titles, and valid products", () => {
+  it("verifies organizations and centers have category labels and valid linked products", () => {
     expect(partners.length).toBeGreaterThanOrEqual(5);
 
     for (const partner of partners) {
@@ -43,8 +43,6 @@ describe("Community Fixtures & Data Integrity", () => {
       expect(partner.name).toBeTruthy();
       expect(partner.summary).toBeTruthy();
       expect(partner.categoryLabel).toBeTruthy();
-      expect(partner.videoTitle).toBeTruthy();
-      expect(partner.videoDuration).toBeTruthy();
 
       if (partner.relatedProductSlugs) {
         for (const productSlug of partner.relatedProductSlugs) {

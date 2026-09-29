@@ -28,7 +28,7 @@
 
 | Показник | Цільовий орієнтир | Визначення та контекст |
 |---|---|---|
-| **RPO (Recovery Point Objective)** | **<= 24 годин** (плановий щоденний бекап) / **0 секунд** (pre-release snapshot) | Максимально допустима втрата даних: перед кожним релізом створюється snapshot, тому при релізі цільовий RPO = 0. |
+| **RPO (Recovery Point Objective)** | **<= 24 годин** (плановий щоденний бекап) / **до точки знімка** (pre-release snapshot) | Максимально допустима втрата даних: у разі аварії дані повертаються до точки останнього валідного знімка. Перед релізом створюється snapshot, але це не гарантує нульової втрати транзакцій між релізом і моментом збою. |
 | **RTO (Recovery Time Objective)** | **<= 15 хвилин** | Цільовий час від моменту оголошення інциденту до відновлення працездатності сервісу. |
 
 ---
@@ -113,13 +113,19 @@ TARGET_BACKUP="/var/backups/life-mp/<BACKUP_ID>"
 ```bash
 EMERGENCY_DIR="/var/backups/life-mp/emergency-pre-restore-$(date +%Y%m%dT%H%M%SZ)"
 mkdir -p "${EMERGENCY_DIR}" && chmod 700 "${EMERGENCY_DIR}"
-docker exec life-mp-postgres pg_dump -U life_prod -Fc life_production > "${EMERGENCY_DIR}/corrupted_state.dump" || true
+if docker exec life-mp-postgres pg_dump -U life_prod -Fc life_production > "${EMERGENCY_DIR}/corrupted_state.dump"; then
+  echo "Попередній знімок аварійного стану збережено."
+else
+  echo "УВАГА: Не вдалося зняти дамп аварійного стану (можливе пошкодження системних каталогів або брак місця). Зафіксуйте журнал помилок."
+fi
 ```
 
 ### Крок 4: Відновлення структури та даних
 ```bash
-# Для стандартного кастомного дампу (-Fc) через pg_restore:
-docker exec -i life-mp-postgres pg_restore -U life_prod -d life_production --clean --if-exists < "${TARGET_BACKUP}/database.dump"
+# Для безпечного відновлення кастомного дампу (-Fc) із зупинкою при помилках:
+docker exec -i life-mp-postgres pg_restore -U life_prod -d life_production --clean --if-exists --exit-on-error < "${TARGET_BACKUP}/database.dump"
+
+> **Застереження щодо цілісності:** Опція `--clean` видаляє наявні таблиці перед відновленням. Перед її запуском обов'язково переконайтеся, що всі клієнтські з'єднання зупинено (Крок 1). Для критичних інцидентів безпечніше відновлювати дамп у тимчасову базу (`life_restore_drill`), перевіряти структуру (Крок 5), і лише після успішної перевірки перемикати трафік.
 
 # ПРИМІТКА ЩОДО ФОРМАТІВ:
 # Якщо відновлюється успадкований plain SQL дамп (database.sql), використовується psql з прапорцем зупинки при помилках:

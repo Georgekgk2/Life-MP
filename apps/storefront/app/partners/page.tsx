@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { Partner } from "@life/types";
 import Link from "next/link";
 
 import { SectionHeading } from "@/components";
@@ -47,7 +48,7 @@ export default async function PartnersPage() {
             description="Простори взаємодопомоги, адаптації та реабілітації для ветеранів і спільноти."
           />
           <div className="content-grid content-grid--cards partner-grid">
-            {partners.map((partner) => {
+            {partners.map((partner: Partner) => {
               const partnerProducts = allProducts.filter(
                 (p) =>
                   p.provider?.name

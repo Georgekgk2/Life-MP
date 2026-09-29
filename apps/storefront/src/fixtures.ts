@@ -407,9 +407,7 @@ export const partners = [
     summary:
       "Ініціатива взаємопідтримки та спілкування ветеранів і їхніх родин у межах демонстраційного прототипу.",
     categoryLabel: "Ветеранський простір",
-    websiteLabel: "Ветеранський простір · Організація допомоги",
-    videoTitle: "Практикум соціальної адаптації та взаємодії",
-    videoDuration: "14 хв",
+    websiteLabel: "Ветеранський простір · Демо-профіль",
     relatedProductSlugs: ["futbolka-svitlo", "shoper-razom"],
   },
   {
@@ -417,11 +415,9 @@ export const partners = [
     slug: "tsentr-kapralova",
     name: "Центр Капралова",
     summary:
-      "Ознайомчий профіль оздоровчого простору для демонстрації партнерського каталогу.",
-    categoryLabel: "Оздоровчий простір",
-    websiteLabel: "Оздоровчий центр · Організація підтримки",
-    videoTitle: "Ознайомчий матеріал щодо оздоровчих практик",
-    videoDuration: "22 хв",
+      "Ознайомчий профіль для демонстрації партнерського каталогу; медичні послуги та запис на процедури на вітрині не надаються.",
+    categoryLabel: "Демо-партнер",
+    websiteLabel: "Ознайомчий профіль",
     relatedProductSlugs: ["nabor-tvorchist"],
   },
   {
@@ -429,11 +425,9 @@ export const partners = [
     slug: "tsentr-krutova",
     name: "Центр Крутова",
     summary:
-      "Ознайомчий профіль простору підтримки та взаємодії для демонстрації партнерського каталогу.",
-    categoryLabel: "Простір підтримки",
-    websiteLabel: "Простір підтримки · Організація допомоги",
-    videoTitle: "Презентація програм взаємопідтримки",
-    videoDuration: "18 хв",
+      "Ознайомчий профіль для демонстрації партнерського каталогу; консультаційні послуги та запис на прийом на вітрині не надаються.",
+    categoryLabel: "Демо-партнер",
+    websiteLabel: "Ознайомчий профіль",
     relatedProductSlugs: ["svichka-vechir", "chashka-ranok"],
   },
   {
@@ -444,8 +438,6 @@ export const partners = [
       "Крафтова майстерня ароматичних композицій та творчих занять для демонстрації каталогу.",
     categoryLabel: "Творча майстерня",
     websiteLabel: "Ароматерапія · Творча майстерня",
-    videoTitle: "Створення релаксаційних композицій: відкритий воркшоп",
-    videoDuration: "12 хв",
     relatedProductSlugs: ["svichka-vechir"],
   },
   {
@@ -455,9 +447,7 @@ export const partners = [
     summary:
       "Ознайомчий профіль правозахисної та консультаційної ініціативи для демонстрації структури каталогу.",
     categoryLabel: "Правовий супровід",
-    websiteLabel: "Консультаційний центр · Організація допомоги",
-    videoTitle: "Ознайомча лекція щодо правового захисту",
-    videoDuration: "25 хв",
+    websiteLabel: "Консультаційний центр · Демо-профіль",
     relatedProductSlugs: ["notatnyk-istorii"],
   },
 ] as const satisfies readonly Partner[];

@@ -139,7 +139,7 @@ export function ProductMediaViewer({
                   fontSize: "0.75rem",
                 }}
               >
-                ✓ Держстандарт / ДСТУ
+                ✓ Підтверджений документ
               </span>
               <span
                 style={{
@@ -147,7 +147,7 @@ export function ProductMediaViewer({
                   color: "var(--color-ink-muted)",
                 }}
               >
-                Орган акредитації: Держпродспоживслужба
+                Документ відповідності стандартам
               </span>
             </div>
 
@@ -189,7 +189,7 @@ export function ProductMediaViewer({
               }}
             >
               {certificateTitle ||
-                "Сертифікат якості та відповідності ДСТУ / системі HACCP (ISO 22000)."}
+                "Документ відповідності та безпечності виробу."}
             </p>
           </div>
         )}

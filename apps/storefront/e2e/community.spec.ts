@@ -103,7 +103,7 @@ test.describe("Community Stories & Dynamic Events E2E", () => {
       fullPage: true,
     });
   });
-  test("organizations page displays support centers with video workshop badges and product detail displays certificate switcher", async ({
+  test("organizations page displays demonstration support centers with compliance disclaimer and product detail page displays product media", async ({
     page,
   }) => {
     // 1. Visit organizations/partners page
@@ -116,34 +116,13 @@ test.describe("Community Stories & Dynamic Events E2E", () => {
     await expect(page.getByText("Центр Крутова")).toBeVisible();
     await expect(page.getByText("Інформаційне застереження")).toBeVisible();
 
-    // 2. Visit certified Dobroizh product detail page
+    // 2. Visit demo product detail page
     await page.goto("/catalog/podarunky/nabor-podarunok");
     await expect(page.locator("h1")).toContainText(
-      "Набір «Добрий знак» (Доброїж смаколики)",
+      "Подарунковий набір «Добрий знак»",
     );
-    await expect(page.getByText("ДСТУ / Сертифікат якості")).toBeVisible();
 
-    // 3. Verify certificate switcher tabs
-    const certTab = page.getByRole("tab", {
-      name: /Сертифікат відповідності/i,
-    });
-    await expect(certTab).toBeVisible();
-    const photoTab = page.getByRole("tab", { name: /Фото виробу/i });
-    await expect(photoTab).toBeVisible();
-
-    // 4. Switch to certificate tab and verify document preview
-    await certTab.click();
-    await expect(page.getByText("Держстандарт / ДСТУ")).toBeVisible();
-    await expect(
-      page.getByText("Орган акредитації: Держпродспоживслужба"),
-    ).toBeVisible();
-    const certImage = page.locator(
-      '.product-media-viewer img[alt*="Сертифікат"]',
-    );
-    await expect(certImage).toBeVisible();
-
-    // 5. Switch back to photo tab
-    await photoTab.click();
+    // 3. Verify clean product photo display
     const productImage = page.locator(
       '.product-media-viewer img[alt*="Фото виробу"]',
     );

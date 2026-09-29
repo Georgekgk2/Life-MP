@@ -55,30 +55,23 @@ describe("Community Fixtures & Data Integrity", () => {
     }
   });
 
-  it("verifies certified food products have valid certificates on disk", () => {
+  it("verifies any product declaring a certificate image points to an existing file in public", () => {
     const certifiedProducts = products.filter(
       (
         p,
       ): p is typeof p & {
-        certifiedProductBadge: string;
-        certificateTitle: string;
+        certifiedProductBadge?: string;
+        certificateTitle?: string;
         certificateImageSrc: string;
-      } =>
-        "certifiedProductBadge" in p &&
-        Boolean(p.certifiedProductBadge) &&
-        "certificateImageSrc" in p &&
-        Boolean(p.certificateImageSrc),
+      } => "certificateImageSrc" in p && Boolean(p.certificateImageSrc),
     );
 
-    expect(certifiedProducts.length).toBeGreaterThan(0);
     for (const p of certifiedProducts) {
-      expect(p.certifiedProductBadge).toBeTruthy();
-      expect(p.certificateTitle).toBeTruthy();
       expect(p.certificateImageSrc).toBeDefined();
       const certPath = resolve(
         process.cwd(),
         "public",
-        (p.certificateImageSrc ?? "").replace(/^\//, ""),
+        p.certificateImageSrc.replace(/^\//, ""),
       );
       expect(existsSync(certPath)).toBe(true);
     }

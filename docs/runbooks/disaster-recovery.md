@@ -46,10 +46,9 @@ BACKUP_DIR="/var/backups/life-mp/${BACKUP_ID}"
 mkdir -p "${BACKUP_DIR}"
 chmod 700 "${BACKUP_DIR}"
 
-# 2. Створення стисненого дампу PostgreSQL без блокування таблиць
+# 2. Створення стисненого дампу PostgreSQL без блокування таблиць із суворим umask
+(umask 077 && touch "${BACKUP_DIR}/database.dump" && chmod 600 "${BACKUP_DIR}/database.dump")
 docker exec life-mp-postgres pg_dump -U life_prod -Fc life_production > "${BACKUP_DIR}/database.dump"
-chmod 600 "${BACKUP_DIR}/database.dump"
-
 # 3. Розрахунок криптографічної контрольної суми
 (cd "${BACKUP_DIR}" && sha256sum database.dump > CHECKSUMS.sha256)
 chmod 600 "${BACKUP_DIR}/CHECKSUMS.sha256"
@@ -122,6 +121,7 @@ _Якщо перевірка контрольної суми не пройшла
 ```bash
 EMERGENCY_DIR="/var/backups/life-mp/emergency-pre-restore-$(date +%Y%m%dT%H%M%SZ)"
 mkdir -p "${EMERGENCY_DIR}" && chmod 700 "${EMERGENCY_DIR}"
+(umask 077 && touch "${EMERGENCY_DIR}/corrupted_state.dump" && chmod 600 "${EMERGENCY_DIR}/corrupted_state.dump")
 if docker exec life-mp-postgres pg_dump -U life_prod -Fc life_production > "${EMERGENCY_DIR}/corrupted_state.dump"; then
   echo "Попередній знімок аварійного стану збережено."
 else
@@ -136,10 +136,11 @@ fi
 Замість цього відновлення виконується в ізольовану базу-кандидат `life_restore_candidate`:
 
 ```bash
-# 1. Створення чистої тимчасової бази для перевірки відновлення
-docker exec life-mp-postgres psql -U life_prod -d postgres -c "DROP DATABASE IF EXISTS life_restore_candidate;"
-docker exec life-mp-postgres psql -U life_prod -d postgres -c "CREATE DATABASE life_restore_candidate WITH OWNER life_prod;"
-
+# 1. Створення чистої тимчасової бази для перевірки відновлення (із захистом від завислих підключень)
+docker exec life-mp-postgres psql -U life_prod -d postgres \
+  -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'life_restore_candidate' AND pid <> pg_backend_pid();" \
+  -c "DROP DATABASE IF EXISTS life_restore_candidate WITH (FORCE);" \
+  -c "CREATE DATABASE life_restore_candidate WITH OWNER life_prod;"
 # 2. Відновлення кастомного дампу (-Fc) в ізольовану базу із зупинкою при помилках
 docker exec -i life-mp-postgres pg_restore -U life_prod -d life_restore_candidate --exit-on-error < "${TARGET_BACKUP}/database.dump"
 ```
@@ -152,17 +153,24 @@ _Примітка щодо успадкованих SQL-дампів:_ Якщо 
 Перед перемиканням трафіку обов'язково перевіряється цілісність відновленого стану:
 
 ```bash
-# 1. Перевірка кількості таблиць у відновленій базі (у Medusa v2 — понад 50 таблиць)
-docker exec life-mp-postgres psql -U life_prod -d life_restore_candidate -c "
-  SELECT count(*) AS table_count FROM information_schema.tables WHERE table_schema = 'public';
-"
+# 1. Перевірка схеми та сутностей із зупинкою при невідповідності (Fail-Closed)
+TABLE_COUNT=$(docker exec life-mp-postgres psql -U life_prod -d life_restore_candidate -t -A -c \
+  "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';")
 
-# 2. Перевірка наявності та кількості ключових сутностей каталогу
-docker exec life-mp-postgres psql -U life_prod -d life_restore_candidate -c "
-  SELECT count(*) AS product_count FROM product;
-"
-```
+PRODUCT_COUNT=$(docker exec life-mp-postgres psql -U life_prod -d life_restore_candidate -t -A -c \
+  "SELECT count(*) FROM product;")
 
+echo "Таблиць у відновленій базі: ${TABLE_COUNT}, Продуктів: ${PRODUCT_COUNT}"
+
+if [ -z "${TABLE_COUNT}" ] || [ "${TABLE_COUNT}" -lt 50 ]; then
+  echo "ПОМИЛКА: Кількість таблиць (${TABLE_COUNT:-0}) менша за мінімальний поріг (50). Відновлення скасовано." >&2
+  exit 1
+fi
+
+if [ -z "${PRODUCT_COUNT}" ] || [ "${PRODUCT_COUNT}" -le 0 ]; then
+  echo "ПОМИЛКА: Каталог продуктів порожній або відсутній. Відновлення скасовано." >&2
+  exit 1
+fi
 _Якщо перевірка не пройшла або виявлено помилки — робоча база `life_production` залишається повністю недоторканою, а оператор переходить до іншого знімка._
 
 ### Крок 6: Безпечна ротація баз даних (Safe Atomic Swap)
@@ -173,18 +181,22 @@ _Якщо перевірка не пройшла або виявлено пом�
 PREV_NAME="life_production_pre_restore_$(date +%Y%m%dT%H%M%SZ)"
 
 docker exec life-mp-postgres psql -U life_prod -d postgres -c "
-  -- Примусове завершення активних з'єднань з робочою базою
+  -- 1. Заборона нових з'єднань з робочою базою та кандидатом на час ротації
+  ALTER DATABASE life_production ALLOW_CONNECTIONS = false;
+  ALTER DATABASE life_restore_candidate ALLOW_CONNECTIONS = false;
+
+  -- 2. Примусове завершення залишкових з'єднань
   SELECT pg_terminate_backend(pid) FROM pg_stat_activity
-  WHERE datname = 'life_production' AND pid <> pg_backend_pid();
+  WHERE datname IN ('life_production', 'life_restore_candidate') AND pid <> pg_backend_pid();
 
-  -- Перейменування старої бази у страхувальну копію
+  -- 3. Атомарне перейменування в єдиному запиті
   ALTER DATABASE life_production RENAME TO ${PREV_NAME};
-
-  -- Активація відновленого кандидата
   ALTER DATABASE life_restore_candidate RENAME TO life_production;
+  -- 4. Відновлення дозволу на підключення до відновленої production-бази та страхувальної копії (для аудиту)
+  ALTER DATABASE life_production ALLOW_CONNECTIONS = true;
+  ALTER DATABASE ${PREV_NAME} ALLOW_CONNECTIONS = true;
 "
 ```
-
 ### Крок 7: Відновлення роботи сервісів та верифікація
 
 ```bash
@@ -192,6 +204,37 @@ cd /opt/life-mp/current/deploy
 docker compose -p life-mp -f docker-compose.prod.yml --env-file .env.production start commerce storefront
 
 # Перевірка проходження healthcheck
+docker compose -p life-mp -f docker-compose.prod.yml --env-file .env.production ps
+```
+
+### Крок 7.1: Процедура екстреного відкату (Emergency Rollback)
+
+Якщо після запуску сервісів (Крок 7) виявлено помилки у логах, сервіси не проходять healthcheck або дані виявилися несумісними з поточним релізом застосунку — оператор виконує повернення до страхувальної копії:
+
+```bash
+cd /opt/life-mp/current/deploy
+
+# 1. Зупинка сервісів для виключення нових запитів
+docker compose -p life-mp -f docker-compose.prod.yml --env-file .env.production stop storefront commerce
+
+# 2. Зворотна ротація баз даних
+FAILED_RESTORE_NAME="life_failed_restore_$(date +%Y%m%dT%H%M%SZ)"
+
+docker exec life-mp-postgres psql -U life_prod -d postgres -c "
+  ALTER DATABASE life_production ALLOW_CONNECTIONS = false;
+  SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+  WHERE datname = 'life_production' AND pid <> pg_backend_pid();
+
+  ALTER DATABASE life_production RENAME TO ${FAILED_RESTORE_NAME};
+  ALTER DATABASE ${PREV_NAME} RENAME TO life_production;
+  ALTER DATABASE life_production ALLOW_CONNECTIONS = true;
+  ALTER DATABASE ${FAILED_RESTORE_NAME} ALLOW_CONNECTIONS = true;
+"
+
+# 3. Перезапуск сервісів на попередній базі
+docker compose -p life-mp -f docker-compose.prod.yml --env-file .env.production start commerce storefront
+
+# 4. Перевірка повернення працездатності
 docker compose -p life-mp -f docker-compose.prod.yml --env-file .env.production ps
 ```
 
@@ -217,18 +260,22 @@ docker run --rm -d --name life-synthetic-dr-test \
   -e POSTGRES_PASSWORD=dr_password \
   postgres:16-alpine
 
-# 2. Створення тестової синтетичної схеми
+# 2. Створення тестової синтетичної схеми (категорії, майстри, товари)
 docker exec -i life-synthetic-dr-test psql -U dr_user -d life_dr_source << 'EOF'
+CREATE TABLE categories (id SERIAL PRIMARY KEY, handle VARCHAR(64) UNIQUE, name VARCHAR(128));
 CREATE TABLE artisans (id SERIAL PRIMARY KEY, handle VARCHAR(64) UNIQUE, name VARCHAR(128));
-CREATE TABLE products (id SERIAL PRIMARY KEY, artisan_id INT REFERENCES artisans(id), title VARCHAR(128));
+CREATE TABLE products (id SERIAL PRIMARY KEY, category_id INT REFERENCES categories(id), artisan_id INT REFERENCES artisans(id), title VARCHAR(128));
+
+INSERT INTO categories (handle, name) VALUES ('ceramics', 'Кераміка');
 INSERT INTO artisans (handle, name) VALUES ('kosiv-clay', 'Майстерня Косів');
-INSERT INTO products (artisan_id, title) VALUES (1, 'Глечик керамічний');
+INSERT INTO products (category_id, artisan_id, title) VALUES (1, 1, 'Глечик керамічний');
 EOF
 
-# 3. Експорт кастомного архіву та розрахунок контрольної суми
+# 3. Експорт кастомного архіву з суворим umask та розрахунок контрольної суми
+(umask 077 && touch /tmp/synthetic.dump && chmod 600 /tmp/synthetic.dump)
 docker exec life-synthetic-dr-test pg_dump -U dr_user -Fc life_dr_source > /tmp/synthetic.dump
 sha256sum /tmp/synthetic.dump > /tmp/CHECKSUMS.sha256
-
+chmod 600 /tmp/CHECKSUMS.sha256
 # 4. Перевірка цілісності та структури
 sha256sum -c /tmp/CHECKSUMS.sha256
 docker exec -i life-synthetic-dr-test pg_restore -l < /tmp/synthetic.dump | grep "TABLE DATA"
@@ -242,29 +289,61 @@ CREATE TABLE products (id SERIAL PRIMARY KEY, title VARCHAR(128));
 INSERT INTO products (title) VALUES ('Пошкоджений запис до відновлення');
 EOF
 
-# 6. Безпечне відновлення в ізольовану базу-кандидат
-docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_source -c "DROP DATABASE IF EXISTS life_dr_candidate;"
-docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_source -c "CREATE DATABASE life_dr_candidate;"
+# 6. Безпечне відновлення в ізольовану базу-кандидат (із захистом від активних з'єднань)
+docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_source \
+  -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'life_dr_candidate' AND pid <> pg_backend_pid();" \
+  -c "DROP DATABASE IF EXISTS life_dr_candidate WITH (FORCE);" \
+  -c "CREATE DATABASE life_dr_candidate;"
 docker exec -i life-synthetic-dr-test pg_restore -U dr_user -d life_dr_candidate --exit-on-error < /tmp/synthetic.dump
 
-# 7. Верифікація даних у базі-кандидаті
-docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_candidate -c "SELECT count(*) FROM products;"
+# 7. Fail-Closed верифікація схеми та даних у базі-кандидаті
+DRILL_TABLES=$(docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_candidate -t -A -c \
+  "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';")
+DRILL_PRODUCTS=$(docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_candidate -t -A -c \
+  "SELECT count(*) FROM products;")
+DRILL_CATEGORIES=$(docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_candidate -t -A -c \
+  "SELECT count(*) FROM categories;")
 
-# 8. Атомарна ротація баз (діюча -> backup, кандидат -> prod)
+if [ "${DRILL_TABLES}" -lt 3 ] || [ "${DRILL_PRODUCTS}" -le 0 ] || [ "${DRILL_CATEGORIES}" -le 0 ]; then
+  echo "ПОМИЛКА САМОПЕРЕВІРКИ: Відновлені дані не пройшли критерії валідності!" >&2
+  exit 1
+fi
+
+# 8. Атомарна ротація баз із блокуванням з'єднань
 docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_source -c "
-  SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'life_dr_prod' AND pid <> pg_backend_pid();
+  ALTER DATABASE life_dr_prod ALLOW_CONNECTIONS = false;
+  ALTER DATABASE life_dr_candidate ALLOW_CONNECTIONS = false;
+  SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IN ('life_dr_prod', 'life_dr_candidate') AND pid <> pg_backend_pid();
   ALTER DATABASE life_dr_prod RENAME TO life_dr_backup_pre_restore;
   ALTER DATABASE life_dr_candidate RENAME TO life_dr_prod;
+  ALTER DATABASE life_dr_prod ALLOW_CONNECTIONS = true;
+  ALTER DATABASE life_dr_backup_pre_restore ALLOW_CONNECTIONS = true;
 "
-
 # 9. Підтвердження успішного відновлення діючої бази та збереження бекапу
-docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_prod -c "SELECT title FROM products;"
+docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_prod -c "SELECT p.title, c.name, a.name FROM products p JOIN categories c ON p.category_id = c.id JOIN artisans a ON p.artisan_id = a.id;"
 docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_backup_pre_restore -c "SELECT title FROM products;"
 
+# 9.1. Перевірка процедури відкату (Rollback Drill)
+docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_source -c "
+  ALTER DATABASE life_dr_prod ALLOW_CONNECTIONS = false;
+  SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'life_dr_prod' AND pid <> pg_backend_pid();
+  ALTER DATABASE life_dr_prod RENAME TO life_dr_failed_candidate;
+  ALTER DATABASE life_dr_backup_pre_restore RENAME TO life_dr_prod;
+  ALTER DATABASE life_dr_prod ALLOW_CONNECTIONS = true;
+"
+docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_prod -c "SELECT title FROM products;"
+
+# Повернення відновленого стану для фінальних перевірок
+docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_source -c "
+  ALTER DATABASE life_dr_prod RENAME TO life_dr_backup_pre_restore;
+  ALTER DATABASE life_dr_failed_candidate RENAME TO life_dr_prod;
+  ALTER DATABASE life_dr_prod ALLOW_CONNECTIONS = true;
+"
 # 10. Fail-Closed негативний тест (перевірка реакції на пошкодження архіву)
 head -c 100 /tmp/synthetic.dump > /tmp/corrupted.dump
-docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_source -c "DROP DATABASE IF EXISTS life_dr_broken_test;"
-docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_source -c "CREATE DATABASE life_dr_broken_test;"
+docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_source \
+  -c "DROP DATABASE IF EXISTS life_dr_broken_test WITH (FORCE);" \
+  -c "CREATE DATABASE life_dr_broken_test;"
 docker exec -i life-synthetic-dr-test pg_restore -U dr_user -d life_dr_broken_test --exit-on-error < /tmp/corrupted.dump || echo "Пошкоджений дамп успішно відхилено, основна база неушкоджена"
 
 # 11. Очищення тимчасових ресурсів

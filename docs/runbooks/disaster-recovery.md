@@ -26,10 +26,10 @@
 
 > **Статус показників:** Зазначені нижче RPO та RTO є **цільовими проєктними орієнтирами (Provisional Target Objectives)**, а не емпірично доведеними або сертифікованими характеристиками SLA. Вони підлягають регулярному вимірюванню під час навчальних відновлень.
 
-| Показник | Цільовий орієнтир | Визначення та контекст |
-|---|---|---|
+| Показник                           | Цільовий орієнтир                                                                      | Визначення та контекст                                                                                                                                                                                                   |
+| ---------------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **RPO (Recovery Point Objective)** | **<= 24 годин** (плановий щоденний бекап) / **до точки знімка** (pre-release snapshot) | Максимально допустима втрата даних: у разі аварії дані повертаються до точки останнього валідного знімка. Перед релізом створюється snapshot, але це не гарантує нульової втрати транзакцій між релізом і моментом збою. |
-| **RTO (Recovery Time Objective)** | **<= 15 хвилин** | Цільовий час від моменту оголошення інциденту до відновлення працездатності сервісу. |
+| **RTO (Recovery Time Objective)**  | **<= 15 хвилин**                                                                       | Цільовий час від моменту оголошення інциденту до відновлення працездатності сервісу.                                                                                                                                     |
 
 ---
 
@@ -62,6 +62,7 @@ touch "${BACKUP_DIR}/BACKUP_COMPLETE_WITH_DB"
 ### 3.2. Критерії придатності резервної копії (Acceptance Criteria)
 
 Резервна копія вважається валідною лише за одночасного виконання таких умов:
+
 1. Файл `database.dump` існує, має розмір > 0 байт і успішно проходить перевірку заголовка `pg_restore -l`;
 2. Контрольна сума `sha256sum -c CHECKSUMS.sha256` повертає статус `OK`;
 3. Наявні файли-маркери `BACKUP_COMPLETE` та `BACKUP_COMPLETE_WITH_DB`;
@@ -70,6 +71,7 @@ touch "${BACKUP_DIR}/BACKUP_COMPLETE_WITH_DB"
 ### 3.3. Політика ротації локальних копій (Retention Policy)
 
 На хості зберігаються:
+
 - Усі пре-релізні знімки за останні **5 релізів**;
 - Щоденні автоматичні бекапи за останні **7 днів**;
 - Копії, старіші за 7 днів, автоматично ротуються та очищуються лише за наявності успішної реплікації у віддалене сховище.
@@ -79,6 +81,7 @@ touch "${BACKUP_DIR}/BACKUP_COMPLETE_WITH_DB"
 ## 4. Вимоги до віддаленого сховища (Offsite Storage Requirements)
 
 Для захисту від повної втрати сервера (катастрофа ЦОД або видалення VM):
+
 1. **Шифрування до відправки (Client-Side Encryption):**
    Дамп бази шифрується на хості асиметричним ключем (наприклад, за допомогою `age` або `gpg --encrypt`) перед завантаженням у мережу. Відкритий ключ для шифрування зберігається на хості, приватний ключ для розшифрування — суворо офлайн у сховищі ключів власника.
 2. **Ізольований бакет (Dedicated Object Storage):**
@@ -93,23 +96,29 @@ touch "${BACKUP_DIR}/BACKUP_COMPLETE_WITH_DB"
 У разі підтвердженого пошкодження бази даних оператор виконує такі кроки:
 
 ### Крок 1: Ізоляція трафіку (Введення режиму обслуговування)
+
 Щоб запобігти новим запитам та конфліктам даних, зупиняються клієнтські контейнери:
+
 ```bash
 cd /opt/life-mp/current/deploy
 docker compose -p life-mp -f docker-compose.prod.yml --env-file .env.production stop storefront commerce
 ```
 
 ### Крок 2: Верифікація цілісності відновлюваного дампу
+
 ```bash
 TARGET_BACKUP="/var/backups/life-mp/<BACKUP_ID>"
 
 # Перевірка цілісності архіву
 (cd "${TARGET_BACKUP}" && sha256sum -c CHECKSUMS.sha256)
 ```
-*Якщо перевірка контрольної суми не пройшла — дамп скомпрометовано, переходити до попереднього валідного бекапу.*
+
+_Якщо перевірка контрольної суми не пройшла — дамп скомпрометовано, переходити до попереднього валідного бекапу._
 
 ### Крок 3: Страхувальний знімок поточного стану (Pre-Restore Snapshot)
+
 Навіть пошкоджений стан бази бекапиться для можливого криміналістичного аудиту:
+
 ```bash
 EMERGENCY_DIR="/var/backups/life-mp/emergency-pre-restore-$(date +%Y%m%dT%H%M%SZ)"
 mkdir -p "${EMERGENCY_DIR}" && chmod 700 "${EMERGENCY_DIR}"
@@ -120,35 +129,78 @@ else
 fi
 ```
 
-### Крок 4: Відновлення структури та даних
+### Крок 4: Відновлення в ізольовану тимчасову базу (Safe Staging Database)
+
+Категорично забороняється виконувати прямий `pg_restore --clean` на діючу базу `life_production`. У разі збою відновлення посередині або пошкодження даних опція `--clean` безповоротно видаляє наявні таблиці, позбавляючи можливості відкату.
+
+Замість цього відновлення виконується в ізольовану базу-кандидат `life_restore_candidate`:
+
 ```bash
-# Для безпечного відновлення кастомного дампу (-Fc) із зупинкою при помилках:
-docker exec -i life-mp-postgres pg_restore -U life_prod -d life_production --clean --if-exists --exit-on-error < "${TARGET_BACKUP}/database.dump"
+# 1. Створення чистої тимчасової бази для перевірки відновлення
+docker exec life-mp-postgres psql -U life_prod -d postgres -c "DROP DATABASE IF EXISTS life_restore_candidate;"
+docker exec life-mp-postgres psql -U life_prod -d postgres -c "CREATE DATABASE life_restore_candidate WITH OWNER life_prod;"
 
-> **Застереження щодо цілісності:** Опція `--clean` видаляє наявні таблиці перед відновленням. Перед її запуском обов'язково переконайтеся, що всі клієнтські з'єднання зупинено (Крок 1). Для критичних інцидентів безпечніше відновлювати дамп у тимчасову базу (`life_restore_drill`), перевіряти структуру (Крок 5), і лише після успішної перевірки перемикати трафік.
-
-# ПРИМІТКА ЩОДО ФОРМАТІВ:
-# Якщо відновлюється успадкований plain SQL дамп (database.sql), використовується psql з прапорцем зупинки при помилках:
-# docker exec -i life-mp-postgres psql -U life_prod -d life_production --set ON_ERROR_STOP=1 < "${TARGET_BACKUP}/database.sql"
-# (утиліта pg_restore не підтримує plain text SQL і призначена виключно для custom, tar або directory форматів).
+# 2. Відновлення кастомного дампу (-Fc) в ізольовану базу із зупинкою при помилках
+docker exec -i life-mp-postgres pg_restore -U life_prod -d life_restore_candidate --exit-on-error < "${TARGET_BACKUP}/database.dump"
 ```
 
-### Крок 5: Саніті-перевірка цілісності схеми
+_Примітка щодо успадкованих SQL-дампів:_ Якщо відновлюється plain SQL (`database.sql`), використовується psql з прапорцем зупинки при помилках:
+`docker exec -i life-mp-postgres psql -U life_prod -d life_restore_candidate --set ON_ERROR_STOP=1 < "${TARGET_BACKUP}/database.sql"`
+
+### Крок 5: Саніті-перевірка схеми та цілісності у тимчасовій базі
+
+Перед перемиканням трафіку обов'язково перевіряється цілісність відновленого стану:
+
 ```bash
-# Перевірка наявності основних таблиць Medusa та каталогу
-docker exec life-mp-postgres psql -U life_prod -d life_production -c "
-  SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';
+# 1. Перевірка кількості таблиць у відновленій базі (у Medusa v2 — понад 50 таблиць)
+docker exec life-mp-postgres psql -U life_prod -d life_restore_candidate -c "
+  SELECT count(*) AS table_count FROM information_schema.tables WHERE table_schema = 'public';
+"
+
+# 2. Перевірка наявності та кількості ключових сутностей каталогу
+docker exec life-mp-postgres psql -U life_prod -d life_restore_candidate -c "
+  SELECT count(*) AS product_count FROM product;
 "
 ```
-Очікується ненульова кількість таблиць (у стандартній схемі Medusa v2 — понад 50 таблиць).
 
-### Крок 6: Відновлення роботи сервісів та тестування
+_Якщо перевірка не пройшла або виявлено помилки — робоча база `life_production` залишається повністю недоторканою, а оператор переходить до іншого знімка._
+
+### Крок 6: Безпечна ротація баз даних (Safe Atomic Swap)
+
+Лише після підтвердження валідності даних виконується перемикання баз із збереженням страхувальної копії:
+
+```bash
+PREV_NAME="life_production_pre_restore_$(date +%Y%m%dT%H%M%SZ)"
+
+docker exec life-mp-postgres psql -U life_prod -d postgres -c "
+  -- Примусове завершення активних з'єднань з робочою базою
+  SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+  WHERE datname = 'life_production' AND pid <> pg_backend_pid();
+
+  -- Перейменування старої бази у страхувальну копію
+  ALTER DATABASE life_production RENAME TO ${PREV_NAME};
+
+  -- Активація відновленого кандидата
+  ALTER DATABASE life_restore_candidate RENAME TO life_production;
+"
+```
+
+### Крок 7: Відновлення роботи сервісів та верифікація
+
 ```bash
 cd /opt/life-mp/current/deploy
 docker compose -p life-mp -f docker-compose.prod.yml --env-file .env.production start commerce storefront
 
-# Очікування проходження healthcheck
+# Перевірка проходження healthcheck
 docker compose -p life-mp -f docker-compose.prod.yml --env-file .env.production ps
+```
+
+### Крок 8: Очищення страхувальної копії (після стабілізації)
+
+Після підтвердження стабільної роботи (рекомендовано не раніше ніж через 24 години після інциденту):
+
+```bash
+# docker exec life-mp-postgres psql -U life_prod -d postgres -c "DROP DATABASE IF EXISTS ${PREV_NAME};"
 ```
 
 ---
@@ -181,18 +233,41 @@ sha256sum /tmp/synthetic.dump > /tmp/CHECKSUMS.sha256
 sha256sum -c /tmp/CHECKSUMS.sha256
 docker exec -i life-synthetic-dr-test pg_restore -l < /tmp/synthetic.dump | grep "TABLE DATA"
 
-# 5. Відновлення в чисту цільову базу даних
-docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_source -c "CREATE DATABASE life_dr_target;"
-docker exec -i life-synthetic-dr-test pg_restore -U dr_user -d life_dr_target < /tmp/synthetic.dump
+# 5. Створення імітації діючої бази з застарілими/пошкодженими даними
+docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_source -c "
+  CREATE DATABASE life_dr_prod;
+"
+docker exec -i life-synthetic-dr-test psql -U dr_user -d life_dr_prod << 'EOF'
+CREATE TABLE products (id SERIAL PRIMARY KEY, title VARCHAR(128));
+INSERT INTO products (title) VALUES ('Пошкоджений запис до відновлення');
+EOF
 
-# 6. Верифікація інваріантів відновлених даних
-docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_target -c "SELECT count(*) FROM products;"
+# 6. Безпечне відновлення в ізольовану базу-кандидат
+docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_source -c "DROP DATABASE IF EXISTS life_dr_candidate;"
+docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_source -c "CREATE DATABASE life_dr_candidate;"
+docker exec -i life-synthetic-dr-test pg_restore -U dr_user -d life_dr_candidate --exit-on-error < /tmp/synthetic.dump
 
-# 7. Fail-Closed негативний тест (перевірка реакції на пошкодження заголовка)
+# 7. Верифікація даних у базі-кандидаті
+docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_candidate -c "SELECT count(*) FROM products;"
+
+# 8. Атомарна ротація баз (діюча -> backup, кандидат -> prod)
+docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_source -c "
+  SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'life_dr_prod' AND pid <> pg_backend_pid();
+  ALTER DATABASE life_dr_prod RENAME TO life_dr_backup_pre_restore;
+  ALTER DATABASE life_dr_candidate RENAME TO life_dr_prod;
+"
+
+# 9. Підтвердження успішного відновлення діючої бази та збереження бекапу
+docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_prod -c "SELECT title FROM products;"
+docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_backup_pre_restore -c "SELECT title FROM products;"
+
+# 10. Fail-Closed негативний тест (перевірка реакції на пошкодження архіву)
 head -c 100 /tmp/synthetic.dump > /tmp/corrupted.dump
-docker exec -i life-synthetic-dr-test pg_restore -l < /tmp/corrupted.dump || echo "Пошкоджений дамп успішно відхилено"
+docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_source -c "DROP DATABASE IF EXISTS life_dr_broken_test;"
+docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_source -c "CREATE DATABASE life_dr_broken_test;"
+docker exec -i life-synthetic-dr-test pg_restore -U dr_user -d life_dr_broken_test --exit-on-error < /tmp/corrupted.dump || echo "Пошкоджений дамп успішно відхилено, основна база неушкоджена"
 
-# 8. Очищення тимчасових ресурсів
+# 11. Очищення тимчасових ресурсів
 docker rm -f life-synthetic-dr-test
 rm -f /tmp/synthetic.dump /tmp/CHECKSUMS.sha256 /tmp/corrupted.dump
 ```

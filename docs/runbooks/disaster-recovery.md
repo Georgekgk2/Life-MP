@@ -116,7 +116,7 @@ docker compose -p life-mp -f docker-compose.prod.yml --env-file .env.production 
 
 ```bash
 TARGET_BACKUP="/var/backups/life-mp/<BACKUP_ID>"
-RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)_$$"
+RUN_ID="$(date -u +%Y%m%d_%H%M%S)_$$"
 RESTORE_DB="life_restore_candidate_${RUN_ID}"
 PREV_NAME="life_production_pre_restore_${RUN_ID}"
 FAILED_RESTORE_NAME="life_failed_restore_${RUN_ID}"
@@ -163,7 +163,7 @@ BASH
 ```bash
 bash -Eeuo pipefail <<'BASH'
 : "${RESTORE_DB:?Run the recovery setup in Step 2 first}"
-[[ "${RESTORE_DB}" =~ ^life_restore_candidate_[A-Za-z0-9_]+$ ]]
+[[ "${RESTORE_DB}" =~ ^life_restore_candidate_[a-z0-9_]+$ ]]
 
 # A collision fails safely; no existing database is dropped.
 docker exec life-mp-postgres psql -v ON_ERROR_STOP=1 -U life_prod -d postgres \
@@ -189,7 +189,7 @@ BASH
 ```bash
 bash -Eeuo pipefail <<'BASH'
 : "${RESTORE_DB:?Run the recovery setup in Step 2 first}"
-[[ "${RESTORE_DB}" =~ ^life_restore_candidate_[A-Za-z0-9_]+$ ]]
+[[ "${RESTORE_DB}" =~ ^life_restore_candidate_[a-z0-9_]+$ ]]
 
 HAS_PRODUCT_TABLE="$(docker exec life-mp-postgres psql -v ON_ERROR_STOP=1 -U life_prod -d "${RESTORE_DB}" -t -A -c \
   "SELECT to_regclass('public.product') IS NOT NULL;")"
@@ -211,13 +211,14 @@ BASH
 Перед виконанням переконайтеся, що storefront, commerce та всі інші відомі застосунки, воркери й jobs, які підключаються до цієї БД, зупинені та не можуть повторно стартувати. Запишіть `RUN_ID`, `RESTORE_DB` і `PREV_NAME` у журнал інциденту. Ідентифікатори з Кроку 2 містять лише літери, цифри та `_`.
 
 Спершу окремими командами зафіксуйте `ALLOW_CONNECTIONS=false`. Кожна команда завершується власним commit; лише після цього завершіть наявні сесії. Не об'єднуйте цей крок із перейменуванням в один `psql -c`: інші сесії не побачать незакомічену заборону на підключення.
+PostgreSQL виконує кілька SQL-операторів, переданих одним simple-query request, в одній неявній транзакції; помилка відкочує весь request. Cutover нижче спирається на цю властивість ([PostgreSQL 16: Protocol Flow](https://www.postgresql.org/docs/16/protocol-flow.html)).
 
 ```bash
 bash -Eeuo pipefail <<'BASH'
 : "${RESTORE_DB:?Run the recovery setup in Step 2 first}"
 : "${PREV_NAME:?Run the recovery setup in Step 2 first}"
-[[ "${RESTORE_DB}" =~ ^life_restore_candidate_[A-Za-z0-9_]+$ ]]
-[[ "${PREV_NAME}" =~ ^life_production_pre_restore_[A-Za-z0-9_]+$ ]]
+[[ "${RESTORE_DB}" =~ ^life_restore_candidate_[a-z0-9_]+$ ]]
+[[ "${PREV_NAME}" =~ ^life_production_pre_restore_[a-z0-9_]+$ ]]
 
 PREVIOUS_EXISTS="$(docker exec life-mp-postgres psql -v ON_ERROR_STOP=1 -U life_prod -d postgres -t -A -c \
   "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = '${PREV_NAME}');")"
@@ -246,18 +247,18 @@ BASH
 
 #### Якщо fencing закомічено, а rename transaction не відбувся
 
-Виконуйте лише коли службова перевірка підтверджує, що `life_production` іще є старою базою, `PREV_NAME` відсутня, candidate існує з `ALLOW_CONNECTIONS=false`, а активних сесій до старої та candidate баз немає. Якщо фактичний стан відрізняється, зупиніться й передайте відновлення incident lead.
+Виконуйте лише коли службова перевірка підтверджує, що `life_production` іще є старою базою та має `ALLOW_CONNECTIONS=false`, `PREV_NAME` відсутня, candidate існує з `ALLOW_CONNECTIONS=false`, а активних сесій до старої та candidate баз немає. Якщо фактичний стан відрізняється, зупиніться й передайте відновлення incident lead.
 
 ```bash
 bash -Eeuo pipefail <<'BASH'
 : "${RESTORE_DB:?Use the exact RESTORE_DB recorded for this recovery}"
 : "${PREV_NAME:?Use the exact PREV_NAME recorded for this recovery}"
-[[ "${RESTORE_DB}" =~ ^life_restore_candidate_[A-Za-z0-9_]+$ ]]
-[[ "${PREV_NAME}" =~ ^life_production_pre_restore_[A-Za-z0-9_]+$ ]]
+[[ "${RESTORE_DB}" =~ ^life_restore_candidate_[a-z0-9_]+$ ]]
+[[ "${PREV_NAME}" =~ ^life_production_pre_restore_[a-z0-9_]+$ ]]
 
 STATE="$(docker exec life-mp-postgres psql -v ON_ERROR_STOP=1 -U life_prod -d postgres -t -A -F '|' -c \
-  "SELECT COALESCE((SELECT datallowconn FROM pg_database WHERE datname = 'life_production'), false), EXISTS (SELECT 1 FROM pg_database WHERE datname = '${PREV_NAME}'), COALESCE((SELECT datallowconn FROM pg_database WHERE datname = '${RESTORE_DB}'), false), (SELECT count(*) FROM pg_stat_activity WHERE datname IN ('life_production', '${RESTORE_DB}'));")"
-if [ "${STATE}" != "f|f|f|0" ]; then
+  "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'life_production'), COALESCE((SELECT datallowconn FROM pg_database WHERE datname = 'life_production'), false), EXISTS (SELECT 1 FROM pg_database WHERE datname = '${PREV_NAME}'), EXISTS (SELECT 1 FROM pg_database WHERE datname = '${RESTORE_DB}'), COALESCE((SELECT datallowconn FROM pg_database WHERE datname = '${RESTORE_DB}'), false), (SELECT count(*) FROM pg_stat_activity WHERE datname IN ('life_production', '${RESTORE_DB}'));")"
+if [ "${STATE}" != "t|f|f|t|f|0" ]; then
   echo "STOP: unexpected database state (${STATE}); do not reopen or rename any database." >&2
   exit 1
 fi
@@ -291,8 +292,8 @@ BASH
 bash -Eeuo pipefail <<'BASH'
 : "${PREV_NAME:?Use the exact PREV_NAME recorded for this recovery}"
 : "${FAILED_RESTORE_NAME:?Use the exact FAILED_RESTORE_NAME recorded for this recovery}"
-[[ "${PREV_NAME}" =~ ^life_production_pre_restore_[A-Za-z0-9_]+$ ]]
-[[ "${FAILED_RESTORE_NAME}" =~ ^life_failed_restore_[A-Za-z0-9_]+$ ]]
+[[ "${PREV_NAME}" =~ ^life_production_pre_restore_[a-z0-9_]+$ ]]
+[[ "${FAILED_RESTORE_NAME}" =~ ^life_failed_restore_[a-z0-9_]+$ ]]
 
 cd /opt/life-mp/current/deploy
 docker compose -p life-mp -f docker-compose.prod.yml --env-file .env.production stop storefront commerce
@@ -357,6 +358,12 @@ for _ in $(seq 1 60); do
   sleep 1
 done
 test "${READY}" = true
+RUN_ID="$(date -u +%Y%m%d_%H%M%S)_$$"
+RESTORE_DB="life_restore_candidate_${RUN_ID}"
+PREV_NAME="life_production_pre_restore_${RUN_ID}"
+FAILED_RESTORE_NAME="life_failed_restore_${RUN_ID}"
+[[ "${RESTORE_DB}" =~ ^life_restore_candidate_[a-z0-9_]+$ ]]
+
 
 psql() {
   local arg
@@ -398,11 +405,11 @@ INSERT INTO products (title) VALUES ('Пошкоджений запис до в�
 SQL
 
 # Restore into a new candidate; never drop or force-delete an earlier database.
-psql -d postgres -c "CREATE DATABASE life_dr_candidate;"
-docker exec -i "${CONTAINER}" pg_restore -U dr_user -d life_dr_candidate --exit-on-error < "${DUMP}"
+psql -d postgres -c "CREATE DATABASE ${RESTORE_DB};"
+docker exec -i "${CONTAINER}" pg_restore -U dr_user -d "${RESTORE_DB}" --exit-on-error < "${DUMP}"
 
 # Exact expected fixture rows prove the restored relational data, not mere query success.
-COUNTS="$(psql -d life_dr_candidate -At -F '|' -c \
+COUNTS="$(psql -d "${RESTORE_DB}" -At -F '|' -c \
   "SELECT (SELECT count(*) FROM categories), (SELECT count(*) FROM artisans), (SELECT count(*) FROM products);")"
 if [ "${COUNTS}" != "1|1|1" ]; then
   echo "FAIL: candidate fixture counts were ${COUNTS}, expected 1|1|1" >&2
@@ -424,36 +431,62 @@ if psql -d life_dr_prod -c "SELECT 1;" >/dev/null 2>&1; then
   echo "FAIL: a new session connected after the committed connection fence" >&2
   exit 1
 fi
-psql -d postgres -c "ALTER DATABASE life_dr_candidate ALLOW_CONNECTIONS = false;"
+psql -d postgres -c "ALTER DATABASE ${RESTORE_DB} ALLOW_CONNECTIONS = false;"
 psql -d postgres -c \
-  "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IN ('life_dr_prod', 'life_dr_candidate') AND pid <> pg_backend_pid();"
-# Exercise the documented recovery guard for a failed rename transaction.
+  "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IN ('life_dr_prod', '${RESTORE_DB}') AND pid <> pg_backend_pid();"
+# Exercise the documented recovery guard with the real generated identifiers.
 FENCED_STATE="$(psql -d postgres -At -F '|' -c \
-  "SELECT COALESCE((SELECT datallowconn FROM pg_database WHERE datname = 'life_dr_prod'), false), EXISTS (SELECT 1 FROM pg_database WHERE datname = 'life_dr_backup_pre_restore'), COALESCE((SELECT datallowconn FROM pg_database WHERE datname = 'life_dr_candidate'), false), (SELECT count(*) FROM pg_stat_activity WHERE datname IN ('life_dr_prod', 'life_dr_candidate'));")"
-if [ "${FENCED_STATE}" != "f|f|f|0" ]; then
-  echo "FAIL: fenced recovery state was ${FENCED_STATE}, expected f|f|f|0" >&2
+  "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'life_dr_prod'), COALESCE((SELECT datallowconn FROM pg_database WHERE datname = 'life_dr_prod'), false), EXISTS (SELECT 1 FROM pg_database WHERE datname = '${PREV_NAME}'), EXISTS (SELECT 1 FROM pg_database WHERE datname = '${RESTORE_DB}'), COALESCE((SELECT datallowconn FROM pg_database WHERE datname = '${RESTORE_DB}'), false), (SELECT count(*) FROM pg_stat_activity WHERE datname IN ('life_dr_prod', '${RESTORE_DB}'));")"
+if [ "${FENCED_STATE}" != "t|f|f|t|f|0" ]; then
+  echo "FAIL: fenced recovery state was ${FENCED_STATE}, expected t|f|f|t|f|0" >&2
   exit 1
 fi
+
+# A second-statement error must roll back the first rename in this one query request.
+if psql -d postgres -c "
+  ALTER DATABASE life_dr_prod RENAME TO ${PREV_NAME};
+  ALTER DATABASE ${RESTORE_DB}_missing RENAME TO life_dr_prod;
+" >/dev/null 2>&1; then
+  echo "FAIL: invalid second rename unexpectedly succeeded" >&2
+  exit 1
+fi
+FAILED_RENAME_STATE="$(psql -d postgres -At -F '|' -c \
+  "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'life_dr_prod'), COALESCE((SELECT datallowconn FROM pg_database WHERE datname = 'life_dr_prod'), false), EXISTS (SELECT 1 FROM pg_database WHERE datname = '${PREV_NAME}'), EXISTS (SELECT 1 FROM pg_database WHERE datname = '${RESTORE_DB}'), COALESCE((SELECT datallowconn FROM pg_database WHERE datname = '${RESTORE_DB}'), false), (SELECT count(*) FROM pg_stat_activity WHERE datname IN ('life_dr_prod', '${RESTORE_DB}'));")"
+if [ "${FAILED_RENAME_STATE}" != "t|f|f|t|f|0" ]; then
+  echo "FAIL: first rename was not rolled back after second-statement error: ${FAILED_RENAME_STATE}" >&2
+  exit 1
+fi
+echo "PASS: failed second rename rolled back the first statement"
+
+MISSING_CANDIDATE_STATE="$(psql -d postgres -At -F '|' -c \
+  "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'life_dr_prod'), COALESCE((SELECT datallowconn FROM pg_database WHERE datname = 'life_dr_prod'), false), EXISTS (SELECT 1 FROM pg_database WHERE datname = '${PREV_NAME}'), EXISTS (SELECT 1 FROM pg_database WHERE datname = '${RESTORE_DB}_missing'), COALESCE((SELECT datallowconn FROM pg_database WHERE datname = '${RESTORE_DB}_missing'), false), (SELECT count(*) FROM pg_stat_activity WHERE datname IN ('life_dr_prod', '${RESTORE_DB}_missing'));")"
+if [ "${MISSING_CANDIDATE_STATE}" != "t|f|f|f|f|0" ]; then
+  echo "FAIL: missing candidate did not have a distinct fail-closed state: ${MISSING_CANDIDATE_STATE}" >&2
+  exit 1
+fi
+echo "PASS: missing candidate is rejected by the fallback state guard"
+
+# Simulate the documented fallback: reopen old production only; keep candidate fenced.
 psql -d postgres -c "ALTER DATABASE life_dr_prod ALLOW_CONNECTIONS = true;"
 FALLBACK_STATE="$(psql -d postgres -At -F '|' -c \
-  "SELECT (SELECT datallowconn FROM pg_database WHERE datname = 'life_dr_prod'), (SELECT datallowconn FROM pg_database WHERE datname = 'life_dr_candidate');")"
-if [ "${FALLBACK_STATE}" != "t|f" ] || psql -d life_dr_candidate -c "SELECT 1;" >/dev/null 2>&1; then
+  "SELECT (SELECT datallowconn FROM pg_database WHERE datname = 'life_dr_prod'), (SELECT datallowconn FROM pg_database WHERE datname = '${RESTORE_DB}');")"
+if [ "${FALLBACK_STATE}" != "t|f" ] || psql -d "${RESTORE_DB}" -c "SELECT 1;" >/dev/null 2>&1; then
   echo "FAIL: recovery fallback did not reopen only the old database" >&2
   exit 1
 fi
 psql -d postgres -c "ALTER DATABASE life_dr_prod ALLOW_CONNECTIONS = false;"
 psql -d postgres -c \
-  "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IN ('life_dr_prod', 'life_dr_candidate') AND pid <> pg_backend_pid();"
+  "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IN ('life_dr_prod', '${RESTORE_DB}') AND pid <> pg_backend_pid();"
 
 
 # The rename pair is one transaction. The old database stays closed to application clients.
 psql -d postgres -c "
-  ALTER DATABASE life_dr_prod RENAME TO life_dr_backup_pre_restore;
-  ALTER DATABASE life_dr_candidate RENAME TO life_dr_prod;
+  ALTER DATABASE life_dr_prod RENAME TO ${PREV_NAME};
+  ALTER DATABASE ${RESTORE_DB} RENAME TO life_dr_prod;
   ALTER DATABASE life_dr_prod ALLOW_CONNECTIONS = true;
 "
 BACKUP_ALLOW_CONNECTIONS="$(psql -d postgres -At -c \
-  "SELECT datallowconn FROM pg_database WHERE datname = 'life_dr_backup_pre_restore';")"
+  "SELECT datallowconn FROM pg_database WHERE datname = '${PREV_NAME}';")"
 if [ "${BACKUP_ALLOW_CONNECTIONS}" != "f" ]; then
   echo "FAIL: pre-restore database was reopened to clients" >&2
   exit 1
@@ -470,14 +503,14 @@ psql -d postgres -c "ALTER DATABASE life_dr_prod ALLOW_CONNECTIONS = false;"
 psql -d postgres -c \
   "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'life_dr_prod' AND pid <> pg_backend_pid();"
 psql -d postgres -c "
-  ALTER DATABASE life_dr_prod RENAME TO life_dr_failed_restore;
-  ALTER DATABASE life_dr_failed_restore ALLOW_CONNECTIONS = false;
-  ALTER DATABASE life_dr_backup_pre_restore RENAME TO life_dr_prod;
+  ALTER DATABASE life_dr_prod RENAME TO ${FAILED_RESTORE_NAME};
+  ALTER DATABASE ${FAILED_RESTORE_NAME} ALLOW_CONNECTIONS = false;
+  ALTER DATABASE ${PREV_NAME} RENAME TO life_dr_prod;
   ALTER DATABASE life_dr_prod ALLOW_CONNECTIONS = true;
 "
 ROLLED_BACK_ROW="$(psql -d life_dr_prod -At -c "SELECT title FROM products;")"
 FAILED_DB_ALLOW_CONNECTIONS="$(psql -d postgres -At -c \
-  "SELECT datallowconn FROM pg_database WHERE datname = 'life_dr_failed_restore';")"
+  "SELECT datallowconn FROM pg_database WHERE datname = '${FAILED_RESTORE_NAME}';")"
 if [ "${ROLLED_BACK_ROW}" != "Пошкоджений запис до відновлення" ] || [ "${FAILED_DB_ALLOW_CONNECTIONS}" != "f" ]; then
   echo "FAIL: rollback result or failed-database isolation was incorrect" >&2
   exit 1

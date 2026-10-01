@@ -21,6 +21,8 @@ overrides:
   csv-parse: 7.0.2
   morgan: 1.12.1
   "@rushstack/node-core-library>ajv": 8.18.0
+  axios: 1.20.0
+  "@grpc/grpc-js": 1.14.5
 allowBuilds:
   "@medusajs/telemetry": false
   "@swc/core": true

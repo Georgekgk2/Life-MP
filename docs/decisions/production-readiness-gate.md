@@ -228,5 +228,21 @@ Public infrastructure accessibility не є application, legal, financial або
 - **Подальші межі й дії:**
   1. Не виконувати SSH, `docker pull`, `docker compose`, рестартів чи інших віддалених змін. `infra/deployment-policy.json` залишається визначальним; цей запис не змінює її.
   2. Власник має окремо вирішити питання видимості репозиторію та пакетів. Автоматичну зміну visibility не виконувати.
-  3. Виправлення DR runbook запропоновані в PR #112, який потребує незалежного review та перевірок; поки PR не merged, вони не є чинним runbook.
+  3. Виправлення DR runbook злиті через PR #112 у commit `d3b5afec16a043fcb9192bfbbc8c882628c8b831`; post-merge CI, Security Scan, CodeQL і Release Container Images завершилися успішно. [Closure-запис](https://github.com/Georgekgk2/Life-MP/pull/112#issuecomment-5941638117) відокремлює локальні synthetic докази від неперевіреного runtime і фіксує відсутність formal GitHub approval. Це не змінює deployment policy.
   4. Комерційні й production gates залишаються `BLOCKED / NO-GO`. Цей інцидентний запис не є дозволом на deployment або активацію.
+
+### DEMO-UPDATE-d3b5afec — обмежений scope рішення оператора
+
+- **Дата запису:** 2026-10-01.
+- **Статус:** `OPERATOR SCOPE RECORDED / EXECUTION BLOCKED BY POLICY`.
+- **Джерело рішення:** команда користувача `go` у цій сесії після пропозиції зафіксувати обмежене погодження оновлення демо конкретними release images. AI-асистент є виконавцем запису, не власником авторизації. Це не погодження merge без review і не ретроактивне виправдання попередніх remote дій.
+- **Ціль:** наявне ізольоване public-demo середовище `https://life-mp.pp.ua/`. Історично задокументований хост — `34.139.21.224`; відповідність хоста цьому середовищу, його поточний стан та безпечність registry authentication ще не підтверджені для цього оновлення.
+- **Незмінний release candidate:** commit `d3b5afec16a043fcb9192bfbbc8c882628c8b831`, [Release Container Images run 36925554797](https://github.com/Georgekgk2/Life-MP/actions/runs/36925554797), artifact `image-digests-manifest` / `IMAGE_DIGESTS.json`:
+  - storefront: `ghcr.io/georgekgk2/life-storefront@sha256:545473fc7cb3d5a53a7f21a4ddf7db1d4cbe4a2f5c5fcb689bb88fdd69f1c076`;
+  - commerce: `ghcr.io/georgekgk2/life-commerce@sha256:d1a7c65d58a3b1244f04d273c1921e7a278b932b8274265086e98be49ba76bb3`.
+- **Запланований scope після належного відкриття policy:** одна контрольована промоція цих двох образів без rebuild, збереження `public-demo` / fixture режиму, перевірка health і ключових сторінок, повернення до зафіксованих до операції runtime digests у разі невдалої перевірки.
+- **Не входять у scope:** DB migrations чи restore, зміна DNS/TLS/firewall, інших проєктів на хості або repository/package visibility, активація live payments/shipping/fiscalization та повідомлення замовникам.
+- **Обов’язкова передумова виконання:** `infra/deployment-policy.json` лишається визначальним. `CONTAINED_PHASE_P2` і scanner `packages/config/src/deployment-containment.ts` вимагають `allow_remote_deployment=false` та `allow_ssh_execution=false`; чинного механізму scoped remote exception немає. Потрібна попередня policy-зміна з enforceable обмеженнями цього scope; сам запис, його merge або зелений preflight не відкривають remote capabilities. До такої зміни SSH, pull та рестарти заборонені.
+- **Перед промоцією, лише за чинним дозволом:** підтвердити ціль і shared-host isolation, безпечну GHCR authentication без розкриття credentials або відкриття пакетів, manifest digest та Cosign provenance для цього commit; зафіксувати фактичні runtime digests і валідний серверний backup без копіювання бойових даних на робочу станцію. Попередній успішний release workflow не замінює цих перевірок.
+- **Завершення scope:** одна успішна промоція з перевіркою або скасування рішення оператором. Інша ціль, commit чи digest не покриваються цим записом.
+- **Повідомлення замовникам:** відкладене за рішенням користувача до фактичного дозволеного оновлення й перевірки демо; цей запис не свідчить про виконаний deployment.

@@ -40,23 +40,29 @@
 Перед будь-яким втручанням або щоденно за розкладом cron виконується процедура:
 
 ```bash
-# 1. Формування мітки часу та директорії
+bash -Eeuo pipefail <<'BASH'
+umask 077
+
+# mkdir without -p fails on an existing backup ID instead of overwriting it.
 BACKUP_ID="rel-$(date -u +%Y%m%dT%H%M%SZ)"
 BACKUP_DIR="/var/backups/life-mp/${BACKUP_ID}"
-mkdir -p "${BACKUP_DIR}"
-chmod 700 "${BACKUP_DIR}"
+mkdir -m 700 -- "${BACKUP_DIR}"
 
-# 2. Створення стисненого дампу PostgreSQL без блокування таблиць
-docker exec life-mp-postgres pg_dump -U life_prod -Fc life_production > "${BACKUP_DIR}/database.dump"
-chmod 600 "${BACKUP_DIR}/database.dump"
+DUMP_TMP="$(mktemp "${BACKUP_DIR}/.database.dump.XXXXXX")"
+CHECKSUM_TMP="$(mktemp "${BACKUP_DIR}/.CHECKSUMS.XXXXXX")"
+trap 'rm -f -- "${DUMP_TMP}" "${CHECKSUM_TMP}"' EXIT
 
-# 3. Розрахунок криптографічної контрольної суми
-(cd "${BACKUP_DIR}" && sha256sum database.dump > CHECKSUMS.sha256)
-chmod 600 "${BACKUP_DIR}/CHECKSUMS.sha256"
+# A failed dump or archive-list check aborts before publishing completion markers.
+docker exec life-mp-postgres pg_dump -U life_prod -Fc life_production > "${DUMP_TMP}"
+test -s "${DUMP_TMP}"
+docker exec -i life-mp-postgres pg_restore -l < "${DUMP_TMP}" > /dev/null
+mv -- "${DUMP_TMP}" "${BACKUP_DIR}/database.dump"
+(cd "${BACKUP_DIR}" && sha256sum database.dump) > "${CHECKSUM_TMP}"
+mv -- "${CHECKSUM_TMP}" "${BACKUP_DIR}/CHECKSUMS.sha256"
 
-# 4. Створення маркерів завершення
-touch "${BACKUP_DIR}/BACKUP_COMPLETE"
-touch "${BACKUP_DIR}/BACKUP_COMPLETE_WITH_DB"
+# Markers are published only after dump and checksum creation succeeded.
+touch "${BACKUP_DIR}/BACKUP_COMPLETE" "${BACKUP_DIR}/BACKUP_COMPLETE_WITH_DB"
+BASH
 ```
 
 ### 3.2. Критерії придатності резервної копії (Acceptance Criteria)
@@ -97,111 +103,225 @@ touch "${BACKUP_DIR}/BACKUP_COMPLETE_WITH_DB"
 
 ### Крок 1: Ізоляція трафіку (Введення режиму обслуговування)
 
-Щоб запобігти новим запитам та конфліктам даних, зупиняються клієнтські контейнери:
+Зупиніть storefront, commerce та будь-які інші відомі клієнти PostgreSQL. Якщо воркери або jobs не керуються цим Compose-проєктом, зупиніть їх окремо й зафіксуйте команду безпечного повторного запуску. PostgreSQL залиште запущеним для backup і restore.
 
 ```bash
 cd /opt/life-mp/current/deploy
 docker compose -p life-mp -f docker-compose.prod.yml --env-file .env.production stop storefront commerce
 ```
 
-### Крок 2: Верифікація цілісності відновлюваного дампу
+### Крок 2: Вибір і перевірка цілісності резервної копії
+
+У тому самому Bash-сеансі задайте точний каталог backup та унікальний ідентифікатор відновлення. Збережіть `RUN_ID`; після розриву сеансу задайте той самий ідентифікатор вручну з журналу інциденту, не генеруйте новий для rollback.
 
 ```bash
 TARGET_BACKUP="/var/backups/life-mp/<BACKUP_ID>"
-
-# Перевірка цілісності архіву
-(cd "${TARGET_BACKUP}" && sha256sum -c CHECKSUMS.sha256)
+RUN_ID="$(date -u +%Y%m%d_%H%M%S)_$$"
+RESTORE_DB="life_restore_candidate_${RUN_ID}"
+PREV_NAME="life_production_pre_restore_${RUN_ID}"
+FAILED_RESTORE_NAME="life_failed_restore_${RUN_ID}"
+export TARGET_BACKUP RUN_ID RESTORE_DB PREV_NAME FAILED_RESTORE_NAME
 ```
 
-_Якщо перевірка контрольної суми не пройшла — дамп скомпрометовано, переходити до попереднього валідного бекапу._
+```bash
+bash -Eeuo pipefail <<'BASH'
+: "${TARGET_BACKUP:?Set TARGET_BACKUP to the exact backup directory}"
+test -s "${TARGET_BACKUP}/database.dump"
+test -f "${TARGET_BACKUP}/BACKUP_COMPLETE"
+test -f "${TARGET_BACKUP}/BACKUP_COMPLETE_WITH_DB"
+(cd "${TARGET_BACKUP}" && sha256sum -c CHECKSUMS.sha256)
+docker exec -i life-mp-postgres pg_restore -l < "${TARGET_BACKUP}/database.dump" > /dev/null
+BASH
+```
+
+Якщо будь-яка команда завершується помилкою, не продовжуйте з цього backup. Виберіть інший валідний знімок і зафіксуйте причину відхилення.
 
 ### Крок 3: Страхувальний знімок поточного стану (Pre-Restore Snapshot)
 
 Навіть пошкоджений стан бази бекапиться для можливого криміналістичного аудиту:
 
 ```bash
-EMERGENCY_DIR="/var/backups/life-mp/emergency-pre-restore-$(date +%Y%m%dT%H%M%SZ)"
-mkdir -p "${EMERGENCY_DIR}" && chmod 700 "${EMERGENCY_DIR}"
-if docker exec life-mp-postgres pg_dump -U life_prod -Fc life_production > "${EMERGENCY_DIR}/corrupted_state.dump"; then
-  echo "Попередній знімок аварійного стану збережено."
-else
-  echo "УВАГА: Не вдалося зняти дамп аварійного стану (можливе пошкодження системних каталогів або брак місця). Зафіксуйте журнал помилок."
-fi
+bash -Eeuo pipefail <<'BASH'
+: "${RUN_ID:?Run the recovery setup in Step 2 first}"
+EMERGENCY_DIR="/var/backups/life-mp/emergency-pre-restore-${RUN_ID}"
+mkdir -m 700 -- "${EMERGENCY_DIR}"
+DUMP_TMP="$(mktemp "${EMERGENCY_DIR}/.corrupted_state.dump.XXXXXX")"
+trap 'rm -f -- "${DUMP_TMP}"' EXIT
+
+docker exec life-mp-postgres pg_dump -U life_prod -Fc life_production > "${DUMP_TMP}"
+test -s "${DUMP_TMP}"
+docker exec -i life-mp-postgres pg_restore -l < "${DUMP_TMP}" > /dev/null
+mv -- "${DUMP_TMP}" "${EMERGENCY_DIR}/corrupted_state.dump"
+echo "Pre-restore snapshot verified at ${EMERGENCY_DIR}/corrupted_state.dump"
+BASH
 ```
 
 ### Крок 4: Відновлення в ізольовану тимчасову базу (Safe Staging Database)
 
-Категорично забороняється виконувати прямий `pg_restore --clean` на діючу базу `life_production`. У разі збою відновлення посередині або пошкодження даних опція `--clean` безповоротно видаляє наявні таблиці, позбавляючи можливості відкату.
-
-Замість цього відновлення виконується в ізольовану базу-кандидат `life_restore_candidate`:
+Використовуйте унікальну назву `RESTORE_DB`, задану в Кроці 2. Не видаляйте попередню базу-кандидат автоматично: невідомий або зайнятий кандидат потрібно дослідити окремо; не застосовуйте `DROP DATABASE ... WITH (FORCE)` як стандартний крок відновлення.
 
 ```bash
-# 1. Створення чистої тимчасової бази для перевірки відновлення
-docker exec life-mp-postgres psql -U life_prod -d postgres -c "DROP DATABASE IF EXISTS life_restore_candidate;"
-docker exec life-mp-postgres psql -U life_prod -d postgres -c "CREATE DATABASE life_restore_candidate WITH OWNER life_prod;"
+bash -Eeuo pipefail <<'BASH'
+: "${RESTORE_DB:?Run the recovery setup in Step 2 first}"
+[[ "${RESTORE_DB}" =~ ^life_restore_candidate_[a-z0-9_]+$ ]]
 
-# 2. Відновлення кастомного дампу (-Fc) в ізольовану базу із зупинкою при помилках
-docker exec -i life-mp-postgres pg_restore -U life_prod -d life_restore_candidate --exit-on-error < "${TARGET_BACKUP}/database.dump"
+# A collision fails safely; no existing database is dropped.
+docker exec life-mp-postgres psql -v ON_ERROR_STOP=1 -U life_prod -d postgres \
+  -c "CREATE DATABASE ${RESTORE_DB} WITH OWNER life_prod;"
+docker exec -i life-mp-postgres pg_restore -U life_prod -d "${RESTORE_DB}" --exit-on-error < "${TARGET_BACKUP}/database.dump"
+BASH
 ```
 
-_Примітка щодо успадкованих SQL-дампів:_ Якщо відновлюється plain SQL (`database.sql`), використовується psql з прапорцем зупинки при помилках:
-`docker exec -i life-mp-postgres psql -U life_prod -d life_restore_candidate --set ON_ERROR_STOP=1 < "${TARGET_BACKUP}/database.sql"`
-
-### Крок 5: Саніті-перевірка схеми та цілісності у тимчасовій базі
-
-Перед перемиканням трафіку обов'язково перевіряється цілісність відновленого стану:
+Для plain SQL (`database.sql`) замініть `pg_restore` на:
 
 ```bash
-# 1. Перевірка кількості таблиць у відновленій базі (у Medusa v2 — понад 50 таблиць)
-docker exec life-mp-postgres psql -U life_prod -d life_restore_candidate -c "
-  SELECT count(*) AS table_count FROM information_schema.tables WHERE table_schema = 'public';
-"
-
-# 2. Перевірка наявності та кількості ключових сутностей каталогу
-docker exec life-mp-postgres psql -U life_prod -d life_restore_candidate -c "
-  SELECT count(*) AS product_count FROM product;
-"
+bash -Eeuo pipefail <<'BASH'
+: "${TARGET_BACKUP:?Run the recovery setup in Step 2 first}"
+: "${RESTORE_DB:?Run the recovery setup in Step 2 first}"
+docker exec -i life-mp-postgres psql -v ON_ERROR_STOP=1 -U life_prod -d "${RESTORE_DB}" < "${TARGET_BACKUP}/database.sql"
+BASH
 ```
 
-_Якщо перевірка не пройшла або виявлено помилки — робоча база `life_production` залишається повністю недоторканою, а оператор переходить до іншого знімка._
+### Крок 5: Перевірка відновленої схеми
 
-### Крок 6: Безпечна ротація баз даних (Safe Atomic Swap)
-
-Лише після підтвердження валідності даних виконується перемикання баз із збереженням страхувальної копії:
+Після успішного `pg_restore --exit-on-error` переконайтеся, що очікувана Medusa-таблиця `public.product` присутня. Кількість рядків може бути нульовою для порожнього каталогу, тому її не використовуємо як критерій відмови. Загальна кількість таблиць і товарів тут інформаційна, а не доказ повноти backup.
 
 ```bash
-PREV_NAME="life_production_pre_restore_$(date +%Y%m%dT%H%M%SZ)"
+bash -Eeuo pipefail <<'BASH'
+: "${RESTORE_DB:?Run the recovery setup in Step 2 first}"
+[[ "${RESTORE_DB}" =~ ^life_restore_candidate_[a-z0-9_]+$ ]]
 
-docker exec life-mp-postgres psql -U life_prod -d postgres -c "
-  -- Примусове завершення активних з'єднань з робочою базою
-  SELECT pg_terminate_backend(pid) FROM pg_stat_activity
-  WHERE datname = 'life_production' AND pid <> pg_backend_pid();
+HAS_PRODUCT_TABLE="$(docker exec life-mp-postgres psql -v ON_ERROR_STOP=1 -U life_prod -d "${RESTORE_DB}" -t -A -c \
+  "SELECT to_regclass('public.product') IS NOT NULL;")"
+if [ "${HAS_PRODUCT_TABLE}" != "t" ]; then
+  echo "STOP: public.product is absent from the restored database; do not switch traffic." >&2
+  exit 1
+fi
 
-  -- Перейменування старої бази у страхувальну копію
+TABLE_COUNT="$(docker exec life-mp-postgres psql -v ON_ERROR_STOP=1 -U life_prod -d "${RESTORE_DB}" -t -A -c \
+  "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';")"
+PRODUCT_COUNT="$(docker exec life-mp-postgres psql -v ON_ERROR_STOP=1 -U life_prod -d "${RESTORE_DB}" -t -A -c \
+  "SELECT count(*) FROM public.product;")"
+printf 'Schema check passed; public tables=%s, products=%s\n' "${TABLE_COUNT}" "${PRODUCT_COUNT}"
+BASH
+```
+
+### Крок 6: Ізоляція з'єднань і ротація назв баз
+
+Перед виконанням переконайтеся, що storefront, commerce та всі інші відомі застосунки, воркери й jobs, які підключаються до цієї БД, зупинені та не можуть повторно стартувати. Запишіть `RUN_ID`, `RESTORE_DB` і `PREV_NAME` у журнал інциденту. Ідентифікатори з Кроку 2 містять лише літери, цифри та `_`.
+
+Спершу окремими командами зафіксуйте `ALLOW_CONNECTIONS=false`. Кожна команда завершується власним commit; лише після цього завершіть наявні сесії. Не об'єднуйте цей крок із перейменуванням в один `psql -c`: інші сесії не побачать незакомічену заборону на підключення.
+PostgreSQL виконує кілька SQL-операторів, переданих одним simple-query request, в одній неявній транзакції; помилка відкочує весь request. Cutover нижче спирається на цю властивість ([PostgreSQL 16: Protocol Flow](https://www.postgresql.org/docs/16/protocol-flow.html)).
+
+```bash
+bash -Eeuo pipefail <<'BASH'
+: "${RESTORE_DB:?Run the recovery setup in Step 2 first}"
+: "${PREV_NAME:?Run the recovery setup in Step 2 first}"
+[[ "${RESTORE_DB}" =~ ^life_restore_candidate_[a-z0-9_]+$ ]]
+[[ "${PREV_NAME}" =~ ^life_production_pre_restore_[a-z0-9_]+$ ]]
+
+PREVIOUS_EXISTS="$(docker exec life-mp-postgres psql -v ON_ERROR_STOP=1 -U life_prod -d postgres -t -A -c \
+  "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = '${PREV_NAME}');")"
+if [ "${PREVIOUS_EXISTS}" = "t" ]; then
+  echo "STOP: ${PREV_NAME} already exists; inspect it, do not overwrite it." >&2
+  exit 1
+fi
+
+docker exec life-mp-postgres psql -v ON_ERROR_STOP=1 -U life_prod -d postgres \
+  -c "ALTER DATABASE life_production ALLOW_CONNECTIONS = false;"
+docker exec life-mp-postgres psql -v ON_ERROR_STOP=1 -U life_prod -d postgres \
+  -c "ALTER DATABASE ${RESTORE_DB} ALLOW_CONNECTIONS = false;"
+docker exec life-mp-postgres psql -v ON_ERROR_STOP=1 -U life_prod -d postgres \
+  -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IN ('life_production', '${RESTORE_DB}') AND pid <> pg_backend_pid();"
+
+# Both renames commit or roll back together. Keep the old database closed to clients.
+docker exec life-mp-postgres psql -v ON_ERROR_STOP=1 -U life_prod -d postgres -c "
   ALTER DATABASE life_production RENAME TO ${PREV_NAME};
-
-  -- Активація відновленого кандидата
-  ALTER DATABASE life_restore_candidate RENAME TO life_production;
+  ALTER DATABASE ${RESTORE_DB} RENAME TO life_production;
+  ALTER DATABASE life_production ALLOW_CONNECTIONS = true;
 "
+BASH
 ```
 
-### Крок 7: Відновлення роботи сервісів та верифікація
+Якщо будь-яка команда ротації завершується помилкою, не запускайте сервіси й не повторюйте rename навмання. Раніше окремо закомічене блокування може залишити `life_production` недоступною. Перевірте фактичні назви та `pg_database.datallowconn` з БД `postgres`; якщо перейменування відкотилося і `life_production` усе ще є старою базою, знімайте блокування лише після підтвердження стану інцидент-лідом і збереження кандидата.
+
+#### Якщо fencing закомічено, а rename transaction не відбувся
+
+Виконуйте лише коли службова перевірка підтверджує, що `life_production` іще є старою базою та має `ALLOW_CONNECTIONS=false`, `PREV_NAME` відсутня, candidate існує з `ALLOW_CONNECTIONS=false`, а активних сесій до старої та candidate баз немає. Якщо фактичний стан відрізняється, зупиніться й передайте відновлення incident lead.
 
 ```bash
+bash -Eeuo pipefail <<'BASH'
+: "${RESTORE_DB:?Use the exact RESTORE_DB recorded for this recovery}"
+: "${PREV_NAME:?Use the exact PREV_NAME recorded for this recovery}"
+[[ "${RESTORE_DB}" =~ ^life_restore_candidate_[a-z0-9_]+$ ]]
+[[ "${PREV_NAME}" =~ ^life_production_pre_restore_[a-z0-9_]+$ ]]
+
+STATE="$(docker exec life-mp-postgres psql -v ON_ERROR_STOP=1 -U life_prod -d postgres -t -A -F '|' -c \
+  "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'life_production'), COALESCE((SELECT datallowconn FROM pg_database WHERE datname = 'life_production'), false), EXISTS (SELECT 1 FROM pg_database WHERE datname = '${PREV_NAME}'), EXISTS (SELECT 1 FROM pg_database WHERE datname = '${RESTORE_DB}'), COALESCE((SELECT datallowconn FROM pg_database WHERE datname = '${RESTORE_DB}'), false), (SELECT count(*) FROM pg_stat_activity WHERE datname IN ('life_production', '${RESTORE_DB}'));")"
+if [ "${STATE}" != "t|f|f|t|f|0" ]; then
+  echo "STOP: unexpected database state (${STATE}); do not reopen or rename any database." >&2
+  exit 1
+fi
+
+docker exec life-mp-postgres psql -v ON_ERROR_STOP=1 -U life_prod -d postgres \
+  -c "ALTER DATABASE life_production ALLOW_CONNECTIONS = true;"
+BASH
+```
+
+Це відкриває лише стару `life_production`; candidate лишається ізольованим.
+
+---
+
+### Крок 7: Запуск і перевірка сервісів
+
+Запускайте сервіси лише після успішної ротації з Кроку 6. Переконайтеся, що кожен сервіс healthy за визначеним у Compose healthcheck, і окремо перевірте прикладний health endpoint. Зовнішні воркери або jobs, зупинені окремо на Кроці 1, запускайте лише після перевірки цих health checks за раніше зафіксованою командою.
+
+```bash
+bash -Eeuo pipefail <<'BASH'
 cd /opt/life-mp/current/deploy
 docker compose -p life-mp -f docker-compose.prod.yml --env-file .env.production start commerce storefront
-
-# Перевірка проходження healthcheck
 docker compose -p life-mp -f docker-compose.prod.yml --env-file .env.production ps
+BASH
 ```
 
-### Крок 8: Очищення страхувальної копії (після стабілізації)
+### Крок 7.1: Відкат після невдалого запуску
 
-Після підтвердження стабільної роботи (рекомендовано не раніше ніж через 24 години після інциденту):
+Якщо перевірка після Кроку 7 не пройшла, зупиніть усі застосунки, воркери й jobs, які можуть записувати до БД. Будь-які записи, зроблені у відновлену БД після її відкриття, залишаться в перейменованій базі `FAILED_RESTORE_NAME`; перед відкатом збережіть її для аналізу та окремо погодьте обробку цих записів.
 
 ```bash
-# docker exec life-mp-postgres psql -U life_prod -d postgres -c "DROP DATABASE IF EXISTS ${PREV_NAME};"
+bash -Eeuo pipefail <<'BASH'
+: "${PREV_NAME:?Use the exact PREV_NAME recorded for this recovery}"
+: "${FAILED_RESTORE_NAME:?Use the exact FAILED_RESTORE_NAME recorded for this recovery}"
+[[ "${PREV_NAME}" =~ ^life_production_pre_restore_[a-z0-9_]+$ ]]
+[[ "${FAILED_RESTORE_NAME}" =~ ^life_failed_restore_[a-z0-9_]+$ ]]
+
+cd /opt/life-mp/current/deploy
+docker compose -p life-mp -f docker-compose.prod.yml --env-file .env.production stop storefront commerce
+
+# Commit the connection fence before terminating sessions.
+docker exec life-mp-postgres psql -v ON_ERROR_STOP=1 -U life_prod -d postgres \
+  -c "ALTER DATABASE life_production ALLOW_CONNECTIONS = false;"
+docker exec life-mp-postgres psql -v ON_ERROR_STOP=1 -U life_prod -d postgres \
+  -c "ALTER DATABASE ${PREV_NAME} ALLOW_CONNECTIONS = false;"
+docker exec life-mp-postgres psql -v ON_ERROR_STOP=1 -U life_prod -d postgres \
+  -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IN ('life_production', '${PREV_NAME}') AND pid <> pg_backend_pid();"
+
+# Restore the pre-incident database; leave the failed restore database inaccessible.
+docker exec life-mp-postgres psql -v ON_ERROR_STOP=1 -U life_prod -d postgres -c "
+  ALTER DATABASE life_production RENAME TO ${FAILED_RESTORE_NAME};
+  ALTER DATABASE ${FAILED_RESTORE_NAME} ALLOW_CONNECTIONS = false;
+  ALTER DATABASE ${PREV_NAME} RENAME TO life_production;
+  ALTER DATABASE life_production ALLOW_CONNECTIONS = true;
+"
+docker compose -p life-mp -f docker-compose.prod.yml --env-file .env.production start commerce storefront
+docker compose -p life-mp -f docker-compose.prod.yml --env-file .env.production ps
+BASH
 ```
+
+### Крок 8: Утримання страхувальної копії
+
+Не видаляйте стару або невдалу базу автоматично після 24 годин. Зберігайте її недоступною для застосунків і дійте за затвердженою політикою retention. Видалення потребує окремого підтвердження точного імені БД, перевірки резервних копій та явного дозволу відповідального власника.
+
 
 ---
 
@@ -210,66 +330,207 @@ docker compose -p life-mp -f docker-compose.prod.yml --env-file .env.production 
 Розробники перевіряють процедуру відновлення локально на синтетичних фікстурах без доступу до продакшн-даних:
 
 ```bash
-# 1. Запуск ізольованого тестового контейнера PostgreSQL
-docker run --rm -d --name life-synthetic-dr-test \
+bash -Eeuo pipefail <<'BASH'
+umask 077
+CONTAINER="life-synthetic-dr-test-$$"
+DRILL_DIR="$(mktemp -d "${TMPDIR:-/tmp}/life-dr-drill.XXXXXX")"
+DUMP="${DRILL_DIR}/synthetic.dump"
+CORRUPT_DUMP="${DRILL_DIR}/corrupted.dump"
+
+cleanup() {
+  docker rm -f "${CONTAINER}" >/dev/null 2>&1 || true
+  rm -rf -- "${DRILL_DIR}"
+}
+trap cleanup EXIT
+
+docker run --rm -d --network none --name "${CONTAINER}" \
   -e POSTGRES_DB=life_dr_source \
   -e POSTGRES_USER=dr_user \
-  -e POSTGRES_PASSWORD=dr_password \
-  postgres:16-alpine
+  -e POSTGRES_PASSWORD=synthetic_only \
+  postgres:16-alpine > /dev/null
 
-# 2. Створення тестової синтетичної схеми
-docker exec -i life-synthetic-dr-test psql -U dr_user -d life_dr_source << 'EOF'
+READY=false
+for _ in $(seq 1 60); do
+  if docker exec "${CONTAINER}" psql -X -v ON_ERROR_STOP=1 -U dr_user -d life_dr_source -c "SELECT 1;" >/dev/null 2>&1; then
+    READY=true
+    break
+  fi
+  sleep 1
+done
+test "${READY}" = true
+RUN_ID="$(date -u +%Y%m%d_%H%M%S)_$$"
+RESTORE_DB="life_restore_candidate_${RUN_ID}"
+PREV_NAME="life_production_pre_restore_${RUN_ID}"
+FAILED_RESTORE_NAME="life_failed_restore_${RUN_ID}"
+[[ "${RESTORE_DB}" =~ ^life_restore_candidate_[a-z0-9_]+$ ]]
+
+
+psql() {
+  local arg
+  for arg in "$@"; do
+    if [[ "${arg}" == "-c" || "${arg}" == "--command" ]]; then
+      docker exec "${CONTAINER}" psql -X -v ON_ERROR_STOP=1 -U dr_user "$@"
+      return
+    fi
+  done
+  docker exec -i "${CONTAINER}" psql -X -v ON_ERROR_STOP=1 -U dr_user "$@"
+}
+
+# Synthetic source: categories, artisans, and products with foreign keys.
+psql -d life_dr_source <<'SQL'
+CREATE TABLE categories (id SERIAL PRIMARY KEY, handle VARCHAR(64) UNIQUE, name VARCHAR(128));
 CREATE TABLE artisans (id SERIAL PRIMARY KEY, handle VARCHAR(64) UNIQUE, name VARCHAR(128));
-CREATE TABLE products (id SERIAL PRIMARY KEY, artisan_id INT REFERENCES artisans(id), title VARCHAR(128));
+CREATE TABLE products (
+  id SERIAL PRIMARY KEY,
+  category_id INT REFERENCES categories(id),
+  artisan_id INT REFERENCES artisans(id),
+  title VARCHAR(128)
+);
+INSERT INTO categories (handle, name) VALUES ('ceramics', 'Кераміка');
 INSERT INTO artisans (handle, name) VALUES ('kosiv-clay', 'Майстерня Косів');
-INSERT INTO products (artisan_id, title) VALUES (1, 'Глечик керамічний');
-EOF
+INSERT INTO products (category_id, artisan_id, title) VALUES (1, 1, 'Глечик керамічний');
+SQL
 
-# 3. Експорт кастомного архіву та розрахунок контрольної суми
-docker exec life-synthetic-dr-test pg_dump -U dr_user -Fc life_dr_source > /tmp/synthetic.dump
-sha256sum /tmp/synthetic.dump > /tmp/CHECKSUMS.sha256
+# Backup is created with restrictive permissions and checksum-verified.
+docker exec "${CONTAINER}" pg_dump -U dr_user -Fc life_dr_source > "${DUMP}"
+test -s "${DUMP}"
+(cd "${DRILL_DIR}" && sha256sum synthetic.dump > CHECKSUMS.sha256 && sha256sum -c CHECKSUMS.sha256)
+docker exec -i "${CONTAINER}" pg_restore -l < "${DUMP}" > /dev/null
 
-# 4. Перевірка цілісності та структури
-sha256sum -c /tmp/CHECKSUMS.sha256
-docker exec -i life-synthetic-dr-test pg_restore -l < /tmp/synthetic.dump | grep "TABLE DATA"
-
-# 5. Створення імітації діючої бази з застарілими/пошкодженими даними
-docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_source -c "
-  CREATE DATABASE life_dr_prod;
-"
-docker exec -i life-synthetic-dr-test psql -U dr_user -d life_dr_prod << 'EOF'
+# Existing production state is intentionally distinct from the restored fixture.
+psql -d postgres -c "CREATE DATABASE life_dr_prod;"
+psql -d life_dr_prod <<'SQL'
 CREATE TABLE products (id SERIAL PRIMARY KEY, title VARCHAR(128));
 INSERT INTO products (title) VALUES ('Пошкоджений запис до відновлення');
-EOF
+SQL
 
-# 6. Безпечне відновлення в ізольовану базу-кандидат
-docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_source -c "DROP DATABASE IF EXISTS life_dr_candidate;"
-docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_source -c "CREATE DATABASE life_dr_candidate;"
-docker exec -i life-synthetic-dr-test pg_restore -U dr_user -d life_dr_candidate --exit-on-error < /tmp/synthetic.dump
+# Restore into a new candidate; never drop or force-delete an earlier database.
+psql -d postgres -c "CREATE DATABASE ${RESTORE_DB};"
+docker exec -i "${CONTAINER}" pg_restore -U dr_user -d "${RESTORE_DB}" --exit-on-error < "${DUMP}"
 
-# 7. Верифікація даних у базі-кандидаті
-docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_candidate -c "SELECT count(*) FROM products;"
+# Exact expected fixture rows prove the restored relational data, not mere query success.
+COUNTS="$(psql -d "${RESTORE_DB}" -At -F '|' -c \
+  "SELECT (SELECT count(*) FROM categories), (SELECT count(*) FROM artisans), (SELECT count(*) FROM products);")"
+if [ "${COUNTS}" != "1|1|1" ]; then
+  echo "FAIL: candidate fixture counts were ${COUNTS}, expected 1|1|1" >&2
+  exit 1
+fi
 
-# 8. Атомарна ротація баз (діюча -> backup, кандидат -> prod)
-docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_source -c "
-  SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'life_dr_prod' AND pid <> pg_backend_pid();
-  ALTER DATABASE life_dr_prod RENAME TO life_dr_backup_pre_restore;
-  ALTER DATABASE life_dr_candidate RENAME TO life_dr_prod;
+# Negative validation: an empty database must be rejected before any cutover.
+psql -d postgres -c "CREATE DATABASE life_dr_empty_candidate;"
+EMPTY_PRODUCT_TABLE="$(psql -d life_dr_empty_candidate -At -c "SELECT to_regclass('public.products') IS NOT NULL;")"
+if [ "${EMPTY_PRODUCT_TABLE}" != "f" ]; then
+  echo "FAIL: empty candidate unexpectedly passed the schema guard" >&2
+  exit 1
+fi
+echo "PASS: empty candidate rejected before cutover"
+
+# Commit each connection fence before terminating sessions; verify fresh connects fail.
+psql -d postgres -c "ALTER DATABASE life_dr_prod ALLOW_CONNECTIONS = false;"
+if psql -d life_dr_prod -c "SELECT 1;" >/dev/null 2>&1; then
+  echo "FAIL: a new session connected after the committed connection fence" >&2
+  exit 1
+fi
+psql -d postgres -c "ALTER DATABASE ${RESTORE_DB} ALLOW_CONNECTIONS = false;"
+psql -d postgres -c \
+  "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IN ('life_dr_prod', '${RESTORE_DB}') AND pid <> pg_backend_pid();"
+# Exercise the documented recovery guard with the real generated identifiers.
+FENCED_STATE="$(psql -d postgres -At -F '|' -c \
+  "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'life_dr_prod'), COALESCE((SELECT datallowconn FROM pg_database WHERE datname = 'life_dr_prod'), false), EXISTS (SELECT 1 FROM pg_database WHERE datname = '${PREV_NAME}'), EXISTS (SELECT 1 FROM pg_database WHERE datname = '${RESTORE_DB}'), COALESCE((SELECT datallowconn FROM pg_database WHERE datname = '${RESTORE_DB}'), false), (SELECT count(*) FROM pg_stat_activity WHERE datname IN ('life_dr_prod', '${RESTORE_DB}'));")"
+if [ "${FENCED_STATE}" != "t|f|f|t|f|0" ]; then
+  echo "FAIL: fenced recovery state was ${FENCED_STATE}, expected t|f|f|t|f|0" >&2
+  exit 1
+fi
+
+# A second-statement error must roll back the first rename in this one query request.
+if psql -d postgres -c "
+  ALTER DATABASE life_dr_prod RENAME TO ${PREV_NAME};
+  ALTER DATABASE ${RESTORE_DB}_missing RENAME TO life_dr_prod;
+" >/dev/null 2>&1; then
+  echo "FAIL: invalid second rename unexpectedly succeeded" >&2
+  exit 1
+fi
+FAILED_RENAME_STATE="$(psql -d postgres -At -F '|' -c \
+  "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'life_dr_prod'), COALESCE((SELECT datallowconn FROM pg_database WHERE datname = 'life_dr_prod'), false), EXISTS (SELECT 1 FROM pg_database WHERE datname = '${PREV_NAME}'), EXISTS (SELECT 1 FROM pg_database WHERE datname = '${RESTORE_DB}'), COALESCE((SELECT datallowconn FROM pg_database WHERE datname = '${RESTORE_DB}'), false), (SELECT count(*) FROM pg_stat_activity WHERE datname IN ('life_dr_prod', '${RESTORE_DB}'));")"
+if [ "${FAILED_RENAME_STATE}" != "t|f|f|t|f|0" ]; then
+  echo "FAIL: first rename was not rolled back after second-statement error: ${FAILED_RENAME_STATE}" >&2
+  exit 1
+fi
+echo "PASS: failed second rename rolled back the first statement"
+
+MISSING_CANDIDATE_STATE="$(psql -d postgres -At -F '|' -c \
+  "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'life_dr_prod'), COALESCE((SELECT datallowconn FROM pg_database WHERE datname = 'life_dr_prod'), false), EXISTS (SELECT 1 FROM pg_database WHERE datname = '${PREV_NAME}'), EXISTS (SELECT 1 FROM pg_database WHERE datname = '${RESTORE_DB}_missing'), COALESCE((SELECT datallowconn FROM pg_database WHERE datname = '${RESTORE_DB}_missing'), false), (SELECT count(*) FROM pg_stat_activity WHERE datname IN ('life_dr_prod', '${RESTORE_DB}_missing'));")"
+if [ "${MISSING_CANDIDATE_STATE}" != "t|f|f|f|f|0" ]; then
+  echo "FAIL: missing candidate did not have a distinct fail-closed state: ${MISSING_CANDIDATE_STATE}" >&2
+  exit 1
+fi
+echo "PASS: missing candidate is rejected by the fallback state guard"
+
+# Simulate the documented fallback: reopen old production only; keep candidate fenced.
+psql -d postgres -c "ALTER DATABASE life_dr_prod ALLOW_CONNECTIONS = true;"
+FALLBACK_STATE="$(psql -d postgres -At -F '|' -c \
+  "SELECT (SELECT datallowconn FROM pg_database WHERE datname = 'life_dr_prod'), (SELECT datallowconn FROM pg_database WHERE datname = '${RESTORE_DB}');")"
+if [ "${FALLBACK_STATE}" != "t|f" ] || psql -d "${RESTORE_DB}" -c "SELECT 1;" >/dev/null 2>&1; then
+  echo "FAIL: recovery fallback did not reopen only the old database" >&2
+  exit 1
+fi
+psql -d postgres -c "ALTER DATABASE life_dr_prod ALLOW_CONNECTIONS = false;"
+psql -d postgres -c \
+  "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname IN ('life_dr_prod', '${RESTORE_DB}') AND pid <> pg_backend_pid();"
+
+
+# The rename pair is one transaction. The old database stays closed to application clients.
+psql -d postgres -c "
+  ALTER DATABASE life_dr_prod RENAME TO ${PREV_NAME};
+  ALTER DATABASE ${RESTORE_DB} RENAME TO life_dr_prod;
+  ALTER DATABASE life_dr_prod ALLOW_CONNECTIONS = true;
 "
+BACKUP_ALLOW_CONNECTIONS="$(psql -d postgres -At -c \
+  "SELECT datallowconn FROM pg_database WHERE datname = '${PREV_NAME}';")"
+if [ "${BACKUP_ALLOW_CONNECTIONS}" != "f" ]; then
+  echo "FAIL: pre-restore database was reopened to clients" >&2
+  exit 1
+fi
+RESTORED_ROW="$(psql -d life_dr_prod -At -F '|' -c \
+  "SELECT p.title, c.name, a.name FROM products p JOIN categories c ON p.category_id=c.id JOIN artisans a ON p.artisan_id=a.id;")"
+if [ "${RESTORED_ROW}" != "Глечик керамічний|Кераміка|Майстерня Косів" ]; then
+  echo "FAIL: restored relational row differed: ${RESTORED_ROW}" >&2
+  exit 1
+fi
 
-# 9. Підтвердження успішного відновлення діючої бази та збереження бекапу
-docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_prod -c "SELECT title FROM products;"
-docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_backup_pre_restore -c "SELECT title FROM products;"
+# Rollback drill: preserve the failed restore as inaccessible; reopen only the old database.
+psql -d postgres -c "ALTER DATABASE life_dr_prod ALLOW_CONNECTIONS = false;"
+psql -d postgres -c \
+  "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'life_dr_prod' AND pid <> pg_backend_pid();"
+psql -d postgres -c "
+  ALTER DATABASE life_dr_prod RENAME TO ${FAILED_RESTORE_NAME};
+  ALTER DATABASE ${FAILED_RESTORE_NAME} ALLOW_CONNECTIONS = false;
+  ALTER DATABASE ${PREV_NAME} RENAME TO life_dr_prod;
+  ALTER DATABASE life_dr_prod ALLOW_CONNECTIONS = true;
+"
+ROLLED_BACK_ROW="$(psql -d life_dr_prod -At -c "SELECT title FROM products;")"
+FAILED_DB_ALLOW_CONNECTIONS="$(psql -d postgres -At -c \
+  "SELECT datallowconn FROM pg_database WHERE datname = '${FAILED_RESTORE_NAME}';")"
+if [ "${ROLLED_BACK_ROW}" != "Пошкоджений запис до відновлення" ] || [ "${FAILED_DB_ALLOW_CONNECTIONS}" != "f" ]; then
+  echo "FAIL: rollback result or failed-database isolation was incorrect" >&2
+  exit 1
+fi
 
-# 10. Fail-Closed негативний тест (перевірка реакції на пошкодження архіву)
-head -c 100 /tmp/synthetic.dump > /tmp/corrupted.dump
-docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_source -c "DROP DATABASE IF EXISTS life_dr_broken_test;"
-docker exec life-synthetic-dr-test psql -U dr_user -d life_dr_source -c "CREATE DATABASE life_dr_broken_test;"
-docker exec -i life-synthetic-dr-test pg_restore -U dr_user -d life_dr_broken_test --exit-on-error < /tmp/corrupted.dump || echo "Пошкоджений дамп успішно відхилено, основна база неушкоджена"
+# A truncated archive must return nonzero; it must not change the rolled-back production database.
+head -c 100 "${DUMP}" > "${CORRUPT_DUMP}"
+psql -d postgres -c "CREATE DATABASE life_dr_broken_test;"
+if docker exec -i "${CONTAINER}" pg_restore -U dr_user -d life_dr_broken_test --exit-on-error < "${CORRUPT_DUMP}"; then
+  echo "FAIL: pg_restore unexpectedly accepted the truncated archive" >&2
+  exit 1
+fi
+FINAL_PROD_ROW="$(psql -d life_dr_prod -At -c "SELECT title FROM products;")"
+if [ "${FINAL_PROD_ROW}" != "Пошкоджений запис до відновлення" ]; then
+  echo "FAIL: negative restore changed the production fixture" >&2
+  exit 1
+fi
 
-# 11. Очищення тимчасових ресурсів
-docker rm -f life-synthetic-dr-test
-rm -f /tmp/synthetic.dump /tmp/CHECKSUMS.sha256 /tmp/corrupted.dump
+echo "PASS: verified backup, candidate restore, fail-closed schema/data checks, committed connection fence, rename, rollback, and corrupted-archive rejection"
+BASH
 ```
 
 ---

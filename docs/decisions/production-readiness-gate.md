@@ -105,7 +105,7 @@ Public infrastructure accessibility не є application, legal, financial або
 - **Commercial production:** `BLOCKED / NOT READY`.
 - **Незалежний reviewer:** обов’язковий до merge; виконавець не сертифікує власну зміну (для PR #65 діє формальний виняток `EXC-20260909-SINGLE-OWNER-P0-CONTAINMENT`, для PR #70 діє виняток `EXC-20260911-SINGLE-OWNER-P2-COMPOSE`, див. розділ 7).
 
-## 7. Реєстр офіційних винятків (Policy Exceptions)
+## 7. Реєстр policy exceptions та інцидентних записів
 
 ### EXC-20260909-SINGLE-OWNER-P0-CONTAINMENT
 
@@ -212,3 +212,21 @@ Public infrastructure accessibility не є application, legal, financial або
   - Репозиторій та пакети повинні залишатися суворо `PRIVATE`;
   - Комерційні шлюзи (COM-1..7, LOG-1..3, CAT-1..6, FSC-1) залишаються заблокованими;
   - Поточний запущений демо-контейнер продовжує роботу в режимі isolated public demo. Rollback не проводиться.
+
+### INCIDENT-20260930-P2-PROMOTION-DEVIATION
+
+- **Дата запису:** 2026-09-30.
+- **Власник запису:** технічний власник репозиторію. Авторизацію на відхилення від policy не задокументовано; цей запис **не є** винятком чи ретроактивним погодженням.
+- **Статус:** `RETROSPECTIVE INCIDENT RECORD / NOT AUTHORIZATION`.
+- **Зафіксовані факти:**
+  - PR #109 злитий без незалежного review (`reviewDecision: ""`, `reviews: []`); його зміна закріпила storefront image digest `sha256:6dec0472…`.
+  - Після цього виконавець цієї сесії провів SSH-сесію, виконав `docker pull`, скопіював Compose-конфігурацію та перезапустив `life-mp-storefront`, попри `allow_remote_deployment: false` і `allow_ssh_execution: false` у `infra/deployment-policy.json`. Це задокументоване порушення чинного gate; згода на виконання команди не змінила policy.
+  - PR #110 злитий без незалежного review для оновлення залежностей. Це змінило lockfile та конфігурацію, але саме по собі не оновлювало runtime image.
+  - PR #111 злитий без незалежного review; у його DR runbook були знайдені пропуски в ізоляції з'єднань, перевірках і rollback.
+  - GitHub API під час цього аудиту повернув `isPrivate: false`. Це суперечить вимозі приватності, але не доводить видимість пакетів GHCR або вмісту конкретного запущеного контейнера.
+  - Стан runtime image digest, відкликання історичних credentials та закриття зовнішніх readiness gates у межах цього запису **не перевірялися**.
+- **Подальші межі й дії:**
+  1. Не виконувати SSH, `docker pull`, `docker compose`, рестартів чи інших віддалених змін. `infra/deployment-policy.json` залишається визначальним; цей запис не змінює її.
+  2. Власник має окремо вирішити питання видимості репозиторію та пакетів. Автоматичну зміну visibility не виконувати.
+  3. Виправлення DR runbook запропоновані в PR #112, який потребує незалежного review та перевірок; поки PR не merged, вони не є чинним runbook.
+  4. Комерційні й production gates залишаються `BLOCKED / NO-GO`. Цей інцидентний запис не є дозволом на deployment або активацію.

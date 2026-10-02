@@ -1,0 +1,46 @@
+import type { DemoUpdateAuthorization } from "./demo-update-authorization.js";
+
+/** Preserve operator identity files, but never reuse a session or forward credentials. */
+export function demoUpdateSshOptions(
+  grant: Pick<DemoUpdateAuthorization, "host" | "ssh_user">,
+  interactive: boolean,
+): string[] {
+  return [
+    interactive ? "-t" : "-T",
+    "-o",
+    "StrictHostKeyChecking=yes",
+    "-o",
+    "BatchMode=yes",
+    "-o",
+    `Hostname=${grant.host}`,
+    "-o",
+    `User=${grant.ssh_user}`,
+    "-o",
+    "Port=22",
+    "-o",
+    `HostKeyAlias=${grant.host}`,
+    "-o",
+    "ControlPath=none",
+    "-o",
+    "ControlMaster=no",
+    "-o",
+    "ControlPersist=no",
+    "-o",
+    "ForwardAgent=no",
+    "-o",
+    "ForwardX11=no",
+    "-o",
+    "Tunnel=no",
+    "-o",
+    "ClearAllForwardings=yes",
+    "-o",
+    "PermitLocalCommand=no",
+    "-o",
+    "ProxyCommand=none",
+    "-o",
+    "ProxyJump=none",
+    "-o",
+    "RemoteCommand=none",
+    "jorvis-prod-vm",
+  ];
+}

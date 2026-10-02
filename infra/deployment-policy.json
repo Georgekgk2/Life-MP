@@ -1,7 +1,7 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "policy_name": "Life-MP Phase P2 Deployment Containment Policy",
-  "last_updated": "2026-09-10",
+  "last_updated": "2026-10-01",
   "status": "CONTAINED_PHASE_P2",
   "gates": {
     "allow_remote_deployment": false,
@@ -12,6 +12,32 @@
     "allow_live_shipping_api": false,
     "allow_live_fiscalization": false
   },
-  "rationale": "Phase P2 allows CI-based container image publishing to GHCR under immutable digest protocol (ADR 0013). Remote deployment, SSH execution, live payments, shipping, and fiscalization remain strictly locked.",
+  "scoped_demo_update": {
+    "id": "DEMO-UPDATE-d3b5afec",
+    "environment": "public-demo",
+    "host": "34.139.21.224",
+    "ssh_user": "medgemma-user",
+    "public_origin": "https://life-mp.pp.ua",
+    "source_commit": "d3b5afec16a043fcb9192bfbbc8c882628c8b831",
+    "release_run_id": 36925554797,
+    "compose_path": "deploy/docker-compose.prod.yml",
+    "project_name": "life-mp",
+    "host_deploy_directory": "/opt/life-mp/current/deploy",
+    "host_backup_directory": "/var/backups/life-mp/demo-d3b5afec",
+    "images": {
+      "commerce": "ghcr.io/georgekgk2/life-commerce@sha256:d1a7c65d58a3b1244f04d273c1921e7a278b932b8274265086e98be49ba76bb3",
+      "storefront": "ghcr.io/georgekgk2/life-storefront@sha256:545473fc7cb3d5a53a7f21a4ddf7db1d4cbe4a2f5c5fcb689bb88fdd69f1c076"
+    },
+    "operations": ["discovery", "promote", "verify", "rollback"],
+    "runner": {
+      "path": "scripts/promote-public-demo.mjs",
+      "sha256": "ee65f827ae5c1dd2f9600a6be6f65e1f5d8339f6893e659dfac45f5a67c74f7d"
+    },
+    "remote_script": {
+      "path": "infra/scripts/promote-public-demo.sh",
+      "sha256": "00e17eecb32a290d40ea5ec564c2a73f6a6faa7fd9bde9ed202661621c8bd708"
+    }
+  },
+  "rationale": "Phase P2 permits immutable CI publication under ADR 0013. Global remote, SSH, production and live integration capabilities remain locked. Only the hash-bound DEMO-UPDATE-d3b5afec runner may perform its fixed demo operations after the executable scope is reviewed and merged into main; this policy is not evidence of a completed deployment.",
   "canonical_runbook": "docs/decisions/production-readiness-gate.md"
 }

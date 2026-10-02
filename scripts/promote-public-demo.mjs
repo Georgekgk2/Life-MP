@@ -152,7 +152,7 @@ try {
   const compose = readFileSync(
     resolve(root, authorization.compose_path),
   ).toString("base64");
-  const command = `bash -Eeuo pipefail -c ${quote(payload)} -- ${quote(operation)} ${quote(compose)}`;
+  const command = `bash --norc -Eeuo pipefail -c ${quote(payload)} -- ${quote(operation)} ${quote(compose)}`;
   run("ssh", [
     ...demoUpdateSshOptions(
       authorization,

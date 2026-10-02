@@ -22,7 +22,7 @@ export function CheckoutSuccessView() {
           marginBottom: "0.5rem",
         }}
       >
-        Чернетка оформлення
+        Демо-перегляд кошика
       </h1>
 
       <p
@@ -32,8 +32,7 @@ export function CheckoutSuccessView() {
           marginBottom: "2rem",
         }}
       >
-        Це лише тестовий Sandbox-стан. Авторитетне замовлення на сервері не
-        створено.
+        Це демонстраційний перегляд кошика. Замовлення на сервері не створено.
       </p>
 
       <div
@@ -59,8 +58,8 @@ export function CheckoutSuccessView() {
         </div>
         <div style={{ fontSize: "0.9rem", lineHeight: 1.5 }}>
           Платіж, Escrow-холдинг, комісія, IBAN, ТТН і виплата майстерні не
-          створюються. Кошти не списуються, а дані форми не відображаються тут і
-          не передаються через цей тестовий перехід.
+          створюються. Контактні дані не запитуються, не зберігаються й не
+          передаються.
         </div>
       </div>
 
@@ -85,7 +84,7 @@ export function CheckoutSuccessView() {
             borderRadius: "var(--radius-sm)",
           }}
         >
-          Повернутися до чернетки
+          Повернутися до демо-кошика
         </Link>
 
         <Link

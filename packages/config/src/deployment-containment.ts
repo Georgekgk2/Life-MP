@@ -7,6 +7,10 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { load as loadYaml } from "js-yaml";
+import {
+  readDemoUpdateAuthorization,
+  type DemoUpdateAuthorization,
+} from "./demo-update-authorization.js";
 
 export type DeploymentContainmentViolation = Readonly<{
   rule: string;
@@ -24,6 +28,7 @@ export type DeploymentPolicyFile = Readonly<{
   policy_name: string;
   status: string;
   gates: Record<string, boolean>;
+  scoped_demo_update?: unknown;
 }>;
 
 /**
@@ -153,6 +158,7 @@ export function scanDeploymentContainment(
   rootDir: string,
 ): DeploymentContainmentResult {
   const violations: DeploymentContainmentViolation[] = [];
+  let demoUpdateGrant: DemoUpdateAuthorization | null = null;
 
   // 1. Validate infra/deployment-policy.json
   let policyStatus = "CONTAINED";
@@ -229,6 +235,21 @@ export function scanDeploymentContainment(
               });
             }
           }
+        }
+      }
+
+      if (
+        "scoped_demo_update" in parsed &&
+        parsed.scoped_demo_update !== undefined
+      ) {
+        try {
+          demoUpdateGrant = readDemoUpdateAuthorization(rootDir);
+        } catch (err) {
+          violations.push({
+            rule: "P2-DEMO-SCOPE",
+            path: "infra/deployment-policy.json",
+            message: `Scoped demo update authorization invalid: ${err instanceof Error ? err.message : String(err)}`,
+          });
         }
       }
     } catch (err) {
@@ -1018,8 +1039,12 @@ export function scanDeploymentContainment(
 
               const lowerName = entry.name.toLowerCase();
 
+              const isAuthorizedDemoRunner =
+                demoUpdateGrant !== null &&
+                relPath === demoUpdateGrant.runner.path;
+
               // Check against permitted local scripts allowlist
-              if (!isPermittedScript(relPath)) {
+              if (!isPermittedScript(relPath) && !isAuthorizedDemoRunner) {
                 violations.push({
                   rule: "P0-UNAUTHORIZED-SCRIPT",
                   path: relPath,
@@ -1037,7 +1062,7 @@ export function scanDeploymentContainment(
                 lowerName.startsWith("rollback") ||
                 lowerName.startsWith("release");
 
-              if (isForbiddenFilename) {
+              if (isForbiddenFilename && !isAuthorizedDemoRunner) {
                 violations.push({
                   rule: "P0-NO-REMOTE-SCRIPTS",
                   path: relPath,
@@ -1048,14 +1073,16 @@ export function scanDeploymentContainment(
               // Check script content for remote execution commands
               try {
                 const content = readFileSync(fullPath, "utf-8");
-                for (const pattern of FORBIDDEN_REMOTE_COMMAND_PATTERNS) {
-                  if (pattern.test(content)) {
-                    violations.push({
-                      rule: "P0-NO-REMOTE-COMMANDS",
-                      path: relPath,
-                      message: `Forbidden remote execution command pattern (${pattern.toString()}) detected in "${relPath}".`,
-                    });
-                    break;
+                if (!isAuthorizedDemoRunner) {
+                  for (const pattern of FORBIDDEN_REMOTE_COMMAND_PATTERNS) {
+                    if (pattern.test(content)) {
+                      violations.push({
+                        rule: "P0-NO-REMOTE-COMMANDS",
+                        path: relPath,
+                        message: `Forbidden remote execution command pattern (${pattern.toString()}) detected in "${relPath}".`,
+                      });
+                      break;
+                    }
                   }
                 }
               } catch (err) {

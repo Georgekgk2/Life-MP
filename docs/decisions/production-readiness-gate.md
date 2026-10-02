@@ -233,16 +233,31 @@ Public infrastructure accessibility не є application, legal, financial або
 
 ### DEMO-UPDATE-d3b5afec — обмежений scope рішення оператора
 
-- **Дата запису:** 2026-10-01.
-- **Статус:** `OPERATOR SCOPE RECORDED / EXECUTION BLOCKED BY POLICY`.
-- **Джерело рішення:** команда користувача `go` у цій сесії після пропозиції зафіксувати обмежене погодження оновлення демо конкретними release images. AI-асистент є виконавцем запису, не власником авторизації. Це не погодження merge без review і не ретроактивне виправдання попередніх remote дій.
-- **Ціль:** наявне ізольоване public-demo середовище `https://life-mp.pp.ua/`. Історично задокументований хост — `34.139.21.224`; відповідність хоста цьому середовищу, його поточний стан та безпечність registry authentication ще не підтверджені для цього оновлення.
+- **Дата запису та актуалізації:** 2026-10-01.
+- **Статус:** `OPERATOR SCOPE CODIFIED / PENDING MERGED CAPABILITY ACTIVATION`.
+- **Джерело рішення та намір:** команда користувача `go` (намір користувача — швидкість виконання через один узгоджений виконуваний PR замість надлишкової бюрократії та паперової тяганини). AI-асистент є технічним виконавцем запису, не власником авторизації. Цей запис **не заявляє про формальне схвалення (peer review approval) у GitHub API** і **не є заявою про завершене розгортання (deployment completed)** чи ретроактивним виправданням попередніх дій.
+- **Ціль:** наявне ізольоване public-demo середовище `https://life-mp.pp.ua/` на хості `34.139.21.224` (користувач `medgemma-user`).
 - **Незмінний release candidate:** commit `d3b5afec16a043fcb9192bfbbc8c882628c8b831`, [Release Container Images run 36925554797](https://github.com/Georgekgk2/Life-MP/actions/runs/36925554797), artifact `image-digests-manifest` / `IMAGE_DIGESTS.json`:
   - storefront: `ghcr.io/georgekgk2/life-storefront@sha256:545473fc7cb3d5a53a7f21a4ddf7db1d4cbe4a2f5c5fcb689bb88fdd69f1c076`;
   - commerce: `ghcr.io/georgekgk2/life-commerce@sha256:d1a7c65d58a3b1244f04d273c1921e7a278b932b8274265086e98be49ba76bb3`.
-- **Запланований scope після належного відкриття policy:** одна контрольована промоція цих двох образів без rebuild, збереження `public-demo` / fixture режиму, перевірка health і ключових сторінок, повернення до зафіксованих до операції runtime digests у разі невдалої перевірки.
-- **Не входять у scope:** DB migrations чи restore, зміна DNS/TLS/firewall, інших проєктів на хості або repository/package visibility, активація live payments/shipping/fiscalization та повідомлення замовникам.
-- **Обов’язкова передумова виконання:** `infra/deployment-policy.json` лишається визначальним. `CONTAINED_PHASE_P2` і scanner `packages/config/src/deployment-containment.ts` вимагають `allow_remote_deployment=false` та `allow_ssh_execution=false`; чинного механізму scoped remote exception немає. Потрібна попередня policy-зміна з enforceable обмеженнями цього scope; сам запис, його merge або зелений preflight не відкривають remote capabilities. До такої зміни SSH, pull та рестарти заборонені.
-- **Перед промоцією, лише за чинним дозволом:** підтвердити ціль і shared-host isolation, безпечну GHCR authentication без розкриття credentials або відкриття пакетів, manifest digest та Cosign provenance для цього commit; зафіксувати фактичні runtime digests і валідний серверний backup без копіювання бойових даних на робочу станцію. Попередній успішний release workflow не замінює цих перевірок.
-- **Завершення scope:** одна успішна промоція з перевіркою або скасування рішення оператором. Інша ціль, commit чи digest не покриваються цим записом.
+- **Межі готовності (Readiness Scope):**
+  - Готовність до виконання **залишається у статусі pending merged capability activation**: віддалені можливості активуються виключно після повного злиття узгодженого виконуваного PR у гілку `main`.
+  - Жодних тверджень про віддалені докази (`remote proof`) чи вже виконане розгортання (`deployment claim`) не робиться.
+  - Надання дозволу (grant) реалізується **виключно через верифікований за SHA-256 скрипт-раннер (`scripts/promote-public-demo.mjs` та `infra/scripts/promote-public-demo.sh`)**, а НЕ через ручний обхід через SSH (`manual SSH bypass`).
+  - Усі глобальні гейти у `infra/deployment-policy.json` (`allow_remote_deployment`, `allow_ssh_execution`, `allow_production_dns_tls`, `allow_live_payment_gateway`, `allow_live_shipping_api`, `allow_live_fiscalization`) залишаються суворо `false`; доступ авторизується лише через строгий опціональний об'єкт `scoped_demo_update`.
+- **Запланований scope після злиття PR:**
+  - Дозволені операції: `discovery`, `promote`, `verify`, `rollback`.
+  - Одна контрольована промоція двох кандидатних образів без локального rebuild на хості;
+  - Збереження ізольованого режиму `public-demo` на фікстурах (`CATALOG_SOURCE: fixtures`, `ALLOW_PUBLIC_DEMO_CATALOG: "true"`, `ALLOW_SYNTHETIC_CATALOG: "false"`);
+  - Перевірка health-ендпоінтів та ключових сторінок;
+  - Відкат (rollback) — **виключно до попередніх зафіксованих runtime-дайджестів (prior captured refs only), без відновлення бази даних (no DB restore)**;
+  - Одиничний стан спроби на хості (one host attempt state) запобігає повторній неузгодженій промоції.
+- **Суворо поза scope:** DB migrations чи відновлення БД, зміна DNS/TLS/firewall, інших проєктів на хості або visibility репозиторію/пакетів, активація live payments/shipping/fiscalization та повідомлення замовникам.
+- **Вимоги безпеки перед промоцією:**
+  - Підтвердити походження образів через маніфест `IMAGE_DIGESTS.json` та атестацію Cosign (локальний lookup Cosign використовує наявний credential helper робочої станції і ніколи не читає токени самостійно);
+  - SSH-з'єднання виконується раннером суворо через аліас `jorvis-prod-vm` із форсованими параметрами `Hostname 34.139.21.224`, `User medgemma-user`, `Port 22`, `StrictHostKeyChecking=yes`, `HostKeyAlias=34.139.21.224`, без проксі, форвардингів та довільних перевизначень хоста чи ключів;
+  - Власник встановлює SSH host key незалежно у `known_hosts`, категорично заборонено `StrictHostKeyChecking=no` чи `accept-new`;
+  - Хост завантажує приватні образи через наявний безпечний Docker credential helper/config або інтерактивне введення PAT оператором через `/dev/tty` (`read -s`) у тимчасовий `DOCKER_CONFIG` (`--password-stdin`, автоочищення при виході); CLI ніколи не отримує і не читає токени;
+  - Headless-промоція використовує чинний конфіг/хелпер хоста й гарантовано абортується до будь-яких мутацій у разі збою pull; окремої ручної авторизації SSH-входу не потрібно;
+- **Завершення scope:** одна успішна промоція з повною верифікацією або скасування рішення оператором. Інша ціль, commit чи digest не покриваються цим записом.
 - **Повідомлення замовникам:** відкладене за рішенням користувача до фактичного дозволеного оновлення й перевірки демо; цей запис не свідчить про виконаний deployment.

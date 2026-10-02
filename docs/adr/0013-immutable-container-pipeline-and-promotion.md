@@ -101,7 +101,8 @@
   - Суворо заборонено використання `pull_request_target` (`P0-NO-PR-TARGET`);
   - Права `packages: write` обмежені виключно джобою публікації;
   - Заборонено використання SSH, віддалених команд, екшенів деплою (`appleboy/ssh-action`) та секретів хоста (`DEPLOY_SSH_KEY`);
-  - Усі інші гейти (`allow_remote_deployment`, `allow_ssh_execution`, `allow_production_dns_tls`, `allow_live_payment_gateway`, `allow_live_shipping_api`, `allow_live_fiscalization`) **зобов'язані залишатися суворо `false`**.
+  - Усі інші гейти (`allow_remote_deployment`, `allow_ssh_execution`, `allow_production_dns_tls`, `allow_live_payment_gateway`, `allow_live_shipping_api`, `allow_live_fiscalization`) **зобов'язані залишатися суворо `false`**;
+  - Допускається наявність опціонального суворого об'єкта `scoped_demo_update` у політиці, який діє виключно після злиття узгодженого виконуваного PR і авторизує прив'язаний до SHA-256 скрипт для ізольованого демо-стенду без зміни глобальних гейтів (`allow_remote_deployment` та `allow_ssh_execution` лишаються `false`).
 
 ### 4. Розділення публікації (P2a) та промоції (P2b)
 
@@ -115,10 +116,17 @@
   3. Фіксує точні digests для сервісних образів: `postgres:16-alpine@sha256:...` та `redis:7-alpine@sha256:...`;
   4. Перевіряє коректність конфігурації через `docker compose config` без виконання будь-яких віддалених команд.
 
-### 5. Межі дозволу розгортання
+### 5. Межі дозволу розгортання та виняток для публічного демо
 
-- **Цей ADR НЕ дозволяє розгортання на продакшні.**
-- Будь-які майбутні дії з розгортання чи промоції можливі виключно після окремого проходження процедури обстеження сервера (server discovery), інфраструктурного аудиту та закриття всіх обов'язкових воріт готовності (COM-1..5, LOG-1, CAT-1..5, FSC-1) згідно з `production-readiness-gate.md`.
+- **Цей ADR НЕ дозволяє загальне розгортання на продакшні:**
+  Загальне віддалене розгортання (generic remote deployment), прямий SSH-доступ оператора чи CI, бойові production-гейти та комерційний запуск залишаються **суворо забороненими** (`allow_remote_deployment: false`, `allow_ssh_execution: false`, `allow_production_dns_tls: false`, `allow_live_payment_gateway: false`, `allow_live_shipping_api: false`, `allow_live_fiscalization: false`).
+- **Обмежений виняток для публічного демо (Bounded Scoped Demo Exception після злиття PR):**
+  - Запроваджується виключно після повного злиття узгодженого виконуваного PR у гілку `main` (`feature/demo-promotion-d3b5afec` ➔ `main`). До моменту злиття PR будь-які віддалені мутації чи команди на хості заблоковані.
+  - Виняток суворо обмежений опціональним контрактом `scoped_demo_update` (ID: `DEMO-UPDATE-d3b5afec`) для цільового стенду `public-demo` (`https://life-mp.pp.ua`, хост `34.139.21.224`, користувач `medgemma-user`, commit `d3b5afec16a043fcb9192bfbbc8c882628c8b831`, Run ID `36925554797`, точні immutable-дайджести `commerce` та `storefront`).
+  - Виконання дозволене **виключно через верифікований за SHA-256 локальний скрипт-раннер (`scripts/promote-public-demo.mjs`) та віддалений скрипт (`infra/scripts/promote-public-demo.sh`)**. Довільний ручний обхід через SSH (`manual SSH bypass`) категорично заборонено.
+- **Розмежування комерційних воріт готовності (Commercial Gates vs. Fixture-Only Demo):**
+  - Комерційні ворота готовності (`COM-1..6`, `LOG-1`, `CAT-1..5`, `FSC-1`, договори з еквайрингом, ПРРО, логістичними операторами, юридичні висновки) є обов'язковими **виключно для комерційного виробничого запуску**.
+  - Публічний демо-стенд функціонує в ізольованому режимі виключно на статичних фікстурах (`CATALOG_SOURCE: fixtures`, `ALLOW_PUBLIC_DEMO_CATALOG: "true"`, `ALLOW_SYNTHETIC_CATALOG: "false"`, відсутність бойових платіжних та фіскальних ключів). Комерційні ворота не вимагаються для оновлення цього фікстурного демо, проте залишаються безумовними блокерами комерційного продакшну.
 
 ## Наслідки
 
@@ -132,8 +140,9 @@
 | ------------------------ | ------------------------------------------------------------------------- | ------------------- |
 | **P2.0**                 | Архітектурний дизайн та специфікація (цей ADR)                            | **Accepted**                                  |
 | **P2.1**                 | Реалізація CI-публікації в GHCR (`release-images.yml`, оновлення сканера) | **Completed & Runtime-Verified** (Run 34562907779) |
-| **P2.2**                 | Перехід `docker-compose.prod.yml` на незмінні дайджести                   | **Proposed / In Progress**                    |
-| **Production Promotion** | Розгортання P2-образів на цільовому сервері                               | **STRICT NO-GO**                              |
+| **P2.2**                                      | Перехід `docker-compose.prod.yml` на незмінні дайджести                   | **Completed (DEMO-UPDATE-d3b5afec candidate pins)** |
+| **Scoped Demo Update (DEMO-UPDATE-d3b5afec)** | Обмежена промоція публічного демо через hash-bound скрипт після злиття PR | **Bounded Exception (Pending PR Merge)**            |
+| **Commercial Production Promotion**           | Розгортання P2-образів на комерційному сервері та комерційний запуск      | **STRICT NO-GO**                                    |
 
 ## Приймання
 

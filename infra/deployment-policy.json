@@ -1,5 +1,5 @@
 {
-  "version": "1.2.0",
+  "version": "1.3.0",
   "policy_name": "Life-MP Phase P2 Deployment Containment Policy",
   "last_updated": "2026-10-02",
   "status": "CONTAINED_PHASE_P2",
@@ -13,20 +13,20 @@
     "allow_live_fiscalization": false
   },
   "scoped_demo_update": {
-    "id": "DEMO-UPDATE-ed8b2e68",
+    "id": "DEMO-UPDATE-7226ce7",
     "environment": "public-demo",
     "host": "34.139.21.224",
     "ssh_user": "medgemma-user",
     "public_origin": "https://life-mp.pp.ua",
-    "source_commit": "ed8b2e6805ab504eef56df0b4f83b643df1ed860",
-    "release_run_id": 37026279249,
+    "source_commit": "7226ce776a28d7f2a4840e0de2ff720d3b365f36",
+    "release_run_id": 37048827832,
     "compose_path": "deploy/docker-compose.prod.yml",
     "project_name": "life-mp",
     "host_deploy_directory": "/opt/life-mp/current/deploy",
-    "host_backup_directory": "/var/backups/life-mp/demo-ed8b2e68",
+    "host_backup_directory": "/var/backups/life-mp/demo-7226ce7",
     "images": {
-      "commerce": "ghcr.io/georgekgk2/life-commerce@sha256:6cea54b5aaeba56b0c499a22446872f0ba7dbb53aade6471b9ac818b16a9cf6d",
-      "storefront": "ghcr.io/georgekgk2/life-storefront@sha256:8b0869a528acdd852c440396976164337a91f0504a5ae35df66e0cfc2c8b440b"
+      "commerce": "ghcr.io/georgekgk2/life-commerce@sha256:6b2f29cdb2e03ae83f2733a273ac2c9ba26c39b75ad5d1b4bee2b4bdd1952b7d",
+      "storefront": "ghcr.io/georgekgk2/life-storefront@sha256:79297bfd19e71622dad6fc86d463272a3d46c8d52c19a40531b6dad775ace7fb"
     },
     "operations": ["discovery", "promote", "verify", "rollback"],
     "runner": {
@@ -35,9 +35,9 @@
     },
     "remote_script": {
       "path": "infra/scripts/promote-public-demo.sh",
-      "sha256": "acbaeffeac577b7dac16f7f4a8f6c3ea1ad6fb6dd99a8dedca86e1f5d470582e"
+      "sha256": "a47c1b61ecdf94e47c1053ad95a7787fd4fc1cf814ffdb8a96c3d08d7906b6a5"
     }
   },
-  "rationale": "Phase P2 permits immutable CI publication under ADR 0013. Global remote, SSH, production and live integration capabilities remain locked. Only the hash-bound DEMO-UPDATE-ed8b2e68 runner may perform its fixed public-demo operations after exact-scope PR #117 merges with all required CI checks passing under the owner-authorized one-time review exception; this policy is not evidence of a completed deployment.",
+  "rationale": "Phase P2 permits immutable CI publication under ADR 0013. Global remote, SSH, production and live integration capabilities remain locked. Only the hash-bound DEMO-UPDATE-7226ce7 runner may perform its fixed public-demo operations after exact-scope deployment PR merges with all required CI checks passing; this policy is not evidence of a completed deployment.",
   "canonical_runbook": "docs/decisions/production-readiness-gate.md"
 }

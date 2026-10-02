@@ -1,128 +1,95 @@
 import { expect, test } from "@playwright/test";
-import path from "node:path";
-import fs from "node:fs";
 
-const screenshotsDir = path.resolve(process.cwd(), "artifacts/screenshots");
-
-test.beforeAll(() => {
-  if (!fs.existsSync(screenshotsDir)) {
-    fs.mkdirSync(screenshotsDir, { recursive: true });
-  }
-});
-
-test.describe("Multi-Vendor Cart & Checkout Draft Containment (Phase 4D)", () => {
-  test("keeps checkout customer-facing state draft-only when server order writer is unavailable", async ({
+test.describe("Demo checkout privacy boundary", () => {
+  test("uses synthetic details and reaches only a non-authoritative preview", async ({
     page,
   }, testInfo) => {
-    // 1. Visit Catalog
     await page.goto("/catalog");
-    await page.waitForLoadState("domcontentloaded");
 
-    // 2. Add first item to cart
     const firstAddBtn = page.locator('button:has-text("В кошик")').first();
     await expect(firstAddBtn).toBeVisible();
     await firstAddBtn.click({ force: true });
 
-    // 3. Verify cart drawer opens
     const cartDrawer = page.locator(".cart-drawer-panel");
     await expect(cartDrawer).toBeVisible();
     await expect(page.locator("#cart-drawer-title")).toContainText(
       "Кошик покупок",
     );
 
-    // 4. Click Checkout button in cart drawer
     const checkoutBtn = page.locator('a:has-text("Оформити замовлення")');
     await expect(checkoutBtn).toBeVisible();
-    await checkoutBtn.scrollIntoViewIfNeeded();
     await checkoutBtn.click();
 
-    // 5. Verify Checkout page
     await page.waitForURL("**/checkout");
     await expect(
-      page.getByRole("heading", { name: "Оформлення замовлення" }),
+      page.getByRole("heading", { name: "Демо-перегляд замовлення" }),
     ).toBeVisible();
+    await expect(page.getByRole("textbox")).toHaveCount(0);
+    await expect(page.locator("main form")).toHaveCount(0);
+    await expect(page.locator("main")).toContainText(
+      "Не вводьте реальні контактні чи адресні дані.",
+    );
 
-    // Capture screenshot of checkout form
     await page.screenshot({
       caret: "initial",
-      path: testInfo.outputPath("checkout-form.png"),
+      path: testInfo.outputPath("checkout-demo-flow.png"),
       fullPage: true,
     });
 
-    // Fill required customer details using non-routable synthetic test data across stepper
-    // Step 1: Contacts
-    await page.locator("#fullName").fill("Тестовий Покупець");
-    await page.locator("#phone").fill("+380 00 000 00 00");
-    await page.locator("#email").fill("buyer@example.internal");
-    await page.locator('button:has-text("Продовжити до доставки")').click();
-
-    // Verify all 4 stepper pills are visible
-    const stepPills = page.locator(".checkout-step-pill");
-    await expect(stepPills).toHaveCount(4);
-
-    // Step 2: Delivery
-    await page.locator("#city").fill("Тестове Місто");
+    await page.getByRole("button", { name: /Продовжити до доставки/ }).click();
+    await expect(
+      page.getByRole("heading", { name: "2. Демо-сценарій доставки" }),
+    ).toBeVisible();
+    await expect(page.getByRole("textbox")).toHaveCount(0);
     await page.getByRole("radio", { name: /Кур'єр/ }).check();
     await page
-      .locator('button:has-text("Продовжити до сценарію оплати")')
+      .getByRole("button", { name: /Продовжити до сценарію оплати/ })
       .click();
+
     await expect(
-      page
-        .locator('[role="alert"]')
-        .filter({ hasText: "Будь ласка, вкажіть адресу доставки." }),
-    ).toHaveText("Будь ласка, вкажіть адресу доставки.");
-    await expect(page.locator('[aria-current="step"]')).toContainText(
-      "Доставка",
-    );
-    await page.locator("#novaPoshtaBranch").fill("вул. Тестова, 0, кв. 0");
+      page.getByRole("heading", {
+        name: "3. Платіжний сценарій (Демо-перевірка)",
+      }),
+    ).toBeVisible();
+    await expect(page.getByRole("textbox")).toHaveCount(0);
     await page
-      .locator('button:has-text("Продовжити до сценарію оплати")')
+      .getByRole("button", { name: /Перейти до підсумку чернетки/ })
       .click();
 
-    // Step 3: Payment Scenario Preview
-    await page
-      .locator('button:has-text("Перейти до підсумку чернетки")')
-      .click();
-
-    // 6. Submit Checkout Form as a non-authoritative draft at Step 4 (Summary)
-    const submitDraftBtn = page.locator(
-      'button:has-text("Переглянути стан чернетки")',
+    await expect(
+      page.getByRole("heading", { name: "4. Підсумок демо-кошика" }),
+    ).toBeVisible();
+    await expect(page.getByRole("textbox")).toHaveCount(0);
+    await expect(page.locator("main")).toContainText("Демо-покупець");
+    await expect(page.locator("main")).toContainText(
+      "Контактні дані не запитуються",
     );
-    await expect(submitDraftBtn).toBeVisible();
-    await submitDraftBtn.click({ force: true });
+    await expect(page.locator("main")).toContainText(
+      "Демо-локація; фактичну адресу не запитано",
+    );
 
-    // 7. Verify explicit unavailable/draft-only state
+    await page.screenshot({
+      caret: "initial",
+      path: testInfo.outputPath("checkout-demo-summary.png"),
+      fullPage: true,
+    });
+
+    await page
+      .getByRole("button", { name: "Переглянути демонстраційний стан" })
+      .click();
     await page.waitForURL("**/checkout/success?mode=draft");
     await expect(
-      page.getByRole("heading", { name: "Чернетка оформлення" }),
+      page.getByRole("heading", { name: "Демо-перегляд кошика" }),
     ).toBeVisible();
     await expect(page.getByRole("status")).toContainText(
       "Серверне оформлення наразі недоступне",
     );
     await expect(page.getByRole("status")).toContainText(
-      "Платіж, Escrow-холдинг, комісія, IBAN, ТТН і виплата майстерні не створюються",
+      "Контактні дані не запитуються, не зберігаються й не передаються",
     );
     await expect(
       page.getByRole("heading", { name: "Дякуємо! Ваше замовлення прийнято" }),
     ).not.toBeVisible();
-    await expect(page.locator("body")).not.toContainText("Тестовий Покупець");
-    await expect(page.locator("body")).not.toContainText(
-      "Відстежувати посилки в реальному часі",
-    );
-
-    // Navigation remains available without exposing an order-tracking mutation.
-    await expect(
-      page.getByRole("link", { name: "Повернутися до чернетки" }),
-    ).toHaveAttribute("href", "/checkout");
-    await expect(
-      page.getByRole("link", { name: "Повернутися до каталогу" }),
-    ).toHaveAttribute("href", "/catalog");
-
-    // Capture screenshot of contained draft state
-    await page.screenshot({
-      caret: "initial",
-      path: testInfo.outputPath("checkout-draft-state.png"),
-      fullPage: true,
-    });
+    await expect(page.locator("main form")).toHaveCount(0);
   });
 });

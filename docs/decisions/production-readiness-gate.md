@@ -265,12 +265,13 @@ Public infrastructure accessibility не є application, legal, financial або
 ### DEMO-UPDATE-ed8b2e68 — кандидат нового обмеженого scope
 
 - **Дата запису:** 2026-10-02.
-- **Статус:** `AUTHORIZATION PR REQUIRED / NOT MERGED / NOT DEPLOYED`.
+- **Статус:** `OWNER-AUTHORIZED ONE-TIME REVIEW EXCEPTION / PR #117 MERGE PENDING / NOT DEPLOYED`.
 - **Джерело запиту:** користувач попросив «онови прод». У межах наявної політики це трактується лише як запит на оновлення чинного ізольованого fixture-only public-demo `https://life-mp.pp.ua/`; комерційний production лишається `STRICT NO-GO`.
 - **Незмінний release candidate:** merged source commit `ed8b2e6805ab504eef56df0b4f83b643df1ed860`, [Release Container Images run 37026279249](https://github.com/Georgekgk2/Life-MP/actions/runs/37026279249), artifact `image-digests-manifest` / `IMAGE_DIGESTS.json`, SHA-256 `2f163cfe4bc5ee7eb34d4a6ec2b5d9175b786a70116bdcd723ae8163a033211d`.
   - commerce: `ghcr.io/georgekgk2/life-commerce@sha256:6cea54b5aaeba56b0c499a22446872f0ba7dbb53aade6471b9ac818b16a9cf6d`;
   - storefront: `ghcr.io/georgekgk2/life-storefront@sha256:8b0869a528acdd852c440396976164337a91f0504a5ae35df66e0cfc2c8b440b`.
 - **Verified provenance:** Cosign signature and SLSA provenance for each digest bind to the exact source commit, release workflow identity and `linux/amd64` CI build.
 - **Boundaries:** target `34.139.21.224` / `medgemma-user`; unique backup state `/var/backups/life-mp/demo-ed8b2e68`; only `discovery`, `promote`, `verify`, `rollback` via the SHA-256-bound canonical runner and payload.
-- **Activation gate:** this candidate does not authorize remote mutation until the exact-scope policy PR is reviewed and merged into `main`. It leaves global remote/SSH, DNS/TLS, payment, shipping, and fiscalization gates `false`; no DB migration/restore, host cleanup, or customer notification is in scope.
+- **Виняток щодо review:** користувач дозволив одноразово не вимагати формального peer review лише для PR #117 після 9/9 успішних CI checks на тодішньому head; formal GitHub review не зафіксований. Фінальний head мусить пройти всі required checks; branch protection і status checks не обходяться.
+- **Activation gate:** remote mutation лишається заблокованою до merge PR #117 з усіма required checks зеленими. Глобальні gates залишаються `false`; DB migrations/restore, host cleanup і customer notifications поза scope.
 - **Deployment status:** no remote command or deployment for this release has been run.

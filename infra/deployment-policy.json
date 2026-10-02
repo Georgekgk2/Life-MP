@@ -38,6 +38,6 @@
       "sha256": "acbaeffeac577b7dac16f7f4a8f6c3ea1ad6fb6dd99a8dedca86e1f5d470582e"
     }
   },
-  "rationale": "Phase P2 permits immutable CI publication under ADR 0013. Global remote, SSH, production and live integration capabilities remain locked. Only the hash-bound DEMO-UPDATE-ed8b2e68 runner may perform its fixed public-demo operations after the exact-scope change is reviewed and merged into main; this policy is not evidence of a completed deployment.",
+  "rationale": "Phase P2 permits immutable CI publication under ADR 0013. Global remote, SSH, production and live integration capabilities remain locked. Only the hash-bound DEMO-UPDATE-ed8b2e68 runner may perform its fixed public-demo operations after exact-scope PR #117 merges with all required CI checks passing under the owner-authorized one-time review exception; this policy is not evidence of a completed deployment.",
   "canonical_runbook": "docs/decisions/production-readiness-gate.md"
 }

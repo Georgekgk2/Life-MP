@@ -126,7 +126,7 @@
   - Виконання відбулося виключно через SHA-256-verified `scripts/promote-public-demo.mjs` та `infra/scripts/promote-public-demo.sh`; manual SSH bypass був і лишається забороненим.
 - **Новий обмежений candidate public-demo (`DEMO-UPDATE-ed8b2e68`):**
   - Запит користувача стосується лише fixture-only `https://life-mp.pp.ua`; source `ed8b2e6805ab504eef56df0b4f83b643df1ed860`, run `37026279249`, точні digests задаються єдиним grant у policy.
-  - Candidate scope набуває чинності лише після окремого exact-scope PR merge; до цього remote mutation заборонена. Commercial production лишається `STRICT NO-GO`.
+  - Користувач дозволив одноразово не вимагати formal peer review лише для PR #117 після 9/9 успішних CI checks на тодішньому head; formal GitHub review не зафіксований. Фінальний head мусить пройти всі required checks; branch protection не обходиться, а grant активується лише після merge точного PR. Commercial production лишається `STRICT NO-GO`.
 - **Розмежування комерційних воріт готовності (Commercial Gates vs. Fixture-Only Demo):**
   - Комерційні ворота готовності (`COM-1..6`, `LOG-1`, `CAT-1..5`, `FSC-1`, договори з еквайрингом, ПРРО, логістичними операторами, юридичні висновки) є обов'язковими **виключно для комерційного виробничого запуску**.
   - Публічний демо-стенд функціонує в ізольованому режимі виключно на статичних фікстурах (`CATALOG_SOURCE: fixtures`, `ALLOW_PUBLIC_DEMO_CATALOG: "true"`, `ALLOW_SYNTHETIC_CATALOG: "false"`, відсутність бойових платіжних та фіскальних ключів). Комерційні ворота не вимагаються для оновлення цього фікстурного демо, проте залишаються безумовними блокерами комерційного продакшну.
@@ -145,7 +145,7 @@
 | **P2.1**                                      | Реалізація CI-публікації в GHCR (`release-images.yml`, оновлення сканера) | **Completed & Runtime-Verified** (Run 34562907779) |
 | **P2.2**                                      | Перехід `docker-compose.prod.yml` на незмінні дайджести                   | **Current candidate pins (DEMO-UPDATE-ed8b2e68)**  |
 | **Scoped Demo Update (DEMO-UPDATE-d3b5afec)** | Попередня обмежена промоція public-demo через hash-bound скрипт           | **Closed / Runtime-Verified (2026-10-01)**         |
-| **Scoped Demo Update (DEMO-UPDATE-ed8b2e68)** | Новий точний scope для #116 через hash-bound скрипт                       | **Authorization PR pending; not deployed**         |
+| **Scoped Demo Update (DEMO-UPDATE-ed8b2e68)** | Новий точний scope для #116 через hash-bound скрипт                       | **Exception approved; merge pending**              |
 | **Commercial Production Promotion**           | Розгортання P2-образів на комерційному сервері та комерційний запуск      | **STRICT NO-GO**                                   |
 
 ## Приймання

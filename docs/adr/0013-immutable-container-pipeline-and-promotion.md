@@ -124,7 +124,7 @@
   - Була обмежена одноразовим grant після merge узгодженого PR `feature/demo-promotion-d3b5afec` у `main`; довільні віддалені мутації до цього merge були заборонені.
   - Точний історичний scope: public-demo `https://life-mp.pp.ua` (`34.139.21.224`, `medgemma-user`), commit `d3b5afec16a043fcb9192bfbbc8c882628c8b831`, run `36925554797` та immutable images, зафіксовані в readiness record. Цей grant закритий і не авторизує наступні digest.
   - Виконання відбулося виключно через SHA-256-verified `scripts/promote-public-demo.mjs` та `infra/scripts/promote-public-demo.sh`; manual SSH bypass був і лишається забороненим.
-- **Новий обмежений candidate public-demo (`DEMO-UPDATE-ed8b2e68`):**
+- **Новий обмежений scope public-demo (`DEMO-UPDATE-ed8b2e68`):**
   - Запит користувача стосується лише fixture-only `https://life-mp.pp.ua`; source `ed8b2e6805ab504eef56df0b4f83b643df1ed860`, run `37026279249`, точні digests задаються єдиним grant у policy.
   - Користувач дозволив одноразово не вимагати formal peer review лише для PR #117 після 9/9 успішних CI checks на тодішньому head; formal GitHub review не зафіксований. Фінальний head мусить пройти всі required checks; branch protection не обходиться, а grant активується лише після merge точного PR. Commercial production лишається `STRICT NO-GO`.
 - **Розмежування комерційних воріт готовності (Commercial Gates vs. Fixture-Only Demo):**
@@ -145,7 +145,7 @@
 | **P2.1**                                      | Реалізація CI-публікації в GHCR (`release-images.yml`, оновлення сканера) | **Completed & Runtime-Verified** (Run 34562907779) |
 | **P2.2**                                      | Перехід `docker-compose.prod.yml` на незмінні дайджести                   | **Current candidate pins (DEMO-UPDATE-ed8b2e68)**  |
 | **Scoped Demo Update (DEMO-UPDATE-d3b5afec)** | Попередня обмежена промоція public-demo через hash-bound скрипт           | **Closed / Runtime-Verified (2026-10-01)**         |
-| **Scoped Demo Update (DEMO-UPDATE-ed8b2e68)** | Новий точний scope для #116 через hash-bound скрипт                       | **Exception approved; merge pending**              |
+| **Scoped Demo Update (DEMO-UPDATE-ed8b2e68)** | Новий точний scope для #116 через hash-bound скрипт                       | **Exception approved; not deployed**              |
 | **Commercial Production Promotion**           | Розгортання P2-образів на комерційному сервері та комерційний запуск      | **STRICT NO-GO**                                   |
 
 ## Приймання

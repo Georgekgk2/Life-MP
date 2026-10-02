@@ -251,13 +251,13 @@ Public infrastructure accessibility не є application, legal, financial або
   - Збереження ізольованого режиму `public-demo` на фікстурах (`CATALOG_SOURCE: fixtures`, `ALLOW_PUBLIC_DEMO_CATALOG: "true"`, `ALLOW_SYNTHETIC_CATALOG: "false"`);
   - Перевірка health-ендпоінтів та ключових сторінок;
   - Відкат (rollback) — **виключно до попередніх зафіксованих runtime-дайджестів (prior captured refs only), без відновлення бази даних (no DB restore)**;
-  - Одиничний стан спроби на хості (one host attempt state) запобігає повторній неузгодженій промоції.
+  - Одиничний cutover на хості: `CUTOVER_STARTED` блокує повторну promotion. Abort до cutover можна продовжити лише зі збереженим валідним backup і незмінними Compose, `.env` та captured runtime refs; без видалення state чи автоматичних retries.
 - **Суворо поза scope:** DB migrations чи відновлення БД, зміна DNS/TLS/firewall, інших проєктів на хості або visibility репозиторію/пакетів, активація live payments/shipping/fiscalization та повідомлення замовникам.
 - **Вимоги безпеки перед промоцією:**
   - Підтвердити походження образів через маніфест `IMAGE_DIGESTS.json` та атестацію Cosign (локальний lookup Cosign використовує наявний credential helper робочої станції і ніколи не читає токени самостійно);
   - SSH-з'єднання виконується раннером суворо через аліас `jorvis-prod-vm` із форсованими параметрами `Hostname 34.139.21.224`, `User medgemma-user`, `Port 22`, `StrictHostKeyChecking=yes`, `HostKeyAlias=34.139.21.224`, без проксі, форвардингів та довільних перевизначень хоста чи ключів;
   - Власник встановлює SSH host key незалежно у `known_hosts`, категорично заборонено `StrictHostKeyChecking=no` чи `accept-new`;
   - Хост завантажує приватні образи через наявний безпечний Docker credential helper/config або інтерактивне введення PAT оператором через `/dev/tty` (`read -s`) у тимчасовий `DOCKER_CONFIG` (`--password-stdin`, автоочищення при виході); CLI ніколи не отримує і не читає токени;
-  - Headless-промоція використовує чинний конфіг/хелпер хоста й гарантовано абортується до будь-яких мутацій у разі збою pull; окремої ручної авторизації SSH-входу не потрібно;
+  - Headless-промоція використовує чинний конфіг/хелпер саме сервера. Збій pull зупиняє заміну Compose й рестарти, але backup/state вже можуть існувати. Локальний login не налаштовує сервер; за відсутності server credentials оператор вводить PAT у прихований prompt canonical interactive runner.
 - **Завершення scope:** одна успішна промоція з повною верифікацією або скасування рішення оператором. Інша ціль, commit чи digest не покриваються цим записом.
 - **Повідомлення замовникам:** відкладене за рішенням користувача до фактичного дозволеного оновлення й перевірки демо; цей запис не свідчить про виконаний deployment.

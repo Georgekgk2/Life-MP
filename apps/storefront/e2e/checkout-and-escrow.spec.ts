@@ -41,7 +41,7 @@ test.describe("Demo checkout privacy boundary", () => {
       page.getByRole("heading", { name: "2. Демо-сценарій доставки" }),
     ).toBeVisible();
     await expect(page.getByRole("textbox")).toHaveCount(0);
-    await page.getByRole("radio", { name: /Кур'єр/ }).check();
+    await page.getByRole("radio", { name: /Кур['’]єр/ }).check();
     await page
       .getByRole("button", { name: /Продовжити до сценарію оплати/ })
       .click();

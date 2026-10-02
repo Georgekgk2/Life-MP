@@ -297,7 +297,7 @@ export function CheckoutView() {
                       checked={deliveryType === "courier"}
                       onChange={() => setDeliveryType("courier")}
                     />
-                    <strong>Кур'єр</strong>
+                    <strong>Кур’єр</strong>
                   </div>
                   <span
                     style={{

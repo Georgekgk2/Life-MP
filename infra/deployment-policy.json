@@ -31,7 +31,7 @@
     "operations": ["discovery", "promote", "verify", "rollback"],
     "runner": {
       "path": "scripts/promote-public-demo.mjs",
-      "sha256": "ee65f827ae5c1dd2f9600a6be6f65e1f5d8339f6893e659dfac45f5a67c74f7d"
+      "sha256": "7a6f31fc1f4cdb816e65f44b12470ca92e973d3e2339f3e425aaaee8f8d91b15"
     },
     "remote_script": {
       "path": "infra/scripts/promote-public-demo.sh",

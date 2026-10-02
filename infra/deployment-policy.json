@@ -35,7 +35,7 @@
     },
     "remote_script": {
       "path": "infra/scripts/promote-public-demo.sh",
-      "sha256": "00e17eecb32a290d40ea5ec564c2a73f6a6faa7fd9bde9ed202661621c8bd708"
+      "sha256": "64eb86af28e4a95533f58995f794f408dd679a46f486ec21273fcf6f2f591656"
     }
   },
   "rationale": "Phase P2 permits immutable CI publication under ADR 0013. Global remote, SSH, production and live integration capabilities remain locked. Only the hash-bound DEMO-UPDATE-d3b5afec runner may perform its fixed demo operations after the executable scope is reviewed and merged into main; this policy is not evidence of a completed deployment.",

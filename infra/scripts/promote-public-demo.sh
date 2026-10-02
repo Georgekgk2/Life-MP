@@ -206,8 +206,27 @@ if [[ "$OPERATION" == rollback ]]; then
   exit 0
 fi
 
-# A single captured attempt; never overwrite old evidence or re-promote after rollback.
-test ! -e "$STATE"
+check_pre_cutover_resume() {
+  RESUMING=0
+  if [[ -e "$STATE" || -L "$STATE" ]]; then
+    test -d "$STATE"
+    test ! -L "$STATE"
+    test -f "$STATE/BACKUP_COMPLETE"
+    test ! -e "$STATE/CUTOVER_STARTED"
+    test ! -e "$STATE/PROMOTION_COMPLETE"
+    test ! -e "$STATE/ROLLBACK_COMPLETE"
+    (cd "$STATE" && sha256sum -c CHECKSUMS.sha256 >/dev/null)
+    sha256sum -c "$STATE/environment.sha256" >/dev/null
+    cmp -s "$DIR/docker-compose.prod.yml" "$STATE/compose.before.yml"
+    mapfile -t CAPTURED < "$STATE/runtime.before.txt"
+    test "${#CAPTURED[@]}" = 2
+    test "${CAPTURED[0]}" = "$OLD_C"
+    test "${CAPTURED[1]}" = "$OLD_S"
+    RESUMING=1
+  fi
+}
+
+# One actual cutover. An authentication abort may resume only its untouched capture.
 health
 OLD_C=$(docker inspect --format '{{.Config.Image}}' life-mp-commerce)
 OLD_S=$(docker inspect --format '{{.Config.Image}}' life-mp-storefront)
@@ -216,6 +235,7 @@ OLD_S=$(docker inspect --format '{{.Config.Image}}' life-mp-storefront)
 assert_runtime "$OLD_C" "$OLD_S"
 jq -e --arg c "$OLD_C" --arg s "$OLD_S" \
   '.services.commerce.image==$c and .services.storefront.image==$s' "$TEMP/active.json" >/dev/null
+check_pre_cutover_resume
 
 # Interactive operator credentials live only in a temporary Docker config.
 # Headless use keeps the existing credential helper; never searches for tokens.
@@ -228,17 +248,21 @@ if [[ -t 0 && -t 1 ]]; then
   unset TOKEN
 fi
 
-mkdir -m 700 "$STATE"
-cp docker-compose.prod.yml "$STATE/compose.before.yml"
-printf '%s\n%s\n' "$OLD_C" "$OLD_S" > "$STATE/runtime.before.txt"
-sha256sum "$DIR/.env.production" > "$STATE/environment.sha256"
-DB_USER=$(jq -er '.services.postgres.environment.POSTGRES_USER' "$TEMP/active.json")
-DB_NAME=$(jq -er '.services.postgres.environment.POSTGRES_DB' "$TEMP/active.json")
-docker exec life-mp-postgres pg_dump -U "$DB_USER" -d "$DB_NAME" -Fc > "$STATE/database.dump"
-test -s "$STATE/database.dump"
-docker exec -i life-mp-postgres pg_restore -l < "$STATE/database.dump" >/dev/null
-(cd "$STATE" && sha256sum compose.before.yml runtime.before.txt environment.sha256 database.dump > CHECKSUMS.sha256 && sha256sum -c CHECKSUMS.sha256 >/dev/null)
-touch "$STATE/BACKUP_COMPLETE"
+if (( RESUMING == 0 )); then
+  mkdir -m 700 "$STATE"
+  cp docker-compose.prod.yml "$STATE/compose.before.yml"
+  printf '%s\n%s\n' "$OLD_C" "$OLD_S" > "$STATE/runtime.before.txt"
+  sha256sum "$DIR/.env.production" > "$STATE/environment.sha256"
+  DB_USER=$(jq -er '.services.postgres.environment.POSTGRES_USER' "$TEMP/active.json")
+  DB_NAME=$(jq -er '.services.postgres.environment.POSTGRES_DB' "$TEMP/active.json")
+  docker exec life-mp-postgres pg_dump -U "$DB_USER" -d "$DB_NAME" -Fc > "$STATE/database.dump"
+  test -s "$STATE/database.dump"
+  docker exec -i life-mp-postgres pg_restore -l < "$STATE/database.dump" >/dev/null
+  (cd "$STATE" && sha256sum compose.before.yml runtime.before.txt environment.sha256 database.dump > CHECKSUMS.sha256 && sha256sum -c CHECKSUMS.sha256 >/dev/null)
+  touch "$STATE/BACKUP_COMPLETE"
+else
+  echo 'Continuing the captured pre-cutover attempt; existing backup evidence retained.'
+fi
 
 docker pull "$COMMERCE"
 docker pull "$STOREFRONT"
@@ -249,6 +273,8 @@ test "$(docker image inspect --format '{{.Architecture}}' "$STOREFRONT")" = amd6
 cmp -s docker-compose.prod.yml "$STATE/compose.before.yml"
 sha256sum -c "$STATE/environment.sha256" >/dev/null
 assert_runtime "$OLD_C" "$OLD_S"
+# Irreversible attempt marker: no automatic/manual re-promotion after cutover begins.
+touch "$STATE/CUTOVER_STARTED"
 MUTATED=1
 atomic_compose "$TEMP/candidate.yml"
 start_apps

@@ -4,26 +4,26 @@ import { join } from "node:path";
 import { load as loadYaml } from "js-yaml";
 import { z } from "zod";
 
-export const DEMO_UPDATE_ID = "DEMO-UPDATE-d3b5afec" as const;
+export const DEMO_UPDATE_ID = "DEMO-UPDATE-ed8b2e68" as const;
 export const DEMO_UPDATE_ENVIRONMENT = "public-demo" as const;
 export const DEMO_UPDATE_HOST = "34.139.21.224" as const;
 export const DEMO_UPDATE_SSH_USER = "medgemma-user" as const;
 export const DEMO_UPDATE_PUBLIC_ORIGIN = "https://life-mp.pp.ua" as const;
 export const DEMO_UPDATE_SOURCE_COMMIT =
-  "d3b5afec16a043fcb9192bfbbc8c882628c8b831" as const;
-export const DEMO_UPDATE_RELEASE_RUN_ID = 36925554797 as const;
+  "ed8b2e6805ab504eef56df0b4f83b643df1ed860" as const;
+export const DEMO_UPDATE_RELEASE_RUN_ID = 37026279249 as const;
 export const DEMO_UPDATE_COMPOSE_PATH =
   "deploy/docker-compose.prod.yml" as const;
 export const DEMO_UPDATE_PROJECT_NAME = "life-mp" as const;
 export const DEMO_UPDATE_HOST_DEPLOY_DIRECTORY =
   "/opt/life-mp/current/deploy" as const;
 export const DEMO_UPDATE_HOST_BACKUP_DIRECTORY =
-  "/var/backups/life-mp/demo-d3b5afec" as const;
+  "/var/backups/life-mp/demo-ed8b2e68" as const;
 
 export const DEMO_UPDATE_COMMERCE_IMAGE =
-  "ghcr.io/georgekgk2/life-commerce@sha256:d1a7c65d58a3b1244f04d273c1921e7a278b932b8274265086e98be49ba76bb3" as const;
+  "ghcr.io/georgekgk2/life-commerce@sha256:6cea54b5aaeba56b0c499a22446872f0ba7dbb53aade6471b9ac818b16a9cf6d" as const;
 export const DEMO_UPDATE_STOREFRONT_IMAGE =
-  "ghcr.io/georgekgk2/life-storefront@sha256:545473fc7cb3d5a53a7f21a4ddf7db1d4cbe4a2f5c5fcb689bb88fdd69f1c076" as const;
+  "ghcr.io/georgekgk2/life-storefront@sha256:8b0869a528acdd852c440396976164337a91f0504a5ae35df66e0cfc2c8b440b" as const;
 
 export const DEMO_UPDATE_RUNNER_PATH =
   "scripts/promote-public-demo.mjs" as const;

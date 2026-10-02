@@ -120,29 +120,33 @@
 
 - **Цей ADR НЕ дозволяє загальне розгортання на продакшні:**
   Загальне віддалене розгортання (generic remote deployment), прямий SSH-доступ оператора чи CI, бойові production-гейти та комерційний запуск залишаються **суворо забороненими** (`allow_remote_deployment: false`, `allow_ssh_execution: false`, `allow_production_dns_tls: false`, `allow_live_payment_gateway: false`, `allow_live_shipping_api: false`, `allow_live_fiscalization: false`).
-- **Обмежений виняток для публічного демо (Bounded Scoped Demo Exception після злиття PR):**
-  - Запроваджується виключно після повного злиття узгодженого виконуваного PR у гілку `main` (`feature/demo-promotion-d3b5afec` ➔ `main`). До моменту злиття PR будь-які віддалені мутації чи команди на хості заблоковані.
-  - Виняток суворо обмежений опціональним контрактом `scoped_demo_update` (ID: `DEMO-UPDATE-d3b5afec`) для цільового стенду `public-demo` (`https://life-mp.pp.ua`, хост `34.139.21.224`, користувач `medgemma-user`, commit `d3b5afec16a043fcb9192bfbbc8c882628c8b831`, Run ID `36925554797`, точні immutable-дайджести `commerce` та `storefront`).
-  - Виконання дозволене **виключно через верифікований за SHA-256 локальний скрипт-раннер (`scripts/promote-public-demo.mjs`) та віддалений скрипт (`infra/scripts/promote-public-demo.sh`)**. Довільний ручний обхід через SSH (`manual SSH bypass`) категорично заборонено.
+- **Попередня обмежена промоція public-demo (`DEMO-UPDATE-d3b5afec`, закрита):**
+  - Була обмежена одноразовим grant після merge узгодженого PR `feature/demo-promotion-d3b5afec` у `main`; довільні віддалені мутації до цього merge були заборонені.
+  - Точний історичний scope: public-demo `https://life-mp.pp.ua` (`34.139.21.224`, `medgemma-user`), commit `d3b5afec16a043fcb9192bfbbc8c882628c8b831`, run `36925554797` та immutable images, зафіксовані в readiness record. Цей grant закритий і не авторизує наступні digest.
+  - Виконання відбулося виключно через SHA-256-verified `scripts/promote-public-demo.mjs` та `infra/scripts/promote-public-demo.sh`; manual SSH bypass був і лишається забороненим.
+- **Новий обмежений scope public-demo (`DEMO-UPDATE-ed8b2e68`):**
+  - Запит користувача стосується лише fixture-only `https://life-mp.pp.ua`; source `ed8b2e6805ab504eef56df0b4f83b643df1ed860`, run `37026279249`, точні digests задаються єдиним grant у policy.
+  - Користувач дозволив одноразово не вимагати formal peer review лише для PR #117 після 9/9 успішних CI checks на тодішньому head; formal GitHub review не зафіксований. Фінальний head мусить пройти всі required checks; branch protection не обходиться, а grant активується лише після merge точного PR. Commercial production лишається `STRICT NO-GO`.
 - **Розмежування комерційних воріт готовності (Commercial Gates vs. Fixture-Only Demo):**
   - Комерційні ворота готовності (`COM-1..6`, `LOG-1`, `CAT-1..5`, `FSC-1`, договори з еквайрингом, ПРРО, логістичними операторами, юридичні висновки) є обов'язковими **виключно для комерційного виробничого запуску**.
   - Публічний демо-стенд функціонує в ізольованому режимі виключно на статичних фікстурах (`CATALOG_SOURCE: fixtures`, `ALLOW_PUBLIC_DEMO_CATALOG: "true"`, `ALLOW_SYNTHETIC_CATALOG: "false"`, відсутність бойових платіжних та фіскальних ключів). Комерційні ворота не вимагаються для оновлення цього фікстурного демо, проте залишаються безумовними блокерами комерційного продакшну.
 
 ## Наслідки
 
-- **Безпека хоста:** Після майбутньої промоції та переходу на готові образи збірка на боці хоста більше не буде потрібна; фактичний поточний стан цільового сервера залишається неперевіреним відповідно до [ADR 0004](0004-production-isolation.md).
+- **Безпека хоста:** Попередню промоцію fixture-only public-demo виконано й перевірено через canonical runner; це не засвідчує комерційну ізоляцію або готовність до commercial production, які лишаються неперевіреними за [ADR 0004](0004-production-isolation.md).
 - **Межі відтворюваності (Reproducibility Boundary):** Збірка не гарантує bit-for-bit reproducibility до моменту публікації через оновлення системних пакунків Alpine під час виконання інструкції `RUN apk upgrade --no-cache`. Проте після публікації конкретний `sha256`-дайджест у реєстрі є незмінним (immutable) і гарантує детерміноване розгортання одного й того самого бінарного артефакту.
 - **Ізоляція ресурсів:** Архітектура P2 не використовує self-hosted runner або remote build і призначена зменшити майбутній host blast radius. Фактична production isolation залишається неперевіреною відповідно до [ADR 0004](0004-production-isolation.md).
 
 ## Статус
 
-| Етап                     | Опис                                                                      | Статус              |
-| ------------------------ | ------------------------------------------------------------------------- | ------------------- |
-| **P2.0**                 | Архітектурний дизайн та специфікація (цей ADR)                            | **Accepted**                                  |
-| **P2.1**                 | Реалізація CI-публікації в GHCR (`release-images.yml`, оновлення сканера) | **Completed & Runtime-Verified** (Run 34562907779) |
-| **P2.2**                                      | Перехід `docker-compose.prod.yml` на незмінні дайджести                   | **Completed (DEMO-UPDATE-d3b5afec candidate pins)** |
-| **Scoped Demo Update (DEMO-UPDATE-d3b5afec)** | Обмежена промоція публічного демо через hash-bound скрипт після злиття PR | **Bounded Exception (Pending PR Merge)**            |
-| **Commercial Production Promotion**           | Розгортання P2-образів на комерційному сервері та комерційний запуск      | **STRICT NO-GO**                                    |
+| Етап                                          | Опис                                                                      | Статус                                             |
+| --------------------------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------- |
+| **P2.0**                                      | Архітектурний дизайн та специфікація (цей ADR)                            | **Accepted**                                       |
+| **P2.1**                                      | Реалізація CI-публікації в GHCR (`release-images.yml`, оновлення сканера) | **Completed & Runtime-Verified** (Run 34562907779) |
+| **P2.2**                                      | Перехід `docker-compose.prod.yml` на незмінні дайджести                   | **Current candidate pins (DEMO-UPDATE-ed8b2e68)**  |
+| **Scoped Demo Update (DEMO-UPDATE-d3b5afec)** | Попередня обмежена промоція public-demo через hash-bound скрипт           | **Closed / Runtime-Verified (2026-10-01)**         |
+| **Scoped Demo Update (DEMO-UPDATE-ed8b2e68)** | Новий точний scope для #116 через hash-bound скрипт                       | **Exception approved; not deployed**              |
+| **Commercial Production Promotion**           | Розгортання P2-образів на комерційному сервері та комерційний запуск      | **STRICT NO-GO**                                   |
 
 ## Приймання
 

@@ -234,22 +234,22 @@ Public infrastructure accessibility не є application, legal, financial або
 ### DEMO-UPDATE-d3b5afec — обмежений scope рішення оператора
 
 - **Дата запису та актуалізації:** 2026-10-01.
-- **Статус:** `OPERATOR SCOPE CODIFIED / PENDING MERGED CAPABILITY ACTIVATION`.
-- **Джерело рішення та намір:** команда користувача `go` (намір користувача — швидкість виконання через один узгоджений виконуваний PR замість надлишкової бюрократії та паперової тяганини). AI-асистент є технічним виконавцем запису, не власником авторизації. Цей запис **не заявляє про формальне схвалення (peer review approval) у GitHub API** і **не є заявою про завершене розгортання (deployment completed)** чи ретроактивним виправданням попередніх дій.
+- **Статус:** `CLOSED / PROMOTED AND VERIFIED (2026-10-01)`.
+- **Джерело рішення та намір:** обмежене рішення оператора для точного public-demo scope. AI-асистент був технічним виконавцем, не власником авторизації; цей запис не заявляє формальне схвалення (peer review approval) у GitHub API та не поширюється на інші commits або digests.
 - **Ціль:** наявне ізольоване public-demo середовище `https://life-mp.pp.ua/` на хості `34.139.21.224` (користувач `medgemma-user`).
 - **Незмінний release candidate:** commit `d3b5afec16a043fcb9192bfbbc8c882628c8b831`, [Release Container Images run 36925554797](https://github.com/Georgekgk2/Life-MP/actions/runs/36925554797), artifact `image-digests-manifest` / `IMAGE_DIGESTS.json`:
   - storefront: `ghcr.io/georgekgk2/life-storefront@sha256:545473fc7cb3d5a53a7f21a4ddf7db1d4cbe4a2f5c5fcb689bb88fdd69f1c076`;
   - commerce: `ghcr.io/georgekgk2/life-commerce@sha256:d1a7c65d58a3b1244f04d273c1921e7a278b932b8274265086e98be49ba76bb3`.
 - **Межі готовності (Readiness Scope):**
-  - Готовність до виконання **залишається у статусі pending merged capability activation**: віддалені можливості активуються виключно після повного злиття узгодженого виконуваного PR у гілку `main`.
-  - Жодних тверджень про віддалені докази (`remote proof`) чи вже виконане розгортання (`deployment claim`) не робиться.
+  - Цей grant був активний лише після merge точного scope PR у `main`; його одноразове повноваження закрито й воно не охоплює нові commits/digests.
+  - Канонічна promotion і verify були виконані; runtime image refs та health пройшли перевірку, сторінки `/`, `/catalog`, `/checkout`, `/api/health` перевірені без фінального надсилання checkout.
   - Надання дозволу (grant) реалізується **виключно через верифікований за SHA-256 скрипт-раннер (`scripts/promote-public-demo.mjs` та `infra/scripts/promote-public-demo.sh`)**, а НЕ через ручний обхід через SSH (`manual SSH bypass`).
   - Усі глобальні гейти у `infra/deployment-policy.json` (`allow_remote_deployment`, `allow_ssh_execution`, `allow_production_dns_tls`, `allow_live_payment_gateway`, `allow_live_shipping_api`, `allow_live_fiscalization`) залишаються суворо `false`; доступ авторизується лише через строгий опціональний об'єкт `scoped_demo_update`.
-- **Запланований scope після злиття PR:**
+- **Scope, виконаний після злиття PR:**
   - Дозволені операції: `discovery`, `promote`, `verify`, `rollback`.
-  - Одна контрольована промоція двох кандидатних образів без локального rebuild на хості;
+  - Одна контрольована промоція двох точних образів без локального rebuild на хості;
   - Збереження ізольованого режиму `public-demo` на фікстурах (`CATALOG_SOURCE: fixtures`, `ALLOW_PUBLIC_DEMO_CATALOG: "true"`, `ALLOW_SYNTHETIC_CATALOG: "false"`);
-  - Перевірка health-ендпоінтів та ключових сторінок;
+  - Перевірка health-ендпоінта та сторінок `/`, `/catalog`, `/checkout`, `/api/health`;
   - Відкат (rollback) — **виключно до попередніх зафіксованих runtime-дайджестів (prior captured refs only), без відновлення бази даних (no DB restore)**;
   - Одиничний cutover на хості: `CUTOVER_STARTED` блокує повторну promotion. Abort до cutover можна продовжити лише зі збереженим валідним backup і незмінними Compose, `.env` та captured runtime refs; без видалення state чи автоматичних retries.
 - **Суворо поза scope:** DB migrations чи відновлення БД, зміна DNS/TLS/firewall, інших проєктів на хості або visibility репозиторію/пакетів, активація live payments/shipping/fiscalization та повідомлення замовникам.
@@ -259,5 +259,19 @@ Public infrastructure accessibility не є application, legal, financial або
   - Власник встановлює SSH host key незалежно у `known_hosts`, категорично заборонено `StrictHostKeyChecking=no` чи `accept-new`;
   - Хост завантажує приватні образи через наявний безпечний Docker credential helper/config або інтерактивне введення PAT оператором через `/dev/tty` (`read -s`) у тимчасовий `DOCKER_CONFIG` (`--password-stdin`, автоочищення при виході); CLI ніколи не отримує і не читає токени;
   - Headless-промоція використовує чинний конфіг/хелпер саме сервера. Збій pull зупиняє заміну Compose й рестарти, але backup/state вже можуть існувати. Локальний login не налаштовує сервер; за відсутності server credentials оператор вводить PAT у прихований prompt canonical interactive runner.
-- **Завершення scope:** одна успішна промоція з повною верифікацією або скасування рішення оператором. Інша ціль, commit чи digest не покриваються цим записом.
-- **Повідомлення замовникам:** відкладене за рішенням користувача до фактичного дозволеного оновлення й перевірки демо; цей запис не свідчить про виконаний deployment.
+- **Завершення scope:** одноразову promotion d3b5afec закрито після успішної promotion і повної перевірки; інший target, commit або digest потребує нового grant.
+- **Повідомлення замовникам:** повідомлення не надсилалися; це не дає дозволу на live communications або комерційний запуск.
+
+### DEMO-UPDATE-ed8b2e68 — обмежений scope нового релізу
+
+- **Дата запису:** 2026-10-02.
+- **Статус:** `OWNER-AUTHORIZED ONE-TIME REVIEW EXCEPTION / NOT DEPLOYED`.
+- **Джерело запиту:** користувач попросив «онови прод». У межах наявної політики це трактується лише як запит на оновлення чинного ізольованого fixture-only public-demo `https://life-mp.pp.ua/`; комерційний production лишається `STRICT NO-GO`.
+- **Незмінний release candidate:** merged source commit `ed8b2e6805ab504eef56df0b4f83b643df1ed860`, [Release Container Images run 37026279249](https://github.com/Georgekgk2/Life-MP/actions/runs/37026279249), artifact `image-digests-manifest` / `IMAGE_DIGESTS.json`, SHA-256 `2f163cfe4bc5ee7eb34d4a6ec2b5d9175b786a70116bdcd723ae8163a033211d`.
+  - commerce: `ghcr.io/georgekgk2/life-commerce@sha256:6cea54b5aaeba56b0c499a22446872f0ba7dbb53aade6471b9ac818b16a9cf6d`;
+  - storefront: `ghcr.io/georgekgk2/life-storefront@sha256:8b0869a528acdd852c440396976164337a91f0504a5ae35df66e0cfc2c8b440b`.
+- **Verified provenance:** Cosign signature and SLSA provenance for each digest bind to the exact source commit, release workflow identity and `linux/amd64` CI build.
+- **Boundaries:** target `34.139.21.224` / `medgemma-user`; unique backup state `/var/backups/life-mp/demo-ed8b2e68`; only `discovery`, `promote`, `verify`, `rollback` via the SHA-256-bound canonical runner and payload.
+- **Виняток щодо review:** користувач дозволив одноразово не вимагати формального peer review лише для PR #117 після 9/9 успішних CI checks на тодішньому head; formal GitHub review не зафіксований. Фінальний head мусить пройти всі required checks; branch protection і status checks не обходяться.
+- **Authorization:** цей точний grant набуває чинності лише після merge PR #117 із проходженням усіх required checks. Виняток стосується лише формального peer review цього PR; жодні required checks чи branch protection не обходяться. Глобальні gates залишаються `false`; DB migrations/restore, host cleanup і customer notifications поза scope.
+- **Deployment status:** no remote command or deployment for this release has been run.

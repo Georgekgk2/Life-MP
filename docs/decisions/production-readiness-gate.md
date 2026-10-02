@@ -281,3 +281,16 @@ Public infrastructure accessibility не є application, legal, financial або
 - **Credential boundary:** the owner reports that the temporary GHCR PAT was revoked. The runner EXIT trap attempts logout and removal of its temporary Docker config; successful deletion was not independently attested.
 - **Checkout boundary:** on public-demo, checkout previously presented contact and delivery inputs (holding entries in client React state before routing to a draft-only page). Branch `fix/public-demo-safe-checkout` eliminates real input collection: contact and delivery fields are replaced with an explicit zero-PII synthetic scenario (`Демо-покупець`, `Демо-локація`), 0 `<input type="text">` fields, 0 `<form>` elements, non-authoritative draft success messaging, Playwright regression coverage, and automated browser verification confirming 0 mutating network requests. Promotion to public-demo remains subject to PR merge, passing CI checks, and explicit owner authorization.
 - **Remote shell warning:** discovery still emits `/etc/bash.bashrc: line 7: PS1: unbound variable`; the canonical operation completed. Host shell configuration was not inspected or changed.
+
+### DEMO-UPDATE-7226ce7 — безпечний zero-PII checkout для public-demo
+
+- **Дата запису:** 2026-10-02.
+- **Статус:** `PENDING MERGE & EXPLICIT PROMOTION / NOT DEPLOYED`; commercial production remains `BLOCKED / NOT READY`.
+- **Джерело запиту:** промоція релізу з безпечним zero-PII checkout на публічний демо-сервер `https://life-mp.pp.ua/`.
+- **Незмінний release candidate:** merged source commit `7226ce776a28d7f2a4840e0de2ff720d3b365f36`, [Release Container Images run 37048827832](https://github.com/Georgekgk2/Life-MP/actions/runs/37048827832), artifact `image-digests-manifest` / `IMAGE_DIGESTS.json`, SHA-256 `e1f312fbd382030d188d285477a7a40746d070b2cd0ae77189dbdf5c2ed39d49`.
+  - commerce: `ghcr.io/georgekgk2/life-commerce@sha256:6b2f29cdb2e03ae83f2733a273ac2c9ba26c39b75ad5d1b4bee2b4bdd1952b7d`;
+  - storefront: `ghcr.io/georgekgk2/life-storefront@sha256:79297bfd19e71622dad6fc86d463272a3d46c8d52c19a40531b6dad775ace7fb`.
+- **Verified provenance:** Cosign signature and SLSA provenance for each digest bind to the exact source commit, release workflow identity and `linux/amd64` CI build.
+- **Boundaries:** target `34.139.21.224` / `medgemma-user`; unique backup state `/var/backups/life-mp/demo-7226ce7`; only `discovery`, `promote`, `verify`, `rollback` via the SHA-256-bound canonical runner and payload.
+- **Authorization:** цей точний grant набуває чинності лише після merge scoping PR із проходженням усіх required checks. Глобальні gates залишаються `false`; DB migrations/restore, host cleanup і customer notifications поза scope.
+- **Deployment status:** no remote command or deployment for this release has been run.

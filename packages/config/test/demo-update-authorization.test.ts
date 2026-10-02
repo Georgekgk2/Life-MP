@@ -29,7 +29,7 @@ const CONTRACT_P2_GATES = Object.freeze({
 const DEFAULT_RUNNER_SCRIPT = `#!/usr/bin/env node
 // Real promote-public-demo.mjs runner script
 import { execFileSync } from "node:child_process";
-console.log("Starting scoped demo update DEMO-UPDATE-ed8b2e68");
+console.log("Starting scoped demo update DEMO-UPDATE-7226ce7");
 execFileSync("ssh", ["medgemma-user@34.139.21.224", "whoami"], { stdio: "inherit" });
 `;
 
@@ -47,11 +47,11 @@ const DEFAULT_COMPOSE_YAML = `services:
   redis:
     image: redis:7-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
   commerce:
-    image: ghcr.io/georgekgk2/life-commerce@sha256:6cea54b5aaeba56b0c499a22446872f0ba7dbb53aade6471b9ac818b16a9cf6d
+    image: ghcr.io/georgekgk2/life-commerce@sha256:6b2f29cdb2e03ae83f2733a273ac2c9ba26c39b75ad5d1b4bee2b4bdd1952b7d
     environment:
       NODE_ENV: production
   storefront:
-    image: ghcr.io/georgekgk2/life-storefront@sha256:8b0869a528acdd852c440396976164337a91f0504a5ae35df66e0cfc2c8b440b
+    image: ghcr.io/georgekgk2/life-storefront@sha256:79297bfd19e71622dad6fc86d463272a3d46c8d52c19a40531b6dad775ace7fb
     environment:
       NODE_ENV: production
       LIFE_RUNTIME_ENV: public-demo
@@ -107,22 +107,22 @@ function setupFixture(
 
   if (includeGrant) {
     policy["scoped_demo_update"] = {
-      id: "DEMO-UPDATE-ed8b2e68",
+      id: "DEMO-UPDATE-7226ce7",
       environment: "public-demo",
       host: "34.139.21.224",
       ssh_user: "medgemma-user",
       public_origin: "https://life-mp.pp.ua",
-      source_commit: "ed8b2e6805ab504eef56df0b4f83b643df1ed860",
-      release_run_id: 37026279249,
+      source_commit: "7226ce776a28d7f2a4840e0de2ff720d3b365f36",
+      release_run_id: 37048827832,
       compose_path: CONTRACT_COMPOSE_PATH,
       project_name: "life-mp",
       host_deploy_directory: "/opt/life-mp/current/deploy",
-      host_backup_directory: "/var/backups/life-mp/demo-ed8b2e68",
+      host_backup_directory: "/var/backups/life-mp/demo-7226ce7",
       images: {
         commerce:
-          "ghcr.io/georgekgk2/life-commerce@sha256:6cea54b5aaeba56b0c499a22446872f0ba7dbb53aade6471b9ac818b16a9cf6d",
+          "ghcr.io/georgekgk2/life-commerce@sha256:6b2f29cdb2e03ae83f2733a273ac2c9ba26c39b75ad5d1b4bee2b4bdd1952b7d",
         storefront:
-          "ghcr.io/georgekgk2/life-storefront@sha256:8b0869a528acdd852c440396976164337a91f0504a5ae35df66e0cfc2c8b440b",
+          "ghcr.io/georgekgk2/life-storefront@sha256:79297bfd19e71622dad6fc86d463272a3d46c8d52c19a40531b6dad775ace7fb",
       },
       operations: ["discovery", "promote", "verify", "rollback"],
       runner: {
@@ -143,21 +143,21 @@ function setupFixture(
   );
 }
 
-describe("DEMO-UPDATE-ed8b2e68 authorization & containment integration", () => {
+describe("DEMO-UPDATE-7226ce7 authorization & containment integration", () => {
   it("passes scanner and authorization when valid bounded grant is present", () => {
     const tempDir = mkdtempSync(join(tmpdir(), "demo-auth-pass-"));
     try {
       setupFixture(tempDir);
 
       const grant = readDemoUpdateAuthorization(tempDir);
-      expect(grant.id).toBe("DEMO-UPDATE-ed8b2e68");
+      expect(grant.id).toBe("DEMO-UPDATE-7226ce7");
       expect(grant.environment).toBe("public-demo");
       expect(grant.host).toBe("34.139.21.224");
       expect(grant.images.commerce).toBe(
-        "ghcr.io/georgekgk2/life-commerce@sha256:6cea54b5aaeba56b0c499a22446872f0ba7dbb53aade6471b9ac818b16a9cf6d",
+        "ghcr.io/georgekgk2/life-commerce@sha256:6b2f29cdb2e03ae83f2733a273ac2c9ba26c39b75ad5d1b4bee2b4bdd1952b7d",
       );
       expect(grant.images.storefront).toBe(
-        "ghcr.io/georgekgk2/life-storefront@sha256:8b0869a528acdd852c440396976164337a91f0504a5ae35df66e0cfc2c8b440b",
+        "ghcr.io/georgekgk2/life-storefront@sha256:79297bfd19e71622dad6fc86d463272a3d46c8d52c19a40531b6dad775ace7fb",
       );
 
       const scanResult = scanDeploymentContainment(tempDir);
@@ -217,7 +217,7 @@ describe("DEMO-UPDATE-ed8b2e68 authorization & containment integration", () => {
             commerce:
               "ghcr.io/georgekgk2/life-commerce@sha256:0000000000000000000000000000000000000000000000000000000000000000",
             storefront:
-              "ghcr.io/georgekgk2/life-storefront@sha256:8b0869a528acdd852c440396976164337a91f0504a5ae35df66e0cfc2c8b440b",
+              "ghcr.io/georgekgk2/life-storefront@sha256:79297bfd19e71622dad6fc86d463272a3d46c8d52c19a40531b6dad775ace7fb",
           },
         },
       });
@@ -414,7 +414,7 @@ describe("DEMO-UPDATE-ed8b2e68 authorization & containment integration", () => {
     const tempDir = mkdtempSync(join(tmpdir(), "demo-auth-bad-compose-image-"));
     try {
       const badComposeYaml = DEFAULT_COMPOSE_YAML.replace(
-        "ghcr.io/georgekgk2/life-commerce@sha256:6cea54b5aaeba56b0c499a22446872f0ba7dbb53aade6471b9ac818b16a9cf6d",
+        "ghcr.io/georgekgk2/life-commerce@sha256:6b2f29cdb2e03ae83f2733a273ac2c9ba26c39b75ad5d1b4bee2b4bdd1952b7d",
         "ghcr.io/georgekgk2/life-commerce:latest",
       );
       setupFixture(tempDir, { composeYaml: badComposeYaml });

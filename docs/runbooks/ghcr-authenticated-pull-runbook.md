@@ -1,7 +1,7 @@
 # Інструкція безпечної автентифікації GHCR на Production Хості
 
-- **Статус:** ОПЕРАЦІЙНИЙ РЕГЛАМЕНТ (Фаза P2 / DEMO-UPDATE-d3b5afec)
-- **Дата оновлення:** 2026-10-01
+- **Статус:** КАНДИДАТ ОПЕРАЦІЙНОГО РЕГЛАМЕНТУ (Фаза P2 / DEMO-UPDATE-ed8b2e68; merged scope PR required)
+- **Дата оновлення:** 2026-10-02
 - **Призначення:** Забезпечення захищеного завантаження приватних контейнерів із GitHub Container Registry (GHCR) на сервер публічного демо без витоку облікових даних та без неконтрольованого віддаленого доступу.
 
 ---
@@ -103,7 +103,7 @@
    Для операції `promote` локально завантажується верифікований маніфест за допомогою GitHub CLI:
    ```bash
    WORK="$(mktemp -d)"
-   gh run download 36925554797 --repo Georgekgk2/Life-MP \
+   gh run download 37026279249 --repo Georgekgk2/Life-MP \
      --name image-digests-manifest --dir "$WORK"
    node scripts/promote-public-demo.mjs promote "$WORK/IMAGE_DIGESTS.json"
    ```

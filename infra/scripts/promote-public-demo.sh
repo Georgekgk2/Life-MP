@@ -7,9 +7,9 @@ umask 077
 OPERATION=${1:?operation required}
 CANDIDATE_BASE64=${2:?approved Compose required}
 DIR=/opt/life-mp/current/deploy
-STATE=/var/backups/life-mp/demo-d3b5afec
-COMMERCE='ghcr.io/georgekgk2/life-commerce@sha256:d1a7c65d58a3b1244f04d273c1921e7a278b932b8274265086e98be49ba76bb3'
-STOREFRONT='ghcr.io/georgekgk2/life-storefront@sha256:545473fc7cb3d5a53a7f21a4ddf7db1d4cbe4a2f5c5fcb689bb88fdd69f1c076'
+STATE=/var/backups/life-mp/demo-ed8b2e68
+COMMERCE='ghcr.io/georgekgk2/life-commerce@sha256:6cea54b5aaeba56b0c499a22446872f0ba7dbb53aade6471b9ac818b16a9cf6d'
+STOREFRONT='ghcr.io/georgekgk2/life-storefront@sha256:8b0869a528acdd852c440396976164337a91f0504a5ae35df66e0cfc2c8b440b'
 case "$OPERATION" in discovery|promote|verify|rollback) ;; *) exit 2 ;; esac
 
 test "$(uname -m)" = x86_64
@@ -122,7 +122,7 @@ esac
 
 # Serialize mutations across terminals without touching other projects.
 test -w /var/backups/life-mp
-exec 9>/var/backups/life-mp/demo-d3b5afec.lock
+exec 9>/var/backups/life-mp/demo-ed8b2e68.lock
 flock -n 9
 TEMP=$(mktemp -d "$DIR/.demo-update.XXXXXX")
 AUTH_CONFIG=

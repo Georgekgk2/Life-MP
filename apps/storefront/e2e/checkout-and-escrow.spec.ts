@@ -62,9 +62,19 @@ test.describe("Multi-Vendor Cart & Checkout Draft Containment (Phase 4D)", () =>
 
     // Step 2: Delivery
     await page.locator("#city").fill("Тестове Місто");
+    await page.getByRole("radio", { name: /Кур'єр/ }).check();
     await page
-      .locator("#novaPoshtaBranch")
-      .fill("Відділення №0 (Тестова адреса)");
+      .locator('button:has-text("Продовжити до сценарію оплати")')
+      .click();
+    await expect(
+      page
+        .locator('[role="alert"]')
+        .filter({ hasText: "Будь ласка, вкажіть адресу доставки." }),
+    ).toHaveText("Будь ласка, вкажіть адресу доставки.");
+    await expect(page.locator('[aria-current="step"]')).toContainText(
+      "Доставка",
+    );
+    await page.locator("#novaPoshtaBranch").fill("вул. Тестова, 0, кв. 0");
     await page
       .locator('button:has-text("Продовжити до сценарію оплати")')
       .click();

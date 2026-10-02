@@ -66,7 +66,11 @@ export function CheckoutView() {
       return false;
     }
     if (!formData.novaPoshtaBranch.trim()) {
-      setError("Будь ласка, вкажіть номер відділення або адресу поштомату.");
+      setError(
+        deliveryType === "courier"
+          ? "Будь ласка, вкажіть адресу доставки."
+          : "Будь ласка, вкажіть номер відділення або адресу поштомату.",
+      );
       return false;
     }
     setError(null);

@@ -166,7 +166,10 @@ test.describe("FAQ Chatbot Widget E2E", () => {
     await page.goto("/vendor/dashboard");
     await expect(page.locator(".chatbot-fab")).toHaveCount(0);
 
-    // 4. Catalog page (chatbot MUST be present)
+    // 4. Artisan demo workspace
+    await page.goto("/demo/artisan");
+    await expect(page.locator(".chatbot-fab")).toHaveCount(0);
+    // 5. Catalog page (chatbot MUST be present)
     await page.goto("/catalog");
     await expect(page.locator(".chatbot-fab")).toBeVisible();
   });

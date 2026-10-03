@@ -327,6 +327,21 @@ Public infrastructure accessibility не є application, legal, financial або
 - **Залишковий ризик:** для PR #126 немає незалежного людського review; CI не є його заміною.
 - **Незмінні межі:** виняток обмежений PR #126 і fixture-only `https://life-mp.pp.ua/`; exception для PR #125 окремий і не є підставою цього merge. Комерційна промоція та live integrations не дозволені.
 
+### EXC-20261003-SINGLE-OWNER-PR-127-RUNNER-FIX
+
+- **Дата авторизації:** 2026-10-03.
+- **Власник авторизації:** користувач прямо дозволив одноразовий no-peer-review виняток для PR #127 у цій сесії.
+- **Статус:** `APPROVED / SINGLE-OWNER REVIEW EXCEPTION / PR #127 ONLY`.
+- **Підстава:** PR #127 не має незалежного review або review request. Виняток знімає лише вимогу незалежного людського review; відсутність review не приховується, жоден required check не обходиться.
+- **Точний scope:** тільки PR #127 (`fix/demo-3b2c22e-runner-scope`), авторизований head `fd416c73f1c5497e7990a8a326ce0d405505012d`. Охоплює один merge через PR; не дозволяє прямий SSH/deploy і не змінює межі `DEMO-UPDATE-3b2c22e`.
+- **Компенсуючі контроли:**
+  1. На авторизованому head усі 9 required checks завершилися успішно: `Verify`, `Storefront E2E`, `Catalog Provider Migrations`, `Catalog Provider Integration`, `CodeQL Analysis`, обидва `Container Scan`, `Dependency Audit` і `Secret Detection`.
+  2. Цей запис змінює head PR; усі required checks мають повторно пройти на фінальному head до merge. Жоден status check не обходиться.
+  3. Merge дозволено лише через PR. Після merge повторна промоція виконується тільки canonical runner з уже затвердженими artifact/digests; інші host-side зміни не дозволені.
+- **Залишковий ризик:** для PR #127 немає незалежного людського review; CI не є його заміною.
+- **Незмінні межі:** виняток лише для PR #127 і не поширюється на PR #126, PR #125, наступні PR або комерційну промоцію.
+
+
 ### DEMO-UPDATE-3b2c22e — backport `braces` для ознайомлення замовника
 
 - **Дата запису:** 2026-10-03.
@@ -339,5 +354,5 @@ Public infrastructure accessibility не є application, legal, financial або
 - **Grant:** `DEMO-UPDATE-3b2c22e` з exact source/run/digests увійшов у `main` через PR #126; його review exception стосувався лише цього PR.
 - **Спроба промоції 2026-10-03:** canonical `promote` завершився `ssh failed (1)`. Наступний canonical `verify` показав попередні commerce/storefront digests (`sha256:6b2f29cdb2e03ae83f2733a273ac2c9ba26c39b75ad5d1b4bee2b4bdd1952b7d` і `sha256:79297bfd19e71622dad6fc86d463272a3d46c8d52c19a40531b6dad775ace7fb`) та повідомив `HTTP and image verification passed`; нові образи не активовані. Після merge PR #126 remote script усе ще містив backup path, lock path і image pins попереднього grant. Runner не вивів точний shell guard, тож причина exit 1 не конкретизується далі.
 - **Promotion scope:** лише `discovery`, `promote`, `verify`, `rollback` через SHA-256-bound canonical runner; Compose зберігає fixture-only flags. DB migrations/restore, DNS/TLS, live integrations, host cleanup і customer notifications поза scope.
-- **Review boundary:** виняток `EXC-20261003-SINGLE-OWNER-PR-126-DEMO-PROMOTION` покривав тільки PR #126. Він не авторизує merge нового runner-fix PR; потрібен незалежний review або окрема явна авторизація, а всі required checks мають пройти.
+- **Review boundary:** no-peer-review виняток `EXC-20261003-SINGLE-OWNER-PR-127-RUNNER-FIX` покриває тільки runner-fix PR #127; усі required checks мають пройти на фінальному head. Exception не змінює точні images/source/run grant та не дозволяє інші host-side дії.
 - **Післяпромоційний стан:** поки не виконано canonical promotion і runtime verification, цей запис не стверджує, що нові образи вже працюють на demo.

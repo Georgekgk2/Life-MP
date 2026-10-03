@@ -312,3 +312,17 @@ Public infrastructure accessibility не є application, legal, financial або
   3. Merge дозволено лише через PR. Після merge release pipeline мусить успішно побудувати, просканувати й атестувати образи; public-demo promotion вимагатиме окремого grant із точними digests.
 - **Залишковий ризик:** для PR #125 немає незалежного людського review; CI не є його заміною.
 - **Незмінні межі:** виняток не змінює глобальні deployment gates, не дозволяє прямий SSH/deploy, не авторизує комерційний production і не дозволяє повторно використати `DEMO-UPDATE-7226ce7`.
+
+### DEMO-UPDATE-3b2c22e — backport `braces` для ознайомлення замовника
+
+- **Дата запису:** 2026-10-03.
+- **Статус:** `PENDING SCOPED PROMOTION PR / PUBLIC-DEMO ONLY`; віддаленої промоції ще не було.
+- **Ціль та межі:** лише fixture-only `https://life-mp.pp.ua/` для ознайомлення замовника; live payments, shipping і fiscalization залишаються вимкненими.
+- **Незмінний release candidate:** source commit `3b2c22ed85fad30252d549b14eaed5d3a9391406`, [Release Container Images run 37135384955](https://github.com/Georgekgk2/Life-MP/actions/runs/37135384955), artifact `image-digests-manifest` / `IMAGE_DIGESTS.json`, SHA-256 `1465b4145b883132c128ec72d39963f59036daa9ed0a4b2d0887e25d771ec602`.
+  - commerce: `ghcr.io/georgekgk2/life-commerce@sha256:a39f61738f6f0eeb7a11582fe4b3ef603f779e49fa494ad2894830cbda1c429e`;
+  - storefront: `ghcr.io/georgekgk2/life-storefront@sha256:66923372c46a122a499a83a8b20290f950a28dad89feec787add2ed3963ae581`.
+- **Scan та provenance:** release run успішний; обидва fail-closed Trivy archive scans, checksum invariant і Cosign attest/verify завершилися успішно. Це підтверджує candidate image, але ще не runtime на demo-хості.
+- **Grant:** новий `DEMO-UPDATE-3b2c22e` прив’язаний лише до наведених source commit, release run і digests; активується після merge цього scoped promotion PR з усіма required checks. `DEMO-UPDATE-7226ce7` не перевикористовується.
+- **Promotion scope:** лише `discovery`, `promote`, `verify`, `rollback` через SHA-256-bound canonical runner; Compose зберігає fixture-only flags. DB migrations/restore, DNS/TLS, live integrations, host cleanup і customer notifications поза scope.
+- **Review boundary:** виняток для PR #125 не поширюється на цей promotion PR; для його merge потрібен окремий незалежний review або окремо авторизований і задокументований виняток.
+- **Післяпромоційний стан:** поки не виконано canonical promotion і runtime verification, цей запис не стверджує, що нові образи вже працюють на demo.

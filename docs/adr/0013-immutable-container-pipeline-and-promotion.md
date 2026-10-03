@@ -141,14 +141,15 @@
 
 ## Статус
 
-| Етап                                          | Опис                                                                      | Статус                                             |
-| --------------------------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------- |
-| **P2.0**                                      | Архітектурний дизайн та специфікація (цей ADR)                            | **Accepted**                                       |
-| **P2.1**                                      | Реалізація CI-публікації в GHCR (`release-images.yml`, оновлення сканера) | **Completed & Runtime-Verified** (Run 34562907779) |
-| **P2.2**                                      | Перехід `docker-compose.prod.yml` на незмінні дайджести                   | **Current candidate pins (DEMO-UPDATE-7226ce7)**  |
-| **Scoped Demo Update (DEMO-UPDATE-ed8b2e68)** | Попередня промоція public-demo через hash-bound скрипт                    | **Closed / Runtime-Verified (2026-10-02)**         |
-| **Scoped Demo Update (DEMO-UPDATE-7226ce7)**  | Новий точний scope для zero-PII checkout через hash-bound скрипт         | **Pending PR merge & explicit promotion**          |
-| **Commercial Production Promotion**           | Розгортання P2-образів на комерційному сервері та комерційний запуск      | **STRICT NO-GO**                                   |
+| Етап                                          | Опис                                                                      | Статус                                               |
+| --------------------------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------- |
+| **P2.0**                                      | Архітектурний дизайн та специфікація (цей ADR)                            | **Accepted**                                         |
+| **P2.1**                                      | Реалізація CI-публікації в GHCR (`release-images.yml`, оновлення сканера) | **Completed & Runtime-Verified** (Run 34562907779)   |
+| **P2.2**                                      | Перехід `docker-compose.prod.yml` на незмінні дайджести                   | **Current candidate pins (DEMO-UPDATE-3b2c22e)**     |
+| **Scoped Demo Update (DEMO-UPDATE-ed8b2e68)** | Попередня промоція public-demo через hash-bound скрипт                    | **Closed / Runtime-Verified (2026-10-02)**           |
+| **Scoped Demo Update (DEMO-UPDATE-7226ce7)**  | Попередній exact-scope checkout update public-demo                        | **Closed / Runtime-Verified (2026-10-02)**           |
+| **Scoped Demo Update (DEMO-UPDATE-3b2c22e)**  | Backport braces із межею глибини для client-demo                          | **Pending scoped promotion PR & explicit promotion** |
+| **Commercial Production Promotion**           | Розгортання P2-образів на комерційному сервері та комерційний запуск      | **STRICT NO-GO**                                     |
 
 ## Приймання
 

@@ -313,10 +313,25 @@ Public infrastructure accessibility не є application, legal, financial або
 - **Залишковий ризик:** для PR #125 немає незалежного людського review; CI не є його заміною.
 - **Незмінні межі:** виняток не змінює глобальні deployment gates, не дозволяє прямий SSH/deploy, не авторизує комерційний production і не дозволяє повторно використати `DEMO-UPDATE-7226ce7`.
 
+### EXC-20261003-SINGLE-OWNER-PR-126-DEMO-PROMOTION
+
+- **Дата авторизації:** 2026-10-03.
+- **Власник авторизації:** користувач прямо дозволив одноразовий виняток для PR #126 у цій сесії, після завершення required checks.
+- **Статус:** `APPROVED / SINGLE-OWNER REVIEW EXCEPTION / PR #126 ONLY`.
+- **Підстава:** на авторизованому head PR #126 немає незалежного review або review request; користувач явно дозволив виняток лише для цієї promotion-зміни. Виняток знімає тільки вимогу незалежного peer review, не приховує відсутність review і не обходить жодних required checks.
+- **Точний scope:** тільки PR #126 (`fix/public-demo-braces`), авторизований head `3f29d2baf3e3a4c752b9ad33623bc88b26b18ae3`. Охоплює один merge через PR; не поширюється на інші PR, нові grants/digests, прямий SSH/deploy чи commercial production.
+- **Компенсуючі контроли:**
+  1. На авторизованому head усі 9 required checks завершилися успішно: `Verify`, `Storefront E2E`, `Catalog Provider Migrations`, `Catalog Provider Integration`, `CodeQL Analysis`, обидва `Container Scan`, `Dependency Audit` і `Secret Detection`.
+  2. Запис цього винятку змінює head PR; усі required checks мають повторно пройти на фінальному head до merge. Жоден status check не обходиться.
+  3. Merge дозволено лише через PR. Після merge public-demo update виконується тільки canonical runner з exact grant та immutable digests; без інших host-side змін.
+- **Залишковий ризик:** для PR #126 немає незалежного людського review; CI не є його заміною.
+- **Незмінні межі:** виняток обмежений PR #126 і fixture-only `https://life-mp.pp.ua/`; exception для PR #125 окремий і не є підставою цього merge. Комерційна промоція та live integrations не дозволені.
+
+
 ### DEMO-UPDATE-3b2c22e — backport `braces` для ознайомлення замовника
 
 - **Дата запису:** 2026-10-03.
-- **Статус:** `PENDING SCOPED PROMOTION PR / PUBLIC-DEMO ONLY`; віддаленої промоції ще не було.
+- **Статус:** `PENDING MERGE / PUBLIC-DEMO ONLY`; canonical promotion і runtime verification ще не виконані.
 - **Ціль та межі:** лише fixture-only `https://life-mp.pp.ua/` для ознайомлення замовника; live payments, shipping і fiscalization залишаються вимкненими.
 - **Незмінний release candidate:** source commit `3b2c22ed85fad30252d549b14eaed5d3a9391406`, [Release Container Images run 37135384955](https://github.com/Georgekgk2/Life-MP/actions/runs/37135384955), artifact `image-digests-manifest` / `IMAGE_DIGESTS.json`, SHA-256 `1465b4145b883132c128ec72d39963f59036daa9ed0a4b2d0887e25d771ec602`.
   - commerce: `ghcr.io/georgekgk2/life-commerce@sha256:a39f61738f6f0eeb7a11582fe4b3ef603f779e49fa494ad2894830cbda1c429e`;
@@ -324,5 +339,5 @@ Public infrastructure accessibility не є application, legal, financial або
 - **Scan та provenance:** release run успішний; обидва fail-closed Trivy archive scans, checksum invariant і Cosign attest/verify завершилися успішно. Це підтверджує candidate image, але ще не runtime на demo-хості.
 - **Grant:** новий `DEMO-UPDATE-3b2c22e` прив’язаний лише до наведених source commit, release run і digests; активується після merge цього scoped promotion PR з усіма required checks. `DEMO-UPDATE-7226ce7` не перевикористовується.
 - **Promotion scope:** лише `discovery`, `promote`, `verify`, `rollback` через SHA-256-bound canonical runner; Compose зберігає fixture-only flags. DB migrations/restore, DNS/TLS, live integrations, host cleanup і customer notifications поза scope.
-- **Review boundary:** виняток для PR #125 не поширюється на цей promotion PR; для його merge потрібен окремий незалежний review або окремо авторизований і задокументований виняток.
+- **Review boundary:** користувач окремо дозволив одноразовий no-peer-review виняток `EXC-20261003-SINGLE-OWNER-PR-126-DEMO-PROMOTION` лише для PR #126. Усі required checks мають пройти на його фінальному head; цей exception не поширюється на PR #125, будь-який інший PR або host action.
 - **Післяпромоційний стан:** поки не виконано canonical promotion і runtime verification, цей запис не стверджує, що нові образи вже працюють на demo.

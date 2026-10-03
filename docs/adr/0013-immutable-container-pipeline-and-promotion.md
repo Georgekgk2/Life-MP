@@ -148,7 +148,7 @@
 | **P2.2**                                      | Перехід `docker-compose.prod.yml` на незмінні дайджести                   | **Current candidate pins (DEMO-UPDATE-3b2c22e)**     |
 | **Scoped Demo Update (DEMO-UPDATE-ed8b2e68)** | Попередня промоція public-demo через hash-bound скрипт                    | **Closed / Runtime-Verified (2026-10-02)**           |
 | **Scoped Demo Update (DEMO-UPDATE-7226ce7)**  | Попередній exact-scope checkout update public-demo                        | **Closed / Runtime-Verified (2026-10-02)**           |
-| **Scoped Demo Update (DEMO-UPDATE-3b2c22e)**  | Backport braces із межею глибини для client-demo                          | **PR #126 open; promotion pending**                  |
+| **Scoped Demo Update (DEMO-UPDATE-3b2c22e)**  | Backport braces із межею глибини для client-demo                          | **PR #127 open; promotion pending**                  |
 | **Commercial Production Promotion**           | Розгортання P2-образів на комерційному сервері та комерційний запуск      | **STRICT NO-GO**                                     |
 
 ## Приймання

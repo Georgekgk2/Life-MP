@@ -14,6 +14,7 @@ COPY apps/storefront/package.json ./apps/storefront/
 COPY apps/cms/package.json ./apps/cms/
 COPY packages/types/package.json ./packages/types/
 COPY packages/config/package.json ./packages/config/
+COPY packages/braces/package.json ./packages/braces/
 
 RUN pnpm install --frozen-lockfile
 
@@ -30,6 +31,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY apps/commerce ./apps/commerce
 COPY packages/types ./packages/types
 COPY packages/config ./packages/config
+COPY packages/braces ./packages/braces
 
 RUN pnpm --filter @life/types build
 RUN pnpm --filter @life/config build
@@ -53,6 +55,7 @@ COPY --from=builder --chown=medusa:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=medusa:nodejs /app/apps/commerce/node_modules ./apps/commerce/node_modules
 COPY --from=builder --chown=medusa:nodejs /app/packages/types ./packages/types
 COPY --from=builder --chown=medusa:nodejs /app/packages/config ./packages/config
+COPY --from=builder --chown=medusa:nodejs /app/packages/braces ./packages/braces
 COPY --from=builder --chown=medusa:nodejs /app/apps/commerce ./apps/commerce
 COPY --from=builder --chown=medusa:nodejs /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml /app/tsconfig.base.json ./
 

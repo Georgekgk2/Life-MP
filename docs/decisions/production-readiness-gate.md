@@ -298,3 +298,17 @@ Public infrastructure accessibility не є application, legal, financial або
 - **Post-promotion discovery (2026-10-02):** commerce, storefront, PostgreSQL, Redis healthy; app refs matched the approved digests. Host snapshot: 21 GiB disk available (79% used), 11 GiB memory available.
 - **Backup boundary:** the promotion flow created and validated database backup in `/var/backups/life-mp/demo-7226ce7` (`CHECKSUMS.sha256`); `pg_restore -l` passed; no production DB restore was performed.
 - **Remote shell warning:** discovery still emits `/etc/bash.bashrc: line 7: PS1: unbound variable`; the canonical operation completed. Host shell configuration was not inspected or changed.
+
+### EXC-20261003-SINGLE-OWNER-PR-125-BRACES
+
+- **Дата авторизації:** 2026-10-03.
+- **Власник авторизації:** Georgekgk2 (репозиторний та технічний власник; користувач прямо дозволив одноразовий виняток для PR #125 у цій сесії).
+- **Статус:** `APPROVED / SINGLE-OWNER REVIEW EXCEPTION / PR #125 ONLY`.
+- **Підстава:** GitHub API повернув лише `Georgekgk2` серед доступних collaborators; незалежного рецензента для цього PR немає. Виняток стосується лише вимоги незалежного formal review; відсутність GitHub review не приховується.
+- **Точний scope:** тільки PR #125 (`fix/braces-depth-limit`), початковий head `5f2aabd437d6e176f6057684ab4e39f527300a14`. Виняток не поширюється на наступний promotion PR, інші commits, release digests чи операції на хості.
+- **Компенсуючі контроли:**
+  1. На початковому head усі 9 required GitHub checks завершилися успішно: `Verify`, `Storefront E2E`, `Catalog Provider Migrations`, `Catalog Provider Integration`, `CodeQL Analysis`, обидва `Container Scan`, `Dependency Audit` і `Secret Detection`.
+  2. Оскільки запис винятку змінює head PR, усі required checks мають повторно пройти на фінальному head до merge; жоден status check не обходиться.
+  3. Merge дозволено лише через PR. Після merge release pipeline мусить успішно побудувати, просканувати й атестувати образи; public-demo promotion вимагатиме окремого grant із точними digests.
+- **Залишковий ризик:** для PR #125 немає незалежного людського review; CI не є його заміною.
+- **Незмінні межі:** виняток не змінює глобальні deployment gates, не дозволяє прямий SSH/deploy, не авторизує комерційний production і не дозволяє повторно використати `DEMO-UPDATE-7226ce7`.

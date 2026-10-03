@@ -1,6 +1,6 @@
 # Посібник з безпеки та політики стримування
 
-- **Дата огляду:** 2026-08-21
+- **Дата огляду:** 2026-10-03
 - **Власник:** security-власник + технічний власник
 - **Середовище:** локальні перевірки та GitHub CI
 - **Принцип:** fail-closed — відсутній або суперечливий доказ блокує promotion.
@@ -87,6 +87,16 @@ node scripts/verify-deployment-containment.mjs
 2. Визначте, чи affected dependency потрапляє в runtime image.
 3. Оновіть залежність або зафіксуйте безпечний override через PR.
 4. Повторіть dependency/container scan; не ігноруйте finding без письмової risk acceptance.
+
+### GHSA-vfj7-8cjw-p6xm — `braces`
+
+- `packages/braces` містить приватний depth-limited backport upstream `braces@3.0.3`, внутрішня версія `3.0.4+life.1`. Він обмежує вкладені AST-блоки 64 рівнями й повертає надмірно вкладений шаблон як literal. Workspace override замінює залежність без advisory ignore або послаблення порога аудиту.
+- Локальні перевірки поточного worktree (2026-10-03):
+  - `pnpm --filter braces test` — 4/4; `pnpm audit --prod --audit-level=high` — `No known vulnerabilities found`.
+  - `docker build --platform linux/amd64 -f deploy/Dockerfile.commerce -t life-commerce-braces-local:verify .` і `docker build --platform linux/amd64 -f deploy/Dockerfile.storefront -t life-storefront-braces-local:verify .` — обидві збірки успішні.
+  - У commerce runtime smoke `micromatch` завантажив `braces@3.0.4+life.1`; вкладений шаблон довжиною 9 001 символ повернувся як звичайний текст.
+  - Smoke standalone storefront: `/catalog` повернув HTTP 200 із `text/html`.
+- Ці результати не є доказом CI/container scan: локальних Trivy/Grype binaries немає, а CI Trivy gate залишається fail-closed. Не публікувати й не промотувати новий digest до успішного `Dependency Audit` і Trivy scan саме цього candidate image та окремого exact-digest promotion authorization. Не повторно використовувати grant `DEMO-UPDATE-7226ce7` для нового digest.
 
 ### Порушення containment
 

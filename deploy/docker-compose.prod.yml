@@ -87,7 +87,7 @@ services:
   # Commerce Engine (Medusa v2 Headless Backend)
   # ---------------------------------------------------------------------------
   commerce:
-    image: ghcr.io/georgekgk2/life-commerce@sha256:6b2f29cdb2e03ae83f2733a273ac2c9ba26c39b75ad5d1b4bee2b4bdd1952b7d
+    image: ghcr.io/georgekgk2/life-commerce@sha256:a39f61738f6f0eeb7a11582fe4b3ef603f779e49fa494ad2894830cbda1c429e
     container_name: life-mp-commerce
     environment:
       NODE_ENV: production
@@ -139,7 +139,7 @@ services:
   # Storefront (Next.js 15 PWA Frontend)
   # ---------------------------------------------------------------------------
   storefront:
-    image: ghcr.io/georgekgk2/life-storefront@sha256:79297bfd19e71622dad6fc86d463272a3d46c8d52c19a40531b6dad775ace7fb
+    image: ghcr.io/georgekgk2/life-storefront@sha256:66923372c46a122a499a83a8b20290f950a28dad89feec787add2ed3963ae581
     container_name: life-mp-storefront
     environment:
       NODE_ENV: production

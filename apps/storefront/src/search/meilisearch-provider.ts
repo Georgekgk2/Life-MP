@@ -37,7 +37,6 @@ export class MeilisearchProvider implements SearchProvider {
 
     try {
       const filterConditions: string[] = [];
-
       if (options?.categorySlug && options.categorySlug !== "all") {
         filterConditions.push(`categorySlug = "${options.categorySlug}"`);
       }
@@ -47,10 +46,13 @@ export class MeilisearchProvider implements SearchProvider {
       if (options?.isCertified) {
         filterConditions.push("isCertified = true");
       }
-      if (options?.minPriceUah) {
+      if (options?.isVerifiedVendor) {
+        filterConditions.push("isVerifiedVendor = true");
+      }
+      if (options?.minPriceUah !== undefined) {
         filterConditions.push(`priceUah >= ${options.minPriceUah}`);
       }
-      if (options?.maxPriceUah) {
+      if (options?.maxPriceUah !== undefined) {
         filterConditions.push(`priceUah <= ${options.maxPriceUah}`);
       }
 
@@ -138,12 +140,13 @@ export class MeilisearchProvider implements SearchProvider {
             "name",
             "description",
             "providerName",
-            "categoryName",
+            "categorySlug",
           ],
           filterableAttributes: [
             "categorySlug",
             "isOrganic",
             "isCertified",
+            "isVerifiedVendor",
             "priceUah",
           ],
           sortableAttributes: ["priceUah", "name"],
@@ -174,7 +177,15 @@ export class MeilisearchProvider implements SearchProvider {
           "Content-Type": "application/json",
           ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {}),
         },
-        body: JSON.stringify(products),
+        body: JSON.stringify(
+          products.map((product) => ({
+            ...product,
+            providerName: product.provider.name,
+            isOrganic: Boolean(product.organicProductBadge),
+            isCertified: Boolean(product.certifiedProductBadge),
+            isVerifiedVendor: Boolean(product.verifiedVendorBadge),
+          })),
+        ),
         signal: AbortSignal.timeout(1000),
       });
     } catch {

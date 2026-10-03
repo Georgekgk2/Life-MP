@@ -298,6 +298,7 @@ Public infrastructure accessibility не є application, legal, financial або
 - **Post-promotion discovery (2026-10-02):** commerce, storefront, PostgreSQL, Redis healthy; app refs matched the approved digests. Host snapshot: 21 GiB disk available (79% used), 11 GiB memory available.
 - **Backup boundary:** the promotion flow created and validated database backup in `/var/backups/life-mp/demo-7226ce7` (`CHECKSUMS.sha256`); `pg_restore -l` passed; no production DB restore was performed.
 - **Remote shell warning:** discovery still emits `/etc/bash.bashrc: line 7: PS1: unbound variable`; the canonical operation completed. Host shell configuration was not inspected or changed.
+- **Повторне застосування старих digests (2026-10-03, за наданим виводом):** старий `IMAGE_DIGESTS.json` підтвердив і повторно застосував ті самі образи, що належать `DEMO-UPDATE-7226ce7`; обидва сервіси стали `Healthy`. Вивід повідомив `Continuing the captured pre-cutover attempt; existing backup evidence retained`. Це не оновило pins до нових digests `DEMO-UPDATE-3b2c22e` і не є доказом їх промоції.
 
 ### EXC-20261003-SINGLE-OWNER-PR-125-BRACES
 
@@ -341,18 +342,33 @@ Public infrastructure accessibility не є application, legal, financial або
 - **Залишковий ризик:** для PR #127 немає незалежного людського review; CI не є його заміною.
 - **Незмінні межі:** виняток лише для PR #127 і не поширюється на PR #126, PR #125, наступні PR або комерційну промоцію.
 
+### EXC-20261003-SINGLE-OWNER-PR-128-DOCS-CLOSEOUT
+
+- **Дата авторизації:** 2026-10-03.
+- **Власник авторизації:** користувач прямо обрав одноразовий виняток лише для PR #128 у цій сесії.
+- **Статус:** `APPROVED / SINGLE-OWNER REVIEW EXCEPTION / PR #128 ONLY`.
+- **Підстава:** на PR #128 немає незалежного review. Виняток знімає лише вимогу незалежного людського review; його відсутність не приховується, required checks залишаються обов’язковими.
+- **Точний scope:** лише PR #128 (`docs/demo-update-3b2c22e-verification`), авторизований head `25e1e1b41368c756d67c191909e2a8db9890884d`. Дозволено тільки один merge через PR для docs-only closeout; application code, новий deployment і host-side дії поза scope.
+- **Компенсуючі контроли:**
+  1. На авторизованому head усі 9 required checks пройшли: `Verify`, `Storefront E2E`, `Catalog Provider Migrations`, `Catalog Provider Integration`, `CodeQL Analysis`, обидва `Container Scan`, `Dependency Audit` і `Secret Detection`.
+  2. Цей запис змінює head PR; усі required checks мають повторно пройти на фінальному head до merge. Жоден status check не обходиться.
+  3. Merge дозволено лише через PR. Документаційна зміна не змінює вже перевірений runtime та не дозволяє нові image digests чи host operations.
+- **Залишковий ризик:** для PR #128 немає незалежного людського review; CI не є його заміною.
+- **Незмінні межі:** виняток тільки для PR #128 і не поширюється на інші PR, application changes, нові digests, deployments або комерційну промоцію.
+
 
 ### DEMO-UPDATE-3b2c22e — backport `braces` для ознайомлення замовника
 
 - **Дата запису:** 2026-10-03.
-- **Статус:** `PENDING RUNNER FIX / PUBLIC-DEMO ONLY`; canonical promotion і runtime verification не завершені.
+- **Статус:** `PROMOTED AND RUNTIME-VERIFIED / PUBLIC-DEMO ONLY`; commercial production remains `BLOCKED / NOT READY`.
 - **Ціль та межі:** лише fixture-only `https://life-mp.pp.ua/` для ознайомлення замовника; live payments, shipping і fiscalization залишаються вимкненими.
 - **Незмінний release candidate:** source commit `3b2c22ed85fad30252d549b14eaed5d3a9391406`, [Release Container Images run 37135384955](https://github.com/Georgekgk2/Life-MP/actions/runs/37135384955), artifact `image-digests-manifest` / `IMAGE_DIGESTS.json`, SHA-256 `1465b4145b883132c128ec72d39963f59036daa9ed0a4b2d0887e25d771ec602`.
   - commerce: `ghcr.io/georgekgk2/life-commerce@sha256:a39f61738f6f0eeb7a11582fe4b3ef603f779e49fa494ad2894830cbda1c429e`;
   - storefront: `ghcr.io/georgekgk2/life-storefront@sha256:66923372c46a122a499a83a8b20290f950a28dad89feec787add2ed3963ae581`.
-- **Scan та provenance:** release run успішний; обидва fail-closed Trivy archive scans, checksum invariant і Cosign attest/verify завершилися успішно. Це підтверджує candidate image, але ще не runtime на demo-хості.
-- **Grant:** `DEMO-UPDATE-3b2c22e` з exact source/run/digests увійшов у `main` через PR #126; його review exception стосувався лише цього PR.
-- **Спроба промоції 2026-10-03:** canonical `promote` завершився `ssh failed (1)`. Наступний canonical `verify` показав попередні commerce/storefront digests (`sha256:6b2f29cdb2e03ae83f2733a273ac2c9ba26c39b75ad5d1b4bee2b4bdd1952b7d` і `sha256:79297bfd19e71622dad6fc86d463272a3d46c8d52c19a40531b6dad775ace7fb`) та повідомив `HTTP and image verification passed`; нові образи не активовані. Після merge PR #126 remote script усе ще містив backup path, lock path і image pins попереднього grant. Runner не вивів точний shell guard, тож причина exit 1 не конкретизується далі.
+- **Scan та provenance:** release run успішний; обидва fail-closed Trivy archive scans, checksum invariant і Cosign attest/verify завершилися успішно.
+- **Grant:** `DEMO-UPDATE-3b2c22e` exact source/run/digests увійшов у `main` через PR #126; stale remote payload виправлено PR #127. Окремі PR-only review exceptions задокументовані; усі required checks пройшли, глобальні gates лишилися locked.
+- **Промоційні спроби:** перший запуск після PR #126 завершився `ssh failed (1)`; remote script ще містив pins/path попереднього grant, а canonical `verify` підтвердив старі digests. Після PR #127 headless повтор зупинився на GHCR `unauthorized` після pre-cutover backup, до `CUTOVER_STARTED`; canonical `discovery` підтвердив старі healthy services.
+- **Успішна промоція 2026-10-03:** оператор запустив canonical runner інтерактивно з `read:packages` credential та artifact з run `37135384955` (manifest SHA-256 `1465b4145b883132c128ec72d39963f59036daa9ed0a4b2d0887e25d771ec602`). Попередня headless спроба до cutover створила й перевірила backup `/var/backups/life-mp/demo-3b2c22e`; інтерактивний запуск перевірив Cosign attestations, завантажив обидва exact digests і повідомив `Promotion passed`; обидва app containers були `Healthy`.
 - **Promotion scope:** лише `discovery`, `promote`, `verify`, `rollback` через SHA-256-bound canonical runner; Compose зберігає fixture-only flags. DB migrations/restore, DNS/TLS, live integrations, host cleanup і customer notifications поза scope.
 - **Review boundary:** no-peer-review виняток `EXC-20261003-SINGLE-OWNER-PR-127-RUNNER-FIX` покриває тільки runner-fix PR #127; усі required checks мають пройти на фінальному head. Exception не змінює точні images/source/run grant та не дозволяє інші host-side дії.
-- **Післяпромоційний стан:** поки не виконано canonical promotion і runtime verification, цей запис не стверджує, що нові образи вже працюють на demo.
+- **Післяпромоційна перевірка:** canonical `verify` підтвердив commerce `sha256:a39f61738f6f0eeb7a11582fe4b3ef603f779e49fa494ad2894830cbda1c429e`, storefront `sha256:66923372c46a122a499a83a8b20290f950a28dad89feec787add2ed3963ae581` та успішні HTTP checks. Browser smoke відобразив `/` demo banner, `/catalog` fixture catalog і `/checkout` synthetic demo flow; реальні персональні дані, оплата та доставка не використовувалися.

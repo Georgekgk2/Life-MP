@@ -342,6 +342,20 @@ Public infrastructure accessibility не є application, legal, financial або
 - **Залишковий ризик:** для PR #127 немає незалежного людського review; CI не є його заміною.
 - **Незмінні межі:** виняток лише для PR #127 і не поширюється на PR #126, PR #125, наступні PR або комерційну промоцію.
 
+### EXC-20261003-SINGLE-OWNER-PR-128-DOCS-CLOSEOUT
+
+- **Дата авторизації:** 2026-10-03.
+- **Власник авторизації:** користувач прямо обрав одноразовий виняток лише для PR #128 у цій сесії.
+- **Статус:** `APPROVED / SINGLE-OWNER REVIEW EXCEPTION / PR #128 ONLY`.
+- **Підстава:** на PR #128 немає незалежного review. Виняток знімає лише вимогу незалежного людського review; його відсутність не приховується, required checks залишаються обов’язковими.
+- **Точний scope:** лише PR #128 (`docs/demo-update-3b2c22e-verification`), авторизований head `25e1e1b41368c756d67c191909e2a8db9890884d`. Дозволено тільки один merge через PR для docs-only closeout; application code, новий deployment і host-side дії поза scope.
+- **Компенсуючі контроли:**
+  1. На авторизованому head усі 9 required checks пройшли: `Verify`, `Storefront E2E`, `Catalog Provider Migrations`, `Catalog Provider Integration`, `CodeQL Analysis`, обидва `Container Scan`, `Dependency Audit` і `Secret Detection`.
+  2. Цей запис змінює head PR; усі required checks мають повторно пройти на фінальному head до merge. Жоден status check не обходиться.
+  3. Merge дозволено лише через PR. Документаційна зміна не змінює вже перевірений runtime та не дозволяє нові image digests чи host operations.
+- **Залишковий ризик:** для PR #128 немає незалежного людського review; CI не є його заміною.
+- **Незмінні межі:** виняток тільки для PR #128 і не поширюється на інші PR, application changes, нові digests, deployments або комерційну промоцію.
+
 
 ### DEMO-UPDATE-3b2c22e — backport `braces` для ознайомлення замовника
 

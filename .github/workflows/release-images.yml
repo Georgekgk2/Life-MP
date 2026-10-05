@@ -350,7 +350,7 @@ jobs:
           sha256sum -c checksums.txt
 
       - name: Fail-Closed Trivy Vulnerability Scan (Commerce Archive)
-        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # master
+        uses: aquasecurity/trivy-action@c03d123cb480c08c69b054af418ea5e69fe6e57e # master
         with:
           input: "/tmp/release-artifacts/commerce.tar"
           format: "table"
@@ -362,7 +362,7 @@ jobs:
           TRIVY_NO_PROGRESS: "true"
 
       - name: Fail-Closed Trivy Vulnerability Scan (Storefront Archive)
-        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # master
+        uses: aquasecurity/trivy-action@c03d123cb480c08c69b054af418ea5e69fe6e57e # master
         with:
           input: "/tmp/release-artifacts/storefront.tar"
           format: "table"

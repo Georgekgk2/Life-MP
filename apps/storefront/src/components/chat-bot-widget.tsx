@@ -149,6 +149,8 @@ export function ChatBotWidget() {
   if (
     pathname?.startsWith("/checkout") ||
     pathname?.startsWith("/moderation") ||
+    pathname === "/demo/artisan" ||
+    pathname?.startsWith("/demo/artisan/") ||
     pathname?.startsWith("/vendor")
   ) {
     return null;

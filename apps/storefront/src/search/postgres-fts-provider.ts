@@ -56,10 +56,16 @@ export class PostgresFtsSearchProvider implements SearchProvider {
       }
 
       // Price range filters
-      if (options?.minPriceUah && product.priceUah < options.minPriceUah) {
+      if (
+        options?.minPriceUah !== undefined &&
+        product.priceUah < options.minPriceUah
+      ) {
         return false;
       }
-      if (options?.maxPriceUah && product.priceUah > options.maxPriceUah) {
+      if (
+        options?.maxPriceUah !== undefined &&
+        product.priceUah > options.maxPriceUah
+      ) {
         return false;
       }
 

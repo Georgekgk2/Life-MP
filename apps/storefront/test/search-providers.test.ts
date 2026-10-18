@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { StorefrontCatalogProduct } from "@life/types";
 import {
   expandWithSynonyms,
@@ -105,6 +105,13 @@ describe("PostgresFtsSearchProvider & Meilisearch Fallback", () => {
     expect(result.items.length).toBe(1);
     expect(result.items[0]?.name).toBe("Чашка «Ранок»");
   });
+  it("treats a zero maximum price as an active filter", async () => {
+    const provider = new PostgresFtsSearchProvider(sampleProducts);
+    const result = await provider.searchProducts("", { maxPriceUah: 0 });
+
+    expect(result.items).toEqual([]);
+    expect(result.totalCount).toBe(0);
+  });
 
   it("generates unified search suggestions across products, workshops, and events", async () => {
     const provider = new PostgresFtsSearchProvider(sampleProducts);
@@ -125,5 +132,96 @@ describe("PostgresFtsSearchProvider & Meilisearch Fallback", () => {
 
     expect(result.items.length).toBe(1);
     expect(result.items[0]?.name).toBe("Шопер «Разом»");
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("applies verified-vendor and zero-valued price filters", async () => {
+    const requestOptions: RequestInit[] = [];
+    const fetchMock = vi.fn(async (...args: Parameters<typeof fetch>) => {
+      const options = args[1];
+      if (options) requestOptions.push(options);
+      return new Response(
+        JSON.stringify({ hits: sampleProducts, estimatedTotalHits: 2 }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const provider = new MeilisearchProvider(
+      "http://127.0.0.1:9999",
+      "test-key",
+      sampleProducts,
+    );
+
+    await provider.searchProducts("", {
+      categorySlug: "dim",
+      isOrganic: true,
+      isCertified: true,
+      isVerifiedVendor: true,
+      minPriceUah: 0,
+      maxPriceUah: 0,
+    });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(requestOptions[0]?.body).toBe(
+      JSON.stringify({
+        q: "",
+        filter:
+          'categorySlug = "dim" AND isOrganic = true AND isCertified = true AND isVerifiedVendor = true AND priceUah >= 0 AND priceUah <= 0',
+        limit: 100,
+        offset: 0,
+      }),
+    );
+  });
+
+  it("indexes fields used by its searchable and filterable settings", async () => {
+    const requests: RequestInit[] = [];
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        if (init) requests.push(init);
+        return new Response(null, { status: 202 });
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const provider = new MeilisearchProvider(
+      "http://127.0.0.1:9999",
+      "test-key",
+      sampleProducts,
+    );
+
+    await provider.configureSettings();
+    const productsToIndex = sampleProducts.map((product, index) =>
+      index === 0
+        ? {
+            ...product,
+            certifiedProductBadge: "Сертифіковано",
+            verifiedVendorBadge: "Перевірений",
+          }
+        : product,
+    );
+    await provider.indexProducts(productsToIndex);
+    const settingsBody = JSON.parse(String(requests[0]?.body));
+    expect(settingsBody.searchableAttributes).toEqual([
+      "name",
+      "description",
+      "providerName",
+      "categorySlug",
+    ]);
+    expect(settingsBody.filterableAttributes).toContain("isVerifiedVendor");
+
+    const indexedProducts = JSON.parse(String(requests[1]?.body));
+    expect(indexedProducts[0]).toMatchObject({
+      providerName: "Майстерня Олени",
+      isOrganic: false,
+      isCertified: true,
+      isVerifiedVendor: true,
+    });
+    expect(indexedProducts[1]).toMatchObject({
+      providerName: "Ткацтво Берегиня",
+      isOrganic: true,
+      isCertified: false,
+      isVerifiedVendor: false,
+    });
   });
 });
